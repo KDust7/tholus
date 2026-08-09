@@ -1,0 +1,22 @@
+[package]
+name = "uv-wasm-engine"
+description = "wasm-bindgen boundary for the browser uv engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = { workspace = true }
+web-time = { workspace = true }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+console_error_panic_hook = { workspace = true }
+
+[dev-dependencies]
+wasm-bindgen-test = { workspace = true }
