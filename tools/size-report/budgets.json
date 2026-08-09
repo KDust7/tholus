@@ -1,0 +1,12 @@
+{
+  "regressionThresholdPercent": 10,
+  "artifacts": [
+    {
+      "path": "packages/core/assets/engine_bg.wasm",
+      "label": "engine wasm",
+      "rawBudgetBytes": 20971520,
+      "brotliBudgetBytes": 6291456,
+      "required": false
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@uv-wasm/size-report",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0 OR MIT",
+  "description": "Measures shipped artifact sizes and compares them against budgets",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "report": "pnpm build && node dist/cli.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "vitest": "^4.1.10"
+  }
+}
