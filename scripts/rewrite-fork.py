@@ -110,13 +110,15 @@ PATH_METADATA_RECEIVERS = {
     "crates/uv-client/src/tls.rs": frozenset({"file"}),
     "crates/uv-distribution/src/metadata/lowering.rs": frozenset({"install_path"}),
     "crates/uv-fs/src/lib.rs": frozenset({"path"}),
-    "crates/uv-fs/src/link.rs": frozenset({"src"}),
     "crates/uv-install-wheel/src/linker.rs": frozenset({"absolute"}),
     "crates/uv-pypi-types/src/parsed_url.rs": frozenset({"verbatim_path", "path"}),
     "crates/uv-virtualenv/src/virtualenv.rs": frozenset({"location"}),
 }
 
 CFG_TEST_ATTRIBUTE = re.compile(r"#\[cfg\((?:all\()?\s*test\b")
+
+ITEM_ATTRIBUTE = re.compile(r"^#\[cfg\((.*)\)\]$", re.M)
+HOST_ONLY_PREDICATES = re.compile(r"\b(unix|windows|target_os|target_env|target_vendor)\b")
 
 CLOSERS = {")": "(", "]": "[", "}": "{"}
 RECEIVER_CHARS = frozenset("_.?:")
@@ -276,6 +278,18 @@ def unit_test_tail(text):
     return len(text)
 
 
+def gated_off_wasm(text, offset):
+    previous_item = text.rfind("\n}", 0, offset)
+    start = 0 if previous_item == -1 else previous_item + 1
+    for match in ITEM_ATTRIBUTE.finditer(text, start, offset):
+        predicate = match.group(1)
+        if "wasm" in predicate:
+            return False
+        if HOST_ONLY_PREDICATES.search(predicate):
+            return True
+    return False
+
+
 def matching_open(text):
     depth = 0
     for index in range(len(text) - 1, -1, -1):
@@ -318,13 +332,13 @@ def rewrite_presence_checks(text, relative):
     pieces = []
     cursor = 0
     rewritten = 0
-    in_unit_tests = 0
+    host_only = 0
     accepted = set()
     skipped = []
 
     for match in PRESENCE_CALL.finditer(text):
-        if match.start() >= unit_tests_at:
-            in_unit_tests += 1
+        if match.start() >= unit_tests_at or gated_off_wasm(text, match.start()):
+            host_only += 1
             continue
         method = match.group(2)
         head, from_call = receiver_head(receiver_before(text, match.start()))
@@ -350,13 +364,13 @@ def rewrite_presence_checks(text, relative):
         rewritten += 1
 
     if not rewritten:
-        return text, 0, accepted, skipped, in_unit_tests
+        return text, 0, accepted, skipped, host_only
 
     pieces.append(text[cursor:])
     text = "".join(pieces)
     if "VfsPathExt" not in text:
         text = insert_import(text, PATH_EXT_IMPORT)
-    return text, rewritten, accepted, skipped, in_unit_tests
+    return text, rewritten, accepted, skipped, host_only
 
 
 def ensure_crate_dependencies(crate_dir, needed, section="dependencies"):
@@ -551,13 +565,15 @@ def main():
             if injected:
                 counts["url-extension-import"] = injected
             if not runs_only_on_the_host(path):
-                updated, rewritten, accepted, skipped, unit_tests = rewrite_presence_checks(
+                updated, rewritten, accepted, skipped, host_only = rewrite_presence_checks(
                     updated, path.relative_to(FORK).as_posix()
                 )
                 if rewritten:
                     counts["path-extension-call"] = rewritten
-                if unit_tests:
-                    totals["left-in-unit-tests"] = totals.get("left-in-unit-tests", 0) + unit_tests
+                if host_only:
+                    totals["left-in-host-only-code"] = (
+                        totals.get("left-in-host-only-code", 0) + host_only
+                    )
                 metadata_hits |= accepted
                 for entry in skipped:
                     residue[entry] = residue.get(entry, 0) + 1
