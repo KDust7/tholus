@@ -44,6 +44,11 @@ SOURCE_RULES = [
         re.compile(r"\btokio::time::(sleep|timeout)\b"),
         r"uv_wasm_compat::time::\1",
     ),
+    (
+        "tokio-spawn-blocking-to-compat",
+        re.compile(r"\btokio::task::spawn_blocking\b"),
+        "uv_wasm_compat::spawn_blocking",
+    ),
 ]
 
 URL_METHODS = re.compile(r"\b(from_file_path|to_file_path|from_directory_path)\b")
