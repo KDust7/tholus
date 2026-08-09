@@ -28,3 +28,4 @@ Thumbs.db
 size-report.json
 
 vendor/
+__pycache__/
