@@ -1,0 +1,64 @@
+{
+  "name": "exec-resize-and-ack",
+  "summary": "Terminal resizes and output acknowledgements are absorbed without a reply",
+  "protocolVersion": "0",
+  "steps": [
+    {
+      "from": "host",
+      "message": {
+        "type": "exec",
+        "invocationId": "inv-1",
+        "argv": [
+          "pip",
+          "list"
+        ],
+        "tty": {
+          "cols": 80,
+          "rows": 24
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "output",
+        "invocationId": "inv-1",
+        "stream": "stdout",
+        "seq": 0,
+        "data": {
+          "$text": "rich    13.9.4\n"
+        }
+      }
+    },
+    {
+      "from": "host",
+      "message": {
+        "type": "ack",
+        "invocationId": "inv-1",
+        "stream": "stdout",
+        "bytes": 15
+      }
+    },
+    {
+      "from": "host",
+      "message": {
+        "type": "resize",
+        "invocationId": "inv-1",
+        "size": {
+          "cols": 120,
+          "rows": 40
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "exit",
+        "invocationId": "inv-1",
+        "code": 0,
+        "cancelled": false,
+        "durationMs": "$any"
+      }
+    }
+  ]
+}

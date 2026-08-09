@@ -1,0 +1,24 @@
+{
+  "name": "@uv-wasm/contract-transcripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0 OR MIT",
+  "description": "Golden protocol transcripts both engine implementations must satisfy",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@uv-wasm/engine-protocol": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@uv-wasm/mock-engine": "workspace:*",
+    "vitest": "^4.1.10"
+  }
+}

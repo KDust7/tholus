@@ -1,0 +1,71 @@
+{
+  "name": "exec-stdin-roundtrip",
+  "summary": "The engine asks the host for a line and waits for the answer before continuing",
+  "protocolVersion": "0",
+  "steps": [
+    {
+      "from": "host",
+      "message": {
+        "type": "exec",
+        "invocationId": "inv-1",
+        "argv": [
+          "pip",
+          "uninstall",
+          "rich"
+        ],
+        "stdin": true
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "output",
+        "invocationId": "inv-1",
+        "stream": "stderr",
+        "seq": 0,
+        "data": {
+          "$text": "Proceed? [y/n] "
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "stdinRequest",
+        "id": "$any",
+        "invocationId": "inv-1",
+        "echo": true
+      }
+    },
+    {
+      "from": "host",
+      "message": {
+        "type": "stdinResponse",
+        "id": "stdin-1",
+        "data": "y\n"
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "output",
+        "invocationId": "inv-1",
+        "stream": "stderr",
+        "seq": 1,
+        "data": {
+          "$text": "Uninstalled 1 package\n"
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "exit",
+        "invocationId": "inv-1",
+        "code": 0,
+        "cancelled": false,
+        "durationMs": "$any"
+      }
+    }
+  ]
+}

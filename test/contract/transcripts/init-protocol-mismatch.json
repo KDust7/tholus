@@ -1,0 +1,37 @@
+{
+  "name": "init-protocol-mismatch",
+  "summary": "An engine speaking a different protocol refuses the handshake instead of guessing",
+  "protocolVersion": "0",
+  "steps": [
+    {
+      "from": "host",
+      "message": {
+        "type": "init",
+        "id": "init-1",
+        "protocolVersion": "999",
+        "config": {
+          "fs": {
+            "kind": "memory"
+          },
+          "cache": {
+            "kind": "memory"
+          }
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "initResult",
+        "id": "init-1",
+        "outcome": {
+          "ok": false,
+          "error": {
+            "code": "protocol-mismatch",
+            "message": "$any"
+          }
+        }
+      }
+    }
+  ]
+}

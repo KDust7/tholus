@@ -1,0 +1,45 @@
+{
+  "name": "exec-structured-error",
+  "summary": "A failing command carries a machine-readable cause beside its human-readable stderr",
+  "protocolVersion": "0",
+  "steps": [
+    {
+      "from": "host",
+      "message": {
+        "type": "exec",
+        "invocationId": "inv-1",
+        "argv": [
+          "pip",
+          "install",
+          "conflicting"
+        ]
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "output",
+        "invocationId": "inv-1",
+        "stream": "stderr",
+        "seq": 0,
+        "data": {
+          "$text": "  x No solution found when resolving dependencies\n"
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "exit",
+        "invocationId": "inv-1",
+        "code": 1,
+        "cancelled": false,
+        "durationMs": "$any",
+        "error": {
+          "code": "resolution-conflict",
+          "message": "$any"
+        }
+      }
+    }
+  ]
+}

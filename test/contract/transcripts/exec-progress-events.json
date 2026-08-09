@@ -1,0 +1,87 @@
+{
+  "name": "exec-progress-events",
+  "summary": "Structured events travel beside the byte stream rather than being parsed out of it",
+  "protocolVersion": "0",
+  "steps": [
+    {
+      "from": "host",
+      "message": {
+        "type": "exec",
+        "invocationId": "inv-1",
+        "argv": [
+          "pip",
+          "install",
+          "rich"
+        ],
+        "tty": {
+          "cols": 80,
+          "rows": 24
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "event",
+        "event": {
+          "type": "phase",
+          "invocationId": "inv-1",
+          "phase": "resolving",
+          "state": "start"
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "event",
+        "event": {
+          "type": "resolution-complete",
+          "invocationId": "inv-1",
+          "packageCount": 4,
+          "durationMs": "$any"
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "output",
+        "invocationId": "inv-1",
+        "stream": "stderr",
+        "seq": 0,
+        "data": {
+          "$text": "Resolved 4 packages\n"
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "event",
+        "event": {
+          "type": "install-report",
+          "invocationId": "inv-1",
+          "installed": [
+            {
+              "name": "rich",
+              "version": "13.9.4"
+            }
+          ],
+          "removed": [],
+          "unchanged": 3
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "exit",
+        "invocationId": "inv-1",
+        "code": 0,
+        "cancelled": false,
+        "durationMs": "$any"
+      }
+    }
+  ]
+}

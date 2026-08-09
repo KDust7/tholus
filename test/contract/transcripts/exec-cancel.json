@@ -1,0 +1,47 @@
+{
+  "name": "exec-cancel",
+  "summary": "Cancelling an in-flight invocation ends it with the conventional interrupt code",
+  "protocolVersion": "0",
+  "steps": [
+    {
+      "from": "host",
+      "message": {
+        "type": "exec",
+        "invocationId": "inv-1",
+        "argv": [
+          "pip",
+          "install",
+          "slow"
+        ],
+        "stdin": true
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "stdinRequest",
+        "id": "$any",
+        "invocationId": "inv-1",
+        "echo": false
+      }
+    },
+    {
+      "from": "host",
+      "message": {
+        "type": "cancel",
+        "invocationId": "inv-1",
+        "reason": "user interrupt"
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "exit",
+        "invocationId": "inv-1",
+        "code": 130,
+        "cancelled": true,
+        "durationMs": "$any"
+      }
+    }
+  ]
+}

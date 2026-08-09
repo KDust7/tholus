@@ -1,0 +1,38 @@
+{
+  "name": "init-handshake",
+  "summary": "Host initializes the engine and receives its build identity",
+  "protocolVersion": "0",
+  "steps": [
+    {
+      "from": "host",
+      "message": {
+        "type": "init",
+        "id": "init-1",
+        "protocolVersion": "0",
+        "config": {
+          "fs": {
+            "kind": "memory"
+          },
+          "cache": {
+            "kind": "memory"
+          }
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "initResult",
+        "id": "init-1",
+        "outcome": {
+          "ok": true,
+          "build": {
+            "engine": "$any",
+            "uv": "$any",
+            "protocol": "0"
+          }
+        }
+      }
+    }
+  ]
+}
