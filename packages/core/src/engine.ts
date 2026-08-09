@@ -11,6 +11,7 @@ import {
   type WorkerMessage,
 } from "@uv-wasm/engine-protocol";
 import { DEFAULT_CWD } from "./brand.js";
+import { createPipApi, createVenvApi } from "./commands.js";
 import { type EndpointFactory, workerEndpoint } from "./endpoint.js";
 import { EngineCrashedError, ProtocolMismatchError, toEngineError } from "./errors.js";
 
@@ -69,6 +70,8 @@ export interface EngineOptions {
 
 export interface Engine {
   readonly build: BuildIdentity;
+  readonly pip: ReturnType<typeof createPipApi>;
+  readonly venv: ReturnType<typeof createVenvApi>;
   exec(argv: string[], options?: ExecOptions): ExecHandle;
   onEvent(listener: (event: EngineEvent) => void): () => void;
   dispose(): Promise<void>;
@@ -286,8 +289,14 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
     };
   };
 
-  return {
+  const engine: Engine = {
     build,
+    get pip() {
+      return createPipApi(engine);
+    },
+    get venv() {
+      return createVenvApi(engine);
+    },
     exec,
     onEvent(listener) {
       listeners.add(listener);
@@ -314,6 +323,8 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
       failAll(new EngineCrashedError("engine terminated"));
     },
   };
+
+  return engine;
 }
 
 export type { EngineEndpoint } from "./endpoint.js";

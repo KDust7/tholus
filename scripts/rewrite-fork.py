@@ -117,6 +117,39 @@ def ensure_crate_dependencies(crate_dir, needed):
     return added
 
 
+REPLACED_DEPENDENCIES = {
+    "fs-err": re.compile(r"\bfs_err\b"),
+    "tempfile": re.compile(r"\btempfile\b"),
+}
+
+FEATURE_REDIRECTS = {'"fs-err/tokio"': '"uv-vfs/tokio"'}
+
+
+def prune_replaced_dependencies(crate_dir):
+    manifest = crate_dir / "Cargo.toml"
+    if not manifest.is_file():
+        return 0
+
+    sources = [path.read_text(encoding="utf-8") for path in rust_sources(crate_dir)]
+    text = manifest.read_text(encoding="utf-8")
+    original = text
+
+    for old, new in FEATURE_REDIRECTS.items():
+        text = text.replace(old, new)
+
+    for dependency, pattern in REPLACED_DEPENDENCIES.items():
+        if any(pattern.search(source) for source in sources):
+            continue
+        text = "\n".join(
+            line for line in text.splitlines() if not line.startswith(f"{dependency} =")
+        ) + ("\n" if text.endswith("\n") else "")
+
+    if text == original:
+        return 0
+    manifest.write_text(text, encoding="utf-8")
+    return 1
+
+
 def ensure_native_tokio(crate_dir):
     features = NATIVE_TOKIO_FEATURES.get(crate_dir.name)
     manifest = crate_dir / "Cargo.toml"
@@ -204,6 +237,8 @@ def main():
                 totals["crate-dependency"] = totals.get("crate-dependency", 0) + added
             if ensure_native_tokio(crate_dir):
                 totals["native-tokio-block"] = totals.get("native-tokio-block", 0) + 1
+            if prune_replaced_dependencies(crate_dir):
+                totals["pruned-manifest"] = totals.get("pruned-manifest", 0) + 1
 
     if not args.check:
         added = ensure_workspace_dependencies()

@@ -6,11 +6,11 @@
 
 Runs on every push to `main` and every pull request.
 
-`javascript` job, installs the pnpm workspace, then:
+`javascript` job, installs the bun workspace, then:
 
-- `pnpm lint` (biome)
-- `pnpm -r typecheck` (tsc 6.0 per package)
-- `pnpm vitest run --coverage`, gated at 80% lines/functions/branches/statements
+- `bun run lint` (biome)
+- `bun run typecheck` (tsc 6.0 per package)
+- `bun run test:coverage`, gated at 80% lines/functions/branches/statements
 - regenerates the protocol JSON Schema artifacts and fails if the committed copies drift
 
 `wasm engine` job, installs the Rust toolchain pinned by `rust-toolchain.toml` plus a
@@ -20,7 +20,7 @@ Runs on every push to `main` and every pull request.
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo test --workspace`
 - `cargo xtask build` to produce the browser artifact
-- `pnpm size` to measure raw, brotli, and gzip sizes against the budgets
+- `bun run size` to measure raw, brotli, and gzip sizes against the budgets
 
 The `wasm-bindgen` crate version and the CLI version must match; the CLI refuses to process a
 module built by a different version. The crate is pinned exactly in the workspace manifest and the
@@ -54,14 +54,14 @@ These are specified in the implementation plan and land with the work they verif
 ## Local equivalents
 
 ```sh
-pnpm lint
-pnpm -r typecheck
-pnpm vitest run --coverage
+bun run lint
+bun run typecheck
+bun run test:coverage
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo xtask build
-pnpm size
+bun run size
 ```
 
 On Windows the Rust toolchain needs a host linker. If Visual Studio Build Tools are not installed,

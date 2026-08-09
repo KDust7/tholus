@@ -4,28 +4,40 @@
   "private": true,
   "type": "module",
   "license": "Apache-2.0 OR MIT",
-  "packageManager": "pnpm@11.10.0",
   "engines": {
-    "node": ">=22"
+    "bun": ">=1.3"
   },
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "tools/*",
+    "test/*"
+  ],
+  "overrides": {
+    "typescript": "~6.0.3",
+    "@types/node": "^24.13.3"
+  },
+  "trustedDependencies": [
+    "esbuild"
+  ],
   "scripts": {
     "lint": "biome check --files-ignore-unknown=true --indent-style=space --indent-width=2 --line-width=100 packages/core/src packages/engine-protocol/src packages/mock-engine/src test/contract/src tools/size-report/src",
     "lint:fix": "biome check --write --files-ignore-unknown=true --indent-style=space --indent-width=2 --line-width=100 packages/core/src packages/engine-protocol/src packages/mock-engine/src test/contract/src tools/size-report/src",
     "format": "biome format --write --files-ignore-unknown=true --indent-style=space --indent-width=2 --line-width=100 packages/core/src packages/engine-protocol/src packages/mock-engine/src test/contract/src tools/size-report/src",
-    "typecheck": "pnpm -r --parallel typecheck",
+    "typecheck": "bun run --filter '*' typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "build": "pnpm -r --filter \"./packages/**\" run build",
+    "build": "bun run --filter './packages/*' build",
     "wasm:build": "cargo xtask build",
-    "size": "pnpm --filter @uv-wasm/size-report run report"
+    "size": "bun run --filter @uv-wasm/size-report report"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.7",
-    "@types/node": "^26.2.0",
+    "@types/node": "^24.13.3",
     "@vitest/coverage-v8": "^4.1.10",
     "binaryen": "^131.0.0",
-    "typescript": "^6.0.3",
+    "typescript": "~6.0.3",
     "vitest": "^4.1.10"
   }
 }

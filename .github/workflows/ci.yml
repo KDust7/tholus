@@ -20,27 +20,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
-          cache: pnpm
+          bun-version: latest
 
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --linker=isolated --frozen-lockfile
 
       - name: Lint
-        run: pnpm lint
+        run: bun run lint
 
       - name: Typecheck
-        run: pnpm -r typecheck
+        run: bun run typecheck
 
       - name: Test with coverage
-        run: pnpm vitest run --coverage
+        run: bun run test:coverage
 
       - name: Verify emitted protocol schemas are current
         run: |
-          pnpm --filter @uv-wasm/engine-protocol run emit-schema
+          bun run --filter @uv-wasm/engine-protocol emit-schema
           git diff --exit-code -- packages/engine-protocol/schema
 
       - uses: actions/upload-artifact@v4
@@ -67,14 +64,11 @@ jobs:
         with:
           tool: wasm-bindgen-cli@${{ env.WASM_BINDGEN_VERSION }}
 
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
-          cache: pnpm
+          bun-version: latest
 
-      - run: pnpm install --frozen-lockfile
+      - run: bun install --linker=isolated --frozen-lockfile
 
       - name: Format
         run: cargo fmt --all --check
@@ -89,7 +83,7 @@ jobs:
         run: cargo xtask build
 
       - name: Size report
-        run: pnpm size
+        run: bun run size
 
       - uses: actions/upload-artifact@v4
         with:
