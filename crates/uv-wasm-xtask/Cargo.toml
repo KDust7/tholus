@@ -1,0 +1,11 @@
+[package]
+name = "uv-wasm-xtask"
+description = "Build pipeline for the wasm engine artifact"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
