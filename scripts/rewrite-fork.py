@@ -1,6 +1,8 @@
 import argparse
 import pathlib
 import re
+import shutil
+import subprocess
 import sys
 
 FORK = pathlib.Path(__file__).resolve().parent.parent / "vendor" / "uv"
@@ -49,6 +51,18 @@ SOURCE_RULES = [
         re.compile(r"\btokio::task::spawn_blocking\b"),
         "uv_wasm_compat::spawn_blocking",
     ),
+    (
+        "reqwest-reexports-to-http",
+        re.compile(r"\breqwest::(header|StatusCode|Method|Version)\b"),
+        r"http::\1",
+    ),
+    ("reqwest-reexport-to-url", re.compile(r"\breqwest::Url\b"), "url::Url"),
+]
+
+REWRITTEN_DEPENDENCIES = {"http::": "http", "web_time::": "web-time"}
+
+EXTRA_WORKSPACE_DEPENDENCIES = [
+    ("web-time", 'web-time = { version = "1.1.0" }', "which = "),
 ]
 
 URL_METHODS = re.compile(r"\b(from_file_path|to_file_path|from_directory_path)\b")
@@ -70,6 +84,10 @@ def rust_sources(crate_dir):
             yield path
 
 
+def runs_on_the_build_host(path, crate_dir):
+    return path.parent == crate_dir and path.name == "build.rs"
+
+
 def apply_source_rules(text):
     counts = {}
     for name, pattern, replacement in SOURCE_RULES:
@@ -79,15 +97,29 @@ def apply_source_rules(text):
     return text, counts
 
 
+def end_of_last_use_statement(lines):
+    insert_at = None
+    inside = False
+    depth = 0
+    for index, line in enumerate(lines):
+        if not inside:
+            if not line.startswith("use "):
+                continue
+            inside = True
+            depth = 0
+        depth += line.count("{") - line.count("}")
+        if depth <= 0 and line.rstrip().endswith(";"):
+            inside = False
+            insert_at = index + 1
+    return insert_at
+
+
 def inject_url_import(text):
     if not URL_METHODS.search(text) or "UrlFilePathExt" in text:
         return text, 0
 
     lines = text.splitlines()
-    insert_at = None
-    for index, line in enumerate(lines):
-        if line.startswith("use "):
-            insert_at = index + 1
+    insert_at = end_of_last_use_statement(lines)
     if insert_at is None:
         for index, line in enumerate(lines):
             stripped = line.strip()
@@ -111,7 +143,7 @@ def ensure_crate_dependencies(crate_dir, needed):
 
     added = 0
     for crate_name in sorted(needed):
-        if crate_name in text:
+        if re.search(rf"^{re.escape(crate_name)} = ", text, re.M):
             continue
         text = text.replace(
             "[dependencies]\n", f"[dependencies]\n{crate_name} = {{ workspace = true }}\n", 1
@@ -145,9 +177,12 @@ def prune_replaced_dependencies(crate_dir):
     for dependency, pattern in REPLACED_DEPENDENCIES.items():
         if any(pattern.search(source) for source in sources):
             continue
-        text = "\n".join(
-            line for line in text.splitlines() if not line.startswith(f"{dependency} =")
-        ) + ("\n" if text.endswith("\n") else "")
+        kept = []
+        for line in text.splitlines():
+            if line.startswith(f"{dependency} =") and line.rstrip().endswith("}"):
+                continue
+            kept.append(line)
+        text = "\n".join(kept) + ("\n" if text.endswith("\n") else "")
 
     if text == original:
         return 0
@@ -188,6 +223,16 @@ def ensure_workspace_dependencies():
         text = f"{text[:index]}{entry}\n{text[index:]}"
         index = text.find(anchor)
         added += 1
+
+    for crate_name, entry, extra_anchor in EXTRA_WORKSPACE_DEPENDENCIES:
+        if f"\n{crate_name} = " in text:
+            continue
+        position = text.find(extra_anchor)
+        if position == -1:
+            continue
+        text = f"{text[:position]}{entry}\n{text[position:]}"
+        added += 1
+
     if added:
         manifest.write_text(text, encoding="utf-8")
     return added
@@ -207,6 +252,38 @@ def strip_workspace_tokio():
     return 1
 
 
+def find_rustfmt():
+    found = shutil.which("rustfmt")
+    if found:
+        return found
+    for candidate in (
+        pathlib.Path.home() / ".cargo" / "bin" / "rustfmt.exe",
+        pathlib.Path.home() / ".cargo" / "bin" / "rustfmt",
+    ):
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def parse_failures(paths):
+    rustfmt = find_rustfmt()
+    if rustfmt is None:
+        return None
+
+    failures = []
+    for path in sorted(paths):
+        result = subprocess.run(
+            [rustfmt, "--edition", "2024", "--emit", "stdout", str(path)],
+            capture_output=True,
+            text=True,
+        )
+        for line in result.stderr.splitlines():
+            if line.startswith("error"):
+                failures.append((path, line))
+                break
+    return failures
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Apply the mechanical wasm rewrites to the vendored uv fork."
@@ -220,12 +297,17 @@ def main():
     for crate_dir in crate_dirs():
         needed = set()
         for path in rust_sources(crate_dir):
+            if runs_on_the_build_host(path, crate_dir):
+                continue
             original = path.read_text(encoding="utf-8")
             updated, counts = apply_source_rules(original)
             updated, injected = inject_url_import(updated)
             if injected:
                 counts["url-extension-import"] = injected
             for marker, (crate_name, _) in SHIM_DEPENDENCIES.items():
+                if marker in updated:
+                    needed.add(crate_name)
+            for marker, crate_name in REWRITTEN_DEPENDENCIES.items():
                 if marker in updated:
                     needed.add(crate_name)
             if updated == original:
@@ -256,6 +338,18 @@ def main():
     print(f"{verb} {len(touched)} file(s) across {FORK}")
     for name in sorted(totals):
         print(f"  {name}: {totals[name]}")
+
+    if not args.check and touched:
+        failures = parse_failures(touched)
+        if failures is None:
+            print("  rustfmt not found; skipped the parse check")
+        elif failures:
+            print(f"  {len(failures)} rewritten file(s) no longer parse:")
+            for path, message in failures:
+                print(f"    {path.relative_to(FORK)}: {message}")
+            return 1
+        else:
+            print(f"  parse check: {len(touched)} file(s) still parse")
 
     return 1 if args.check and touched else 0
 
