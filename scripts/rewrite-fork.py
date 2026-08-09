@@ -5,8 +5,28 @@ import sys
 
 FORK = pathlib.Path(__file__).resolve().parent.parent / "vendor" / "uv"
 SHIM_CRATES = {"uv-vfs", "uv-wasm-http", "uv-wasm-compat"}
-VFS_DEP = 'uv-vfs = { workspace = true }'
-WORKSPACE_DEP = 'uv-vfs = { version = "0.0.70", path = "crates/uv-vfs" }'
+
+SHIM_DEPENDENCIES = {
+    "uv_vfs": ("uv-vfs", 'uv-vfs = { version = "0.0.70", path = "crates/uv-vfs" }'),
+    "uv_wasm_compat": (
+        "uv-wasm-compat",
+        'uv-wasm-compat = { version = "0.0.70", path = "crates/uv-wasm-compat" }',
+    ),
+    "uv_wasm_http": (
+        "uv-wasm-http",
+        'uv-wasm-http = { version = "0.0.70", path = "crates/uv-wasm-http" }',
+    ),
+}
+
+WASM_SAFE_TOKIO_FEATURES = ["io-util", "macros", "rt", "sync"]
+
+NATIVE_TOKIO_FEATURES = {
+    "uv": ["process", "signal"],
+    "uv-auth": ["process"],
+    "uv-build-frontend": ["process"],
+    "uv-installer": ["process"],
+}
+
 URL_IMPORT = '#[cfg(target_family = "wasm")]\nuse uv_vfs::UrlFilePathExt as _;'
 
 SOURCE_RULES = [
@@ -14,10 +34,20 @@ SOURCE_RULES = [
     ("fs_err-to-vfs", re.compile(r"\bfs_err\b(?!\s*=)"), "uv_vfs::fs"),
     ("tempfile-to-vfs", re.compile(r"\btempfile::"), "uv_vfs::temp::"),
     ("std-instant-to-web-time", re.compile(r"\bstd::time::Instant\b"), "web_time::Instant"),
-    ("std-systemtime-to-web-time", re.compile(r"\bstd::time::SystemTime\b"), "web_time::SystemTime"),
+    (
+        "std-systemtime-to-web-time",
+        re.compile(r"\bstd::time::SystemTime\b"),
+        "web_time::SystemTime",
+    ),
+    (
+        "tokio-time-to-compat",
+        re.compile(r"\btokio::time::(sleep|timeout)\b"),
+        r"uv_wasm_compat::time::\1",
+    ),
 ]
 
 URL_METHODS = re.compile(r"\b(from_file_path|to_file_path|from_directory_path)\b")
+TOKIO_WORKSPACE = re.compile(r'tokio = \{ version = "[^"]+", features = \[[^\]]*\] \}', re.S)
 
 
 def crate_dirs():
@@ -66,31 +96,76 @@ def inject_url_import(text):
     return "\n".join(lines) + ("\n" if text.endswith("\n") else ""), 1
 
 
-def ensure_crate_dependency(crate_dir, needs_vfs):
+def ensure_crate_dependencies(crate_dir, needed):
     manifest = crate_dir / "Cargo.toml"
-    if not manifest.is_file() or not needs_vfs:
+    if not manifest.is_file() or not needed:
         return 0
     text = manifest.read_text(encoding="utf-8")
-    if "uv-vfs" in text:
-        return 0
     if "[dependencies]" not in text:
         return 0
-    updated = text.replace("[dependencies]\n", f"[dependencies]\n{VFS_DEP}\n", 1)
-    manifest.write_text(updated, encoding="utf-8")
+
+    added = 0
+    for crate_name in sorted(needed):
+        if crate_name in text:
+            continue
+        text = text.replace(
+            "[dependencies]\n", f"[dependencies]\n{crate_name} = {{ workspace = true }}\n", 1
+        )
+        added += 1
+    if added:
+        manifest.write_text(text, encoding="utf-8")
+    return added
+
+
+def ensure_native_tokio(crate_dir):
+    features = NATIVE_TOKIO_FEATURES.get(crate_dir.name)
+    manifest = crate_dir / "Cargo.toml"
+    if not features or not manifest.is_file():
+        return 0
+    text = manifest.read_text(encoding="utf-8")
+    marker = 'cfg(not(target_family = "wasm"))'
+    if marker in text and "tokio" in text.split(marker, 1)[1][:400]:
+        return 0
+    rendered = ", ".join(f'"{feature}"' for feature in features)
+    block = (
+        f'\n[target.\'{marker}\'.dependencies]\n'
+        f"tokio = {{ workspace = true, features = [{rendered}] }}\n"
+    )
+    manifest.write_text(text.rstrip() + "\n" + block, encoding="utf-8")
     return 1
 
 
-def ensure_workspace_dependency():
+def ensure_workspace_dependencies():
     manifest = FORK / "Cargo.toml"
     text = manifest.read_text(encoding="utf-8")
-    if "uv-vfs" in text:
-        return 0
-    anchor = 'uv-types = '
+    anchor = "uv-types = "
     index = text.find(anchor)
     if index == -1:
         return 0
-    updated = f"{text[:index]}{WORKSPACE_DEP}\n{text[index:]}"
-    manifest.write_text(updated, encoding="utf-8")
+
+    added = 0
+    for _, (crate_name, entry) in sorted(SHIM_DEPENDENCIES.items()):
+        if f"\n{crate_name} = " in text:
+            continue
+        text = f"{text[:index]}{entry}\n{text[index:]}"
+        index = text.find(anchor)
+        added += 1
+    if added:
+        manifest.write_text(text, encoding="utf-8")
+    return added
+
+
+def strip_workspace_tokio():
+    manifest = FORK / "Cargo.toml"
+    text = manifest.read_text(encoding="utf-8")
+    match = TOKIO_WORKSPACE.search(text)
+    if not match:
+        return 0
+    rendered = ",\n  ".join(f'"{feature}"' for feature in WASM_SAFE_TOKIO_FEATURES)
+    replacement = f'tokio = {{ version = "1.45.1", features = [\n  {rendered},\n] }}'
+    if match.group(0) == replacement:
+        return 0
+    manifest.write_text(text[: match.start()] + replacement + text[match.end() :], encoding="utf-8")
     return 1
 
 
@@ -105,15 +180,16 @@ def main():
     touched = set()
 
     for crate_dir in crate_dirs():
-        needs_vfs = False
+        needed = set()
         for path in rust_sources(crate_dir):
             original = path.read_text(encoding="utf-8")
             updated, counts = apply_source_rules(original)
             updated, injected = inject_url_import(updated)
             if injected:
                 counts["url-extension-import"] = injected
-            if "uv_vfs" in updated:
-                needs_vfs = True
+            for marker, (crate_name, _) in SHIM_DEPENDENCIES.items():
+                if marker in updated:
+                    needed.add(crate_name)
             if updated == original:
                 continue
             touched.add(path)
@@ -123,14 +199,18 @@ def main():
                 path.write_text(updated, encoding="utf-8")
 
         if not args.check:
-            added = ensure_crate_dependency(crate_dir, needs_vfs)
+            added = ensure_crate_dependencies(crate_dir, needed)
             if added:
                 totals["crate-dependency"] = totals.get("crate-dependency", 0) + added
+            if ensure_native_tokio(crate_dir):
+                totals["native-tokio-block"] = totals.get("native-tokio-block", 0) + 1
 
     if not args.check:
-        added = ensure_workspace_dependency()
+        added = ensure_workspace_dependencies()
         if added:
             totals["workspace-dependency"] = added
+        if strip_workspace_tokio():
+            totals["workspace-tokio-strip"] = 1
 
     verb = "would rewrite" if args.check else "rewrote"
     print(f"{verb} {len(touched)} file(s) across {FORK}")
