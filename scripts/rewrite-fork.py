@@ -57,12 +57,17 @@ SOURCE_RULES = [
         r"http::\1",
     ),
     ("reqwest-reexport-to-url", re.compile(r"\breqwest::Url\b"), "url::Url"),
+    (
+        "std-fs-types-to-vfs",
+        re.compile(r"\bstd::fs::(Metadata|Permissions|FileType)\b"),
+        r"uv_vfs::fs::\1",
+    ),
 ]
 
 REWRITTEN_DEPENDENCIES = {"http::": "http", "web_time::": "web-time"}
 
 EXTRA_WORKSPACE_DEPENDENCIES = [
-    ("web-time", 'web-time = { version = "1.1.0" }', "which = "),
+    ("web-time", 'web-time = { version = "1.1.0", features = ["serde"] }', "which = "),
 ]
 
 URL_METHODS = re.compile(r"\b(from_file_path|to_file_path|from_directory_path)\b")
@@ -276,6 +281,8 @@ def parse_failures(paths):
             [rustfmt, "--edition", "2024", "--emit", "stdout", str(path)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         for line in result.stderr.splitlines():
             if line.startswith("error"):
