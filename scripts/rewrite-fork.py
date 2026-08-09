@@ -73,14 +73,75 @@ EXTRA_WORKSPACE_DEPENDENCIES = [
 URL_METHODS = re.compile(r"\b(from_file_path|to_file_path|from_directory_path)\b")
 TOKIO_WORKSPACE = re.compile(r'tokio = \{ version = "[^"]+", features = \[[^\]]*\] \}', re.S)
 
+PATH_EXT_IMPORT = "use uv_vfs::VfsPathExt as _;"
+
+PRESENCE_METHODS = (
+    "try_exists",
+    "exists",
+    "is_file",
+    "is_dir",
+    "symlink_metadata",
+    "canonicalize",
+    "read_link",
+)
+
+PRESENCE_CALL = re.compile(r"\.(vfs_)?(" + "|".join((*PRESENCE_METHODS, "metadata")) + r")\(\)")
+
+NON_PATH_PRODUCERS = frozenset({"file_type", "metadata", "symlink_metadata"})
+
+NON_PATH_RECEIVERS = {
+    "is_file": frozenset({"metadata", "file_type", "entry_type", "ty"}),
+    "is_dir": frozenset({"metadata", "file_type", "entry_type", "ty"}),
+}
+
+CHAIN_ADAPTERS = frozenset({"map_err", "unwrap", "expect", "ok", "unwrap_or_default"})
+
+NON_PATH_BINDINGS = {
+    "crates/uv/src/commands/project/mod.rs": frozenset({"link"}),
+    "crates/uv/src/commands/python/uninstall.rs": frozenset({"minor_version_link"}),
+    "crates/uv-pep508/src/verbatim_url.rs": frozenset({"parsed_scheme"}),
+    "crates/uv-virtualenv/src/virtualenv.rs": frozenset({"minor_version_link"}),
+}
+
+PATH_METADATA_RECEIVERS = {
+    "crates/uv/src/commands/project/run.rs": frozenset({"target_path"}),
+    "crates/uv-build-backend/src/wheel.rs": frozenset({"file"}),
+    "crates/uv-cache-info/src/cache_info.rs": frozenset({"path"}),
+    "crates/uv-client/src/tls.rs": frozenset({"file"}),
+    "crates/uv-distribution/src/metadata/lowering.rs": frozenset({"install_path"}),
+    "crates/uv-fs/src/lib.rs": frozenset({"path"}),
+    "crates/uv-fs/src/link.rs": frozenset({"src"}),
+    "crates/uv-install-wheel/src/linker.rs": frozenset({"absolute"}),
+    "crates/uv-pypi-types/src/parsed_url.rs": frozenset({"verbatim_path", "path"}),
+    "crates/uv-virtualenv/src/virtualenv.rs": frozenset({"location"}),
+}
+
+CFG_TEST_ATTRIBUTE = re.compile(r"#\[cfg\((?:all\()?\s*test\b")
+
+CLOSERS = {")": "(", "]": "[", "}": "{"}
+RECEIVER_CHARS = frozenset("_.?:")
+IDENTIFIER_TAIL = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*$")
+
+
+def excluded_crates(manifest):
+    header = manifest.find("[workspace]")
+    if header == -1:
+        return frozenset()
+    match = re.search(r"exclude\s*=\s*\[(.*?)\]", manifest[header:], re.S)
+    return frozenset(re.findall(r'"([^"]+)"', match.group(1))) if match else frozenset()
+
 
 def crate_dirs():
     crates = FORK / "crates"
     if not crates.is_dir():
         raise SystemExit(f"fork not found at {FORK}; clone it before running this script")
+    excluded = excluded_crates((FORK / "Cargo.toml").read_text(encoding="utf-8"))
     for crate_dir in sorted(crates.iterdir()):
-        if crate_dir.is_dir() and crate_dir.name not in SHIM_CRATES:
-            yield crate_dir
+        if not crate_dir.is_dir() or crate_dir.name in SHIM_CRATES:
+            continue
+        if crate_dir.relative_to(FORK).as_posix() in excluded:
+            continue
+        yield crate_dir
 
 
 def rust_sources(crate_dir):
@@ -91,6 +152,10 @@ def rust_sources(crate_dir):
 
 def runs_on_the_build_host(path, crate_dir):
     return path.parent == crate_dir and path.name == "build.rs"
+
+
+def runs_only_on_the_host(path):
+    return not {"tests", "benches", "examples"}.isdisjoint(path.parts)
 
 
 def apply_source_rules(text):
@@ -119,10 +184,7 @@ def end_of_last_use_statement(lines):
     return insert_at
 
 
-def inject_url_import(text):
-    if not URL_METHODS.search(text) or "UrlFilePathExt" in text:
-        return text, 0
-
+def insert_import(text, statement):
     lines = text.splitlines()
     insert_at = end_of_last_use_statement(lines)
     if insert_at is None:
@@ -134,25 +196,183 @@ def inject_url_import(text):
     if insert_at is None:
         insert_at = len(lines)
 
-    lines[insert_at:insert_at] = URL_IMPORT.splitlines()
-    return "\n".join(lines) + ("\n" if text.endswith("\n") else ""), 1
+    lines[insert_at:insert_at] = statement.splitlines()
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
 
 
-def ensure_crate_dependencies(crate_dir, needed):
+def inject_url_import(text):
+    if not URL_METHODS.search(text) or "UrlFilePathExt" in text:
+        return text, 0
+    return insert_import(text, URL_IMPORT), 1
+
+
+def receiver_before(text, end):
+    index = end
+    stack = []
+    consumed = False
+    while index > 0:
+        char = text[index - 1]
+        if char in CLOSERS:
+            stack.append(CLOSERS[char])
+            index -= 1
+            consumed = True
+            continue
+        if char in "([{":
+            if not stack or stack[-1] != char:
+                break
+            stack.pop()
+            index -= 1
+            continue
+        if stack:
+            index -= 1
+            continue
+        if char.isalnum() or char in RECEIVER_CHARS:
+            index -= 1
+            consumed = True
+            continue
+        if char.isspace():
+            run = index
+            while run > 0 and text[run - 1].isspace():
+                run -= 1
+            before = text[run - 1] if run else ""
+            if consumed and (before.isalnum() or before == "_"):
+                break
+            index = run
+            continue
+        break
+    return text[index:end].strip()
+
+
+def matching_close(text, opened_at):
+    depth = 0
+    for index in range(opened_at, len(text)):
+        char = text[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def unit_test_tail(text):
+    for match in CFG_TEST_ATTRIBUTE.finditer(text):
+        index = match.start()
+        while True:
+            if not CFG_TEST_ATTRIBUTE.match(text, index):
+                break
+            opened_at = text.find("{", index)
+            if opened_at == -1:
+                break
+            closed_at = matching_close(text, opened_at)
+            if closed_at is None:
+                break
+            index = closed_at + 1
+            while index < len(text) and text[index].isspace():
+                index += 1
+            if index >= len(text):
+                return match.start()
+    return len(text)
+
+
+def matching_open(text):
+    depth = 0
+    for index in range(len(text) - 1, -1, -1):
+        char = text[index]
+        if char in CLOSERS:
+            depth += 1
+        elif char in "([{":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def receiver_head(receiver):
+    text = receiver
+    while True:
+        text = text.rstrip()
+        if text.endswith("?"):
+            text = text[:-1]
+            continue
+        if not text.endswith(")"):
+            break
+        open_at = matching_open(text)
+        if open_at is None:
+            return None, False
+        name = IDENTIFIER_TAIL.search(text[:open_at])
+        if name is None:
+            return None, False
+        if name.group(1) not in CHAIN_ADAPTERS:
+            return name.group(1).removeprefix("vfs_"), True
+        text = text[: name.start(1)].rstrip().rstrip(".")
+    found = IDENTIFIER_TAIL.search(text)
+    return (found.group(1), False) if found else (None, False)
+
+
+def rewrite_presence_checks(text, relative):
+    allowed_metadata = PATH_METADATA_RECEIVERS.get(relative, frozenset())
+    denied = NON_PATH_BINDINGS.get(relative, frozenset())
+    unit_tests_at = unit_test_tail(text)
+    pieces = []
+    cursor = 0
+    rewritten = 0
+    in_unit_tests = 0
+    accepted = set()
+    skipped = []
+
+    for match in PRESENCE_CALL.finditer(text):
+        if match.start() >= unit_tests_at:
+            in_unit_tests += 1
+            continue
+        method = match.group(2)
+        head, from_call = receiver_head(receiver_before(text, match.start()))
+        if match.group(1):
+            accepted.add((relative, head))
+            continue
+        if head in denied:
+            accepted.add((relative, head))
+            wanted = False
+        elif method == "metadata":
+            wanted = head in allowed_metadata
+        elif from_call:
+            wanted = head not in NON_PATH_PRODUCERS
+        else:
+            wanted = head not in NON_PATH_RECEIVERS.get(method, frozenset())
+        if not wanted:
+            skipped.append((method, head))
+            continue
+        accepted.add((relative, head))
+        pieces.append(text[cursor : match.start()])
+        pieces.append(f".vfs_{method}()")
+        cursor = match.end()
+        rewritten += 1
+
+    if not rewritten:
+        return text, 0, accepted, skipped, in_unit_tests
+
+    pieces.append(text[cursor:])
+    text = "".join(pieces)
+    if "VfsPathExt" not in text:
+        text = insert_import(text, PATH_EXT_IMPORT)
+    return text, rewritten, accepted, skipped, in_unit_tests
+
+
+def ensure_crate_dependencies(crate_dir, needed, section="dependencies"):
     manifest = crate_dir / "Cargo.toml"
     if not manifest.is_file() or not needed:
         return 0
     text = manifest.read_text(encoding="utf-8")
-    if "[dependencies]" not in text:
+    header = f"[{section}]\n"
+    if header not in text:
         return 0
 
     added = 0
     for crate_name in sorted(needed):
         if re.search(rf"^{re.escape(crate_name)} = ", text, re.M):
             continue
-        text = text.replace(
-            "[dependencies]\n", f"[dependencies]\n{crate_name} = {{ workspace = true }}\n", 1
-        )
+        text = text.replace(header, f"{header}{crate_name} = {{ workspace = true }}\n", 1)
         added += 1
     if added:
         manifest.write_text(text, encoding="utf-8")
@@ -291,6 +511,22 @@ def parse_failures(paths):
     return failures
 
 
+def report_presence_residue(residue, hits):
+    if residue:
+        print(f"  presence checks left on non-path receivers: {sum(residue.values())}")
+        for (method, head), count in sorted(residue.items(), key=lambda item: (-item[1], item[0])):
+            print(f"    {count:4d}  {head}.{method}()")
+
+    declared = {
+        (relative, token)
+        for table in (PATH_METADATA_RECEIVERS, NON_PATH_BINDINGS)
+        for relative, tokens in table.items()
+        for token in tokens
+    }
+    for relative, token in sorted(declared - hits):
+        print(f"  no `{token}` receiver left in {relative}; drop it from the table")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Apply the mechanical wasm rewrites to the vendored uv fork."
@@ -300,9 +536,12 @@ def main():
 
     totals = {}
     touched = set()
+    metadata_hits = set()
+    residue = {}
 
     for crate_dir in crate_dirs():
         needed = set()
+        needed_by_host_only_targets = set()
         for path in rust_sources(crate_dir):
             if runs_on_the_build_host(path, crate_dir):
                 continue
@@ -311,12 +550,24 @@ def main():
             updated, injected = inject_url_import(updated)
             if injected:
                 counts["url-extension-import"] = injected
+            if not runs_only_on_the_host(path):
+                updated, rewritten, accepted, skipped, unit_tests = rewrite_presence_checks(
+                    updated, path.relative_to(FORK).as_posix()
+                )
+                if rewritten:
+                    counts["path-extension-call"] = rewritten
+                if unit_tests:
+                    totals["left-in-unit-tests"] = totals.get("left-in-unit-tests", 0) + unit_tests
+                metadata_hits |= accepted
+                for entry in skipped:
+                    residue[entry] = residue.get(entry, 0) + 1
+            wanted = needed_by_host_only_targets if runs_only_on_the_host(path) else needed
             for marker, (crate_name, _) in SHIM_DEPENDENCIES.items():
                 if marker in updated:
-                    needed.add(crate_name)
+                    wanted.add(crate_name)
             for marker, crate_name in REWRITTEN_DEPENDENCIES.items():
                 if marker in updated:
-                    needed.add(crate_name)
+                    wanted.add(crate_name)
             if updated == original:
                 continue
             touched.add(path)
@@ -327,6 +578,9 @@ def main():
 
         if not args.check:
             added = ensure_crate_dependencies(crate_dir, needed)
+            added += ensure_crate_dependencies(
+                crate_dir, needed_by_host_only_targets - needed, "dev-dependencies"
+            )
             if added:
                 totals["crate-dependency"] = totals.get("crate-dependency", 0) + added
             if ensure_native_tokio(crate_dir):
@@ -345,6 +599,8 @@ def main():
     print(f"{verb} {len(touched)} file(s) across {FORK}")
     for name in sorted(totals):
         print(f"  {name}: {totals[name]}")
+
+    report_presence_residue(residue, metadata_hits)
 
     if not args.check and touched:
         failures = parse_failures(touched)
