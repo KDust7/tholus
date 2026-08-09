@@ -1,0 +1,10 @@
+{
+  "protocolVersion": "0",
+  "schemas": [
+    "host-message",
+    "worker-message",
+    "engine-event",
+    "engine-config",
+    "structured-error"
+  ]
+}

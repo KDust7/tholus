@@ -1,0 +1,574 @@
+{
+  "$id": "https://uv-wasm.invalid/protocol/0/worker-message.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "initResult"
+        },
+        "id": {
+          "type": "string"
+        },
+        "outcome": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "build": {
+                  "type": "object",
+                  "properties": {
+                    "engine": {
+                      "type": "string"
+                    },
+                    "uv": {
+                      "type": "string"
+                    },
+                    "protocol": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "engine",
+                    "uv",
+                    "protocol"
+                  ]
+                }
+              },
+              "required": [
+                "ok",
+                "build"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean",
+                  "const": false
+                },
+                "error": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "network",
+                        "resolution-conflict",
+                        "package-not-found",
+                        "hash-mismatch",
+                        "no-runtime-attached",
+                        "sdist-needs-runtime",
+                        "runtime-required",
+                        "build-failed",
+                        "unsupported",
+                        "cancelled",
+                        "engine-crashed",
+                        "protocol-mismatch"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              },
+              "required": [
+                "ok",
+                "error"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "outcome"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "bootProgress"
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "compile-start",
+            "compile-done",
+            "init-start",
+            "ready"
+          ]
+        },
+        "ms": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "type",
+        "phase"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "output"
+        },
+        "invocationId": {
+          "type": "string"
+        },
+        "stream": {
+          "type": "string",
+          "enum": [
+            "stdout",
+            "stderr"
+          ]
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "data": {}
+      },
+      "required": [
+        "type",
+        "invocationId",
+        "stream",
+        "seq",
+        "data"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "event"
+        },
+        "event": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "log"
+                },
+                "invocationId": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "string",
+                  "enum": [
+                    "trace",
+                    "debug",
+                    "info",
+                    "warn",
+                    "error"
+                  ]
+                },
+                "message": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "level",
+                "message"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "phase"
+                },
+                "invocationId": {
+                  "type": "string"
+                },
+                "phase": {
+                  "type": "string",
+                  "enum": [
+                    "resolving",
+                    "downloading",
+                    "building",
+                    "installing",
+                    "uninstalling",
+                    "auditing"
+                  ]
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "start",
+                    "end"
+                  ]
+                }
+              },
+              "required": [
+                "type",
+                "invocationId",
+                "phase",
+                "state"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "progress"
+                },
+                "invocationId": {
+                  "type": "string"
+                },
+                "progressId": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "download",
+                    "build",
+                    "install",
+                    "checkout"
+                  ]
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "current": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "total": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "unit": {
+                  "type": "string",
+                  "enum": [
+                    "bytes",
+                    "items"
+                  ]
+                }
+              },
+              "required": [
+                "type",
+                "invocationId",
+                "progressId",
+                "kind",
+                "current",
+                "unit"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "request"
+                },
+                "invocationId": {
+                  "type": "string"
+                },
+                "method": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "fromCache": {
+                  "type": "boolean"
+                },
+                "bytes": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "type",
+                "method",
+                "url",
+                "fromCache"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "resolution-complete"
+                },
+                "invocationId": {
+                  "type": "string"
+                },
+                "packageCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "durationMs": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "type",
+                "invocationId",
+                "packageCount",
+                "durationMs"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "install-report"
+                },
+                "invocationId": {
+                  "type": "string"
+                },
+                "installed": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "version"
+                    ]
+                  }
+                },
+                "removed": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "version"
+                    ]
+                  }
+                },
+                "unchanged": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "type",
+                "invocationId",
+                "installed",
+                "removed",
+                "unchanged"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "runtime-finalize"
+                },
+                "invocationId": {
+                  "type": "string"
+                },
+                "package": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "version"
+                  ]
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "dynlibs",
+                    "build"
+                  ]
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "start",
+                    "end"
+                  ]
+                }
+              },
+              "required": [
+                "type",
+                "invocationId",
+                "package",
+                "action",
+                "state"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "event"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "stdinRequest"
+        },
+        "id": {
+          "type": "string"
+        },
+        "invocationId": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "echo": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "invocationId",
+        "echo"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "exit"
+        },
+        "invocationId": {
+          "type": "string"
+        },
+        "code": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "cancelled": {
+          "type": "boolean"
+        },
+        "durationMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "network",
+                "resolution-conflict",
+                "package-not-found",
+                "hash-mismatch",
+                "no-runtime-attached",
+                "sdist-needs-runtime",
+                "runtime-required",
+                "build-failed",
+                "unsupported",
+                "cancelled",
+                "engine-crashed",
+                "protocol-mismatch"
+              ]
+            },
+            "message": {
+              "type": "string"
+            },
+            "data": {}
+          },
+          "required": [
+            "code",
+            "message"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "invocationId",
+        "code",
+        "cancelled",
+        "durationMs"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "fatal"
+        },
+        "message": {
+          "type": "string"
+        },
+        "stack": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "message"
+      ]
+    }
+  ]
+}

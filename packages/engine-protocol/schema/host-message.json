@@ -1,0 +1,408 @@
+{
+  "$id": "https://uv-wasm.invalid/protocol/0/host-message.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "init"
+        },
+        "id": {
+          "type": "string"
+        },
+        "protocolVersion": {
+          "type": "string"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "fs": {
+              "default": {
+                "kind": "memory"
+              },
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "memory"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "opfs"
+                    },
+                    "root": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "delegate"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                }
+              ]
+            },
+            "cache": {
+              "default": {
+                "kind": "memory"
+              },
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "opfs"
+                    },
+                    "scope": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "memory"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "none"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ]
+                }
+              ]
+            },
+            "index": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "indexUrl": {
+                  "type": "string"
+                },
+                "extraIndexUrls": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "indexStrategy": {
+                  "type": "string",
+                  "enum": [
+                    "first-index",
+                    "unsafe-first-match",
+                    "unsafe-best-match"
+                  ]
+                },
+                "pyodideIndex": {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            "target": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "pythonVersion": {
+                  "type": "string"
+                },
+                "platform": {
+                  "type": "string"
+                },
+                "pyodideAbi": {
+                  "type": "string"
+                }
+              }
+            },
+            "env": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "cwd": {
+              "default": "/work",
+              "type": "string"
+            },
+            "logFilter": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "protocolVersion",
+        "config"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "exec"
+        },
+        "invocationId": {
+          "type": "string"
+        },
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "env": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "tty": {
+          "type": "object",
+          "properties": {
+            "cols": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "rows": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "colors": {
+              "type": "string",
+              "enum": [
+                "16",
+                "256",
+                "truecolor"
+              ]
+            }
+          },
+          "required": [
+            "cols",
+            "rows"
+          ]
+        },
+        "stdin": {
+          "default": false,
+          "type": "boolean"
+        },
+        "promptPolicy": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "confirm",
+                "deny",
+                "error"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "answers": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "answers"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "invocationId",
+        "argv"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "stdinResponse"
+        },
+        "id": {
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "data"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "resize"
+        },
+        "invocationId": {
+          "type": "string"
+        },
+        "size": {
+          "type": "object",
+          "properties": {
+            "cols": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "rows": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "cols",
+            "rows"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "invocationId",
+        "size"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "cancel"
+        },
+        "invocationId": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "invocationId"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "ack"
+        },
+        "invocationId": {
+          "type": "string"
+        },
+        "stream": {
+          "type": "string",
+          "enum": [
+            "stdout",
+            "stderr"
+          ]
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "type",
+        "invocationId",
+        "stream",
+        "bytes"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "dispose"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    }
+  ]
+}
