@@ -194,6 +194,28 @@ class PresenceRewrite(unittest.TestCase):
         self.assertIn((TLS, "file"), accepted)
 
 
+class SourceRules(unittest.TestCase):
+    def rewrite(self, source):
+        text, counts = rewrite_fork.apply_source_rules(source)
+        return text, counts
+
+    def test_walkdir_paths_route_through_the_shim(self):
+        text, counts = self.rewrite("use walkdir::WalkDir;\n\nfn f() -> walkdir::Error { todo!() }\n")
+        self.assertEqual(counts.get("walkdir-to-vfs"), 2)
+        self.assertIn("use uv_vfs::walk::WalkDir;", text)
+        self.assertIn("uv_vfs::walk::Error", text)
+
+    def test_a_bare_walkdir_word_is_left_alone(self):
+        source = "// walkdir is fast\nlet walkdir_root = 1;\n"
+        self.assertEqual(self.rewrite(source), (source, {}))
+
+    def test_the_walkdir_rule_is_idempotent(self):
+        once, _ = self.rewrite("use walkdir::WalkDir;\n")
+        twice, counts = self.rewrite(once)
+        self.assertEqual(twice, once)
+        self.assertNotIn("walkdir-to-vfs", counts)
+
+
 class UrlImport(unittest.TestCase):
     def inject(self, source, host_only=False):
         return rewrite_fork.inject_url_import(source, host_only)
@@ -266,6 +288,29 @@ class CrateDependencies(unittest.TestCase):
     def test_dev_dependencies_are_not_confused_with_dependencies(self):
         crate = self.manifest("[package]\nname = \"uv-bench\"\n\n[dev-dependencies]\n")
         self.assertEqual(rewrite_fork.ensure_crate_dependencies(crate, {"uv-vfs"}), 0)
+
+    def test_a_replaced_dependency_is_dropped_once_no_source_names_it(self):
+        crate = self.manifest("[dependencies]\nwalkdir = { workspace = true }\nserde = { workspace = true }\n")
+        (crate / "src").mkdir()
+        (crate / "src" / "lib.rs").write_text("use uv_vfs::walk::WalkDir;\n", encoding="utf-8")
+        self.assertEqual(rewrite_fork.prune_replaced_dependencies(crate), 1)
+        text = (crate / "Cargo.toml").read_text(encoding="utf-8")
+        self.assertNotIn("walkdir", text)
+        self.assertIn("serde", text)
+
+    def test_a_replaced_dependency_a_source_still_names_is_kept(self):
+        crate = self.manifest("[dependencies]\nwalkdir = { workspace = true }\n")
+        (crate / "src").mkdir()
+        (crate / "src" / "lib.rs").write_text("pub use walkdir::WalkDir;\n", encoding="utf-8")
+        self.assertEqual(rewrite_fork.prune_replaced_dependencies(crate), 0)
+
+    def test_a_crate_named_only_in_prose_does_not_keep_its_dependency(self):
+        crate = self.manifest("[dependencies]\nwalkdir = { workspace = true }\n")
+        (crate / "src").mkdir()
+        (crate / "src" / "lib.rs").write_text(
+            '// walkdir is cheap\nlet _ = x.expect("walkdir starts with root");\n', encoding="utf-8"
+        )
+        self.assertEqual(rewrite_fork.prune_replaced_dependencies(crate), 1)
 
     def test_a_marker_already_declared_is_not_added_twice(self):
         crate = self.manifest("[dependencies]\nuv-vfs = { workspace = true }\n")

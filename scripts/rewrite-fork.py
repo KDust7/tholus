@@ -62,6 +62,7 @@ SOURCE_RULES = [
         re.compile(r"\bstd::fs::(Metadata|Permissions|FileType)\b"),
         r"uv_vfs::fs::\1",
     ),
+    ("walkdir-to-vfs", re.compile(r"\bwalkdir::"), "uv_vfs::walk::"),
 ]
 
 REWRITTEN_DEPENDENCIES = {"http::": "http", "web_time::": "web-time"}
@@ -419,6 +420,7 @@ def ensure_crate_dependencies(crate_dir, needed, section="dependencies"):
 REPLACED_DEPENDENCIES = {
     "fs-err": re.compile(r"\bfs_err\b"),
     "tempfile": re.compile(r"\btempfile\b"),
+    "walkdir": re.compile(r"\bwalkdir::"),
 }
 
 FEATURE_REDIRECTS = {'"fs-err/tokio"': '"uv-vfs/tokio"'}
