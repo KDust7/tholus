@@ -194,6 +194,47 @@ class PresenceRewrite(unittest.TestCase):
         self.assertIn((TLS, "file"), accepted)
 
 
+class UrlImport(unittest.TestCase):
+    def inject(self, source, host_only=False):
+        return rewrite_fork.inject_url_import(source, host_only)
+
+    def test_production_use_gains_the_guarded_import(self):
+        text, count = self.inject("fn f(u: &Url) {\n    u.to_file_path();\n}\n")
+        self.assertEqual(count, 1)
+        self.assertIn(rewrite_fork.URL_IMPORT, text)
+
+    def test_a_use_confined_to_the_test_tail_gains_nothing(self):
+        source = "fn f() {}\n\n#[cfg(test)]\nmod tests {\n    fn t(u: &Url) { u.to_file_path(); }\n}\n"
+        self.assertEqual(self.inject(source), (source, 0))
+
+    def test_a_use_gated_off_wasm_gains_nothing(self):
+        source = '#[cfg(windows)]\nfn f(u: &Url) {\n    u.to_file_path();\n}\n'
+        self.assertEqual(self.inject(source), (source, 0))
+
+    def test_a_host_only_target_gains_nothing(self):
+        source = "fn f(u: &Url) {\n    u.to_file_path();\n}\n"
+        self.assertEqual(self.inject(source, host_only=True), (source, 0))
+
+    def test_an_import_left_over_from_a_host_only_use_is_stripped(self):
+        source = (
+            rewrite_fork.URL_IMPORT
+            + "\n\n#[cfg(test)]\nmod tests {\n    fn t(u: &Url) { u.to_file_path(); }\n}\n"
+        )
+        text, count = self.inject(source)
+        self.assertEqual(count, 0)
+        self.assertNotIn("UrlFilePathExt", text)
+
+    def test_a_hand_placed_import_is_left_alone(self):
+        source = "mod m {\n    use uv_vfs::UrlFilePathExt as _;\n    fn f(u: &Url) { u.to_file_path(); }\n}\n"
+        self.assertEqual(self.inject(source), (source, 0))
+
+    def test_injection_is_idempotent(self):
+        once, _ = self.inject("fn f(u: &Url) {\n    u.to_file_path();\n}\n")
+        twice, _ = self.inject(once)
+        self.assertEqual(twice, once)
+        self.assertEqual(twice.count("UrlFilePathExt"), 1)
+
+
 class CrateDependencies(unittest.TestCase):
     def manifest(self, body):
         directory = pathlib.Path(tempfile.mkdtemp())

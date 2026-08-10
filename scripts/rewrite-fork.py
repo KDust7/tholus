@@ -202,10 +202,21 @@ def insert_import(text, statement):
     return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
 
 
-def inject_url_import(text):
-    if not URL_METHODS.search(text) or "UrlFilePathExt" in text:
+def url_methods_reach_wasm(text):
+    unit_tests_at = unit_test_tail(text)
+    return any(
+        match.start() < unit_tests_at and not gated_off_wasm(text, match.start())
+        for match in URL_METHODS.finditer(text)
+    )
+
+
+def inject_url_import(text, host_only):
+    stripped = text.replace(URL_IMPORT + "\n", "")
+    if "UrlFilePathExt" in stripped:
         return text, 0
-    return insert_import(text, URL_IMPORT), 1
+    if host_only or not url_methods_reach_wasm(stripped):
+        return stripped, 0
+    return insert_import(stripped, URL_IMPORT), 1
 
 
 def receiver_before(text, end):
@@ -561,7 +572,7 @@ def main():
                 continue
             original = path.read_text(encoding="utf-8")
             updated, counts = apply_source_rules(original)
-            updated, injected = inject_url_import(updated)
+            updated, injected = inject_url_import(updated, runs_only_on_the_host(path))
             if injected:
                 counts["url-extension-import"] = injected
             if not runs_only_on_the_host(path):
