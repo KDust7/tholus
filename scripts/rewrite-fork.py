@@ -70,7 +70,12 @@ EXTRA_WORKSPACE_DEPENDENCIES = [
     ("web-time", 'web-time = { version = "1.1.0", features = ["serde"] }', "which = "),
 ]
 
-URL_METHODS = re.compile(r"\b(from_file_path|to_file_path|from_directory_path)\b")
+URL_METHODS = re.compile(
+    r"\b(?:(?P<owner>[A-Za-z_][A-Za-z0-9_]*)::)?"
+    r"(?P<method>from_file_path|to_file_path|from_directory_path)\b"
+)
+
+URL_METHOD_OWNERS = {"DisplaySafeUrl": frozenset({"from_file_path"})}
 TOKIO_WORKSPACE = re.compile(r'tokio = \{ version = "[^"]+", features = \[[^\]]*\] \}', re.S)
 
 PATH_EXT_IMPORT = "use uv_vfs::VfsPathExt as _;"
@@ -202,10 +207,17 @@ def insert_import(text, statement):
     return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
 
 
+def needs_the_url_trait(match):
+    owned = URL_METHOD_OWNERS.get(match.group("owner"), frozenset())
+    return match.group("method") not in owned
+
+
 def url_methods_reach_wasm(text):
     unit_tests_at = unit_test_tail(text)
     return any(
-        match.start() < unit_tests_at and not gated_off_wasm(text, match.start())
+        match.start() < unit_tests_at
+        and not gated_off_wasm(text, match.start())
+        and needs_the_url_trait(match)
         for match in URL_METHODS.finditer(text)
     )
 

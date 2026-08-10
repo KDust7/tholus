@@ -228,6 +228,20 @@ class UrlImport(unittest.TestCase):
         source = "mod m {\n    use uv_vfs::UrlFilePathExt as _;\n    fn f(u: &Url) { u.to_file_path(); }\n}\n"
         self.assertEqual(self.inject(source), (source, 0))
 
+    def test_a_type_owning_the_method_does_not_pull_the_trait_in(self):
+        source = "fn f(p: &Path) {\n    let _ = DisplaySafeUrl::from_file_path(p);\n}\n"
+        self.assertEqual(self.inject(source), (source, 0))
+
+    def test_a_method_that_type_does_not_own_still_pulls_the_trait_in(self):
+        text, count = self.inject("fn f(u: &DisplaySafeUrl) {\n    u.to_file_path();\n}\n")
+        self.assertEqual(count, 1)
+        self.assertIn(rewrite_fork.URL_IMPORT, text)
+
+    def test_the_plain_url_type_still_pulls_the_trait_in(self):
+        text, count = self.inject("fn f(p: &Path) {\n    let _ = Url::from_file_path(p);\n}\n")
+        self.assertEqual(count, 1)
+        self.assertIn(rewrite_fork.URL_IMPORT, text)
+
     def test_injection_is_idempotent(self):
         once, _ = self.inject("fn f(u: &Url) {\n    u.to_file_path();\n}\n")
         twice, _ = self.inject(once)
@@ -290,6 +304,19 @@ class ForkLayout(unittest.TestCase):
 
 @unittest.skipUnless((rewrite_fork.FORK / "crates").is_dir(), "the fork is not checked out")
 class MetadataTable(unittest.TestCase):
+    def test_every_owner_still_defines_the_methods_claimed_for_it(self):
+        sources = [
+            path.read_text(encoding="utf-8")
+            for crate in rewrite_fork.crate_dirs()
+            for path in rewrite_fork.rust_sources(crate)
+        ]
+        for owner, methods in rewrite_fork.URL_METHOD_OWNERS.items():
+            for method in methods:
+                defined = any(
+                    f"impl {owner}" in source and f"fn {method}" in source for source in sources
+                )
+                self.assertTrue(defined, f"{owner} no longer defines {method}")
+
     def test_every_listed_file_is_in_the_fork(self):
         missing = [
             relative
