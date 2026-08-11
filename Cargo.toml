@@ -20,6 +20,11 @@ console_error_panic_hook = "0.1"
 web-time = "1.1"
 anyhow = "1"
 
+[patch.crates-io]
+astral_async_http_range_reader = { path = "vendor/uv/patches/astral-async-http-range-reader" }
+astral-reqwest-retry = { path = "vendor/uv/patches/astral-reqwest-retry" }
+astral-tokio-tar = { path = "vendor/uv/patches/astral-tokio-tar" }
+
 [profile.release]
 opt-level = "s"
 lto = "fat"

@@ -17,6 +17,8 @@ web-time = { workspace = true }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 console_error_panic_hook = { workspace = true }
+uv = { path = "../../vendor/uv/crates/uv", default-features = false }
+uv-cli = { path = "../../vendor/uv/crates/uv-cli" }
 
 [dev-dependencies]
 wasm-bindgen-test = { workspace = true }
