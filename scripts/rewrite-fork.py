@@ -31,7 +31,35 @@ NATIVE_TOKIO_FEATURES = {
 
 URL_IMPORT = '#[cfg(target_family = "wasm")]\nuse uv_vfs::UrlFilePathExt as _;'
 
+CLOCK_TYPES = ("Instant", "SystemTime", "SystemTimeError", "UNIX_EPOCH")
+
+
+def move_clock_imports(match):
+    indent = match.group(1)
+    items = [item.strip() for item in match.group(2).split(",") if item.strip()]
+    moved = [item for item in items if item in CLOCK_TYPES]
+    if not moved:
+        return match.group(0)
+    kept = [item for item in items if item not in CLOCK_TYPES]
+    lines = []
+    if kept:
+        lines.append(indent + group_import("std::time", kept))
+    lines.append(indent + group_import("web_time", moved))
+    return "\n".join(lines)
+
+
+def group_import(crate, items):
+    if len(items) == 1:
+        return f"use {crate}::{items[0]};"
+    return "use " + crate + "::{" + ", ".join(items) + "};"
+
+
 SOURCE_RULES = [
+    (
+        "std-clock-import-to-web-time",
+        re.compile(r"([ \t]*)use std::time::\{([^}]*)\};"),
+        move_clock_imports,
+    ),
     ("fs_err-to-vfs", re.compile(r"\bfs_err::tokio\b"), "uv_vfs::fs::tokio"),
     ("fs_err-to-vfs", re.compile(r"\bfs_err\b(?!\s*=)"), "uv_vfs::fs"),
     ("tempfile-to-vfs", re.compile(r"\btempfile::"), "uv_vfs::temp::"),
@@ -89,6 +117,7 @@ PRESENCE_METHODS = (
     "symlink_metadata",
     "canonicalize",
     "read_link",
+    "read_dir",
 )
 
 PRESENCE_CALL = re.compile(r"\.(vfs_)?(" + "|".join((*PRESENCE_METHODS, "metadata")) + r")\(\)")

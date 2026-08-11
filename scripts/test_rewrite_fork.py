@@ -271,6 +271,51 @@ class UrlImport(unittest.TestCase):
         self.assertEqual(twice.count("UrlFilePathExt"), 1)
 
 
+class ClockImports(unittest.TestCase):
+    def rewrite(self, source):
+        return rewrite_fork.apply_source_rules(source)[0]
+
+    def test_a_clock_type_moves_out_of_a_group_and_the_rest_stays(self):
+        self.assertEqual(
+            self.rewrite("use std::time::{Duration, Instant};"),
+            "use std::time::Duration;\nuse web_time::Instant;",
+        )
+
+    def test_an_error_type_moves_with_the_clock_it_belongs_to(self):
+        self.assertEqual(
+            self.rewrite("use std::time::{Duration, SystemTime, SystemTimeError};"),
+            "use std::time::Duration;\nuse web_time::{SystemTime, SystemTimeError};",
+        )
+
+    def test_a_group_of_only_clock_types_leaves_no_std_import_behind(self):
+        self.assertEqual(
+            self.rewrite("use std::time::{Instant, SystemTime};"),
+            "use web_time::{Instant, SystemTime};",
+        )
+
+    def test_a_group_without_a_clock_type_is_untouched(self):
+        self.assertEqual(
+            self.rewrite("use std::time::{Duration, TryFromFloatSecsError};"),
+            "use std::time::{Duration, TryFromFloatSecsError};",
+        )
+
+    def test_the_single_import_form_is_covered_by_the_path_rule(self):
+        self.assertEqual(
+            self.rewrite("use std::time::Instant;"),
+            "use web_time::Instant;",
+        )
+
+    def test_the_indentation_of_a_nested_import_is_kept(self):
+        self.assertEqual(
+            self.rewrite("    use std::time::{Duration, Instant};"),
+            "    use std::time::Duration;\n    use web_time::Instant;",
+        )
+
+    def test_moving_the_import_is_idempotent(self):
+        once = self.rewrite("use std::time::{Duration, Instant};")
+        self.assertEqual(self.rewrite(once), once)
+
+
 class CrateDependencies(unittest.TestCase):
     def manifest(self, body):
         directory = pathlib.Path(tempfile.mkdtemp())
