@@ -12,13 +12,17 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+uv-version = { path = "../../vendor/uv/crates/uv-version" }
 wasm-bindgen = { workspace = true }
 web-time = { workspace = true }
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 console_error_panic_hook = { workspace = true }
+js-sys = { workspace = true }
 uv = { path = "../../vendor/uv/crates/uv", default-features = false }
 uv-cli = { path = "../../vendor/uv/crates/uv-cli" }
+uv-wasm-compat = { path = "../../vendor/uv/crates/uv-wasm-compat" }
+wasm-bindgen-futures = { workspace = true }
 
 [dev-dependencies]
 wasm-bindgen-test = { workspace = true }

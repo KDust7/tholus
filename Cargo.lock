@@ -6186,12 +6186,14 @@ dependencies = [
  "owo-colors",
  "rustc-hash",
  "uv-errors",
+ "uv-wasm-compat",
 ]
 
 [[package]]
 name = "uv-wasm-compat"
 version = "0.0.70"
 dependencies = [
+ "anstream",
  "futures",
  "getrandom 0.2.17",
  "getrandom 0.3.4",
@@ -6209,9 +6211,13 @@ name = "uv-wasm-engine"
 version = "0.0.0"
 dependencies = [
  "console_error_panic_hook",
+ "js-sys",
  "uv",
  "uv-cli",
+ "uv-version",
+ "uv-wasm-compat",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "web-time",
 ]
