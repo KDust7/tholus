@@ -9,6 +9,15 @@ const ENGINE_WASM_STEM: &str = "uv_wasm_engine";
 const WASM_TARGET: &str = "wasm32-unknown-unknown";
 const ARTIFACT_NAME: &str = "engine";
 const ARTIFACT_DIR: &str = "packages/core/assets";
+const WASM_FEATURES: [&str; 7] = [
+    "--enable-bulk-memory",
+    "--enable-bulk-memory-opt",
+    "--enable-multivalue",
+    "--enable-mutable-globals",
+    "--enable-nontrapping-float-to-int",
+    "--enable-reference-types",
+    "--enable-sign-ext",
+];
 
 fn main() {
     if let Err(err) = run() {
@@ -118,7 +127,7 @@ fn build(args: &[String]) -> Result<()> {
     } else if let Some(wasm_opt) = find_tool(&root, "wasm-opt") {
         step("optimizing");
         let mut cmd = Command::new(wasm_opt);
-        cmd.current_dir(&root).args([
+        cmd.current_dir(&root).args(WASM_FEATURES).args([
             "-Oz",
             "--converge",
             &bound.to_string_lossy(),
@@ -150,7 +159,7 @@ fn find_tool(root: &Path, name: &str) -> Option<PathBuf> {
         return Some(PathBuf::from(name));
     }
     let bin_dir = root.join("node_modules").join(".bin");
-    for candidate in [format!("{name}.cmd"), name.to_string()] {
+    for candidate in [format!("{name}.exe"), format!("{name}.cmd"), name.to_string()] {
         let path = bin_dir.join(candidate);
         if path.exists() {
             return Some(path);
