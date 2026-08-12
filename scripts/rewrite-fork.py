@@ -103,6 +103,14 @@ SOURCE_RULES = [
         re.compile(r"\benv::(temp_dir|home_dir|split_paths)\b"),
         r"uv_vfs::\1",
     ),
+    (
+        "std-set-current-dir-to-fs",
+        re.compile(r"\bstd::env::set_current_dir\b"),
+        "uv_fs::set_current_dir",
+    ),
+    ("env-set-current-dir-to-fs", re.compile(r"\benv::set_current_dir\b"), "uv_fs::set_current_dir"),
+    ("std-current-dir-to-vfs", re.compile(r"\bstd::env::current_dir\b"), "uv_vfs::current_dir"),
+    ("env-current-dir-to-vfs", re.compile(r"\benv::current_dir\b"), "uv_vfs::current_dir"),
 ]
 
 REWRITTEN_DEPENDENCIES = {"http::": "http", "web_time::": "web-time"}

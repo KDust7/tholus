@@ -294,6 +294,33 @@ class SourceRules(unittest.TestCase):
         source = "env::var(EnvVars::PATH);\nenv::var_os(name);\nenv::consts::EXE_SUFFIX;\n"
         self.assertEqual(self.rewrite(source), (source, {}))
 
+    def test_current_dir_routes_through_the_vfs(self):
+        text, counts = self.rewrite("options.relative_to(&std::env::current_dir()?)\n")
+        self.assertEqual(counts.get("std-current-dir-to-vfs"), 1)
+        self.assertIn("uv_vfs::current_dir()?", text)
+
+    def test_a_bare_current_dir_routes_through_the_vfs(self):
+        text, counts = self.rewrite("options.relative_to(&env::current_dir()?)\n")
+        self.assertEqual(counts.get("env-current-dir-to-vfs"), 1)
+        self.assertIn("uv_vfs::current_dir()?", text)
+
+    def test_set_current_dir_routes_through_uv_fs(self):
+        text, counts = self.rewrite("std::env::set_current_dir(directory)?;\n")
+        self.assertEqual(counts.get("std-set-current-dir-to-fs"), 1)
+        self.assertIn("uv_fs::set_current_dir(directory)?;", text)
+
+    def test_setting_the_directory_is_not_read_as_reading_it(self):
+        _, counts = self.rewrite("env::set_current_dir(directory)?;\n")
+        self.assertEqual(counts.get("env-set-current-dir-to-fs"), 1)
+        self.assertNotIn("env-current-dir-to-vfs", counts)
+
+    def test_the_working_directory_rules_are_idempotent(self):
+        once, _ = self.rewrite("std::env::current_dir()?;\nenv::set_current_dir(d)?;\n")
+        twice, counts = self.rewrite(once)
+        self.assertEqual(twice, once)
+        self.assertNotIn("std-current-dir-to-vfs", counts)
+        self.assertNotIn("env-set-current-dir-to-fs", counts)
+
     def test_the_env_import_goes_when_the_rewrite_leaves_it_unused(self):
         text, counts = self.rewrite("use std::env;\n\nfn f() { env::temp_dir(); }\n")
         self.assertEqual(counts.get("unused-env-import"), 1)
