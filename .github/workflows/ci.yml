@@ -95,6 +95,9 @@ jobs:
       - name: Build wasm artifact
         run: cargo xtask build
 
+      - name: Engine answers uv's command line
+        run: bun run vitest run test/parity
+
       - name: Size report
         run: bun run size
 
