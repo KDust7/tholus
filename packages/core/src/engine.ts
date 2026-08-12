@@ -65,7 +65,7 @@ export interface EngineOptions {
   config?: EngineConfigInput;
   onEvent?: (event: EngineEvent) => void;
   handshakeTimeoutMs?: number;
-  wasmUrl?: URL | string;
+  workerUrl?: URL | string;
 }
 
 export interface Engine {
@@ -90,7 +90,7 @@ const DEFAULT_HANDSHAKE_TIMEOUT_MS = 30_000;
 export async function createEngine(options: EngineOptions = {}): Promise<Engine> {
   const factory: EndpointFactory =
     options.endpoint ??
-    (() => workerEndpoint(options.wasmUrl ?? new URL("./worker.js", import.meta.url)));
+    (() => workerEndpoint(options.workerUrl ?? new URL("./worker.js", import.meta.url)));
 
   const endpoint = await factory();
   const listeners = new Set<(event: EngineEvent) => void>();
