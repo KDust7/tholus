@@ -158,7 +158,7 @@ fn build(args: &[String]) -> Result<()> {
         None => println!("  optimized  (skipped)"),
     }
     println!();
-    println!("Run `pnpm size` for the compressed transfer size and budget check.");
+    println!("Run `bun run size` for the compressed transfer size and budget check.");
     Ok(())
 }
 
