@@ -92,6 +92,16 @@ describe.skipIf(!canCompare)("the engine matches native uv byte for byte", () =>
     expect(here.stdout).toContain(`Usage: ${PROGRAM} [OPTIONS]`);
   });
 
+  it("was built from the same commit as the native binary", async () => {
+    const [there, here] = [native(["--version"]), await browser(["--version"])];
+    const stamp = (text: string): string | undefined =>
+      /^uv \S+ \((\S+ \S+) /.exec(text)?.[1] ?? undefined;
+    expect(
+      stamp(here.stdout),
+      "the artifact and the native binary carry different commit stamps, so --version cannot match; rebuild both from one tree",
+    ).toBe(stamp(there.stdout));
+  });
+
   it("matches `uv --version` once the target triple is normalized", async () => {
     const [there, here] = [native(["--version"]), await browser(["--version"])];
     expect(withoutTargetTriple(here.stdout)).toBe(withoutTargetTriple(there.stdout));
