@@ -44,30 +44,34 @@ fn print_help() {
 cargo xtask <command>
 
 Commands:
-  build [--dev] [--skip-opt]   Build the wasm engine artifact into {ARTIFACT_DIR}
-  help                         Show this message
+  build [--dev] [--skip-opt] [--converge]   Build the wasm engine artifact into {ARTIFACT_DIR}
+  help                                      Show this message
 
 Options:
   --dev        Build the debug profile
-  --skip-opt   Skip wasm-opt even when it is available"
+  --skip-opt   Skip wasm-opt even when it is available
+  --converge   Re-run wasm-opt until it stops shrinking; hours on a module this size"
     );
 }
 
 struct BuildOptions {
     release: bool,
     skip_opt: bool,
+    converge: bool,
 }
 
 fn build(args: &[String]) -> Result<()> {
     let mut opts = BuildOptions {
         release: true,
         skip_opt: false,
+        converge: false,
     };
     for arg in args {
         match arg.as_str() {
             "--dev" => opts.release = false,
             "--release" => opts.release = true,
             "--skip-opt" => opts.skip_opt = true,
+            "--converge" => opts.converge = true,
             other => return Err(format!("unknown build flag {other:?}").into()),
         }
     }
@@ -126,15 +130,19 @@ fn build(args: &[String]) -> Result<()> {
         None
     } else if let Some(wasm_opt) = find_tool(&root, "wasm-opt") {
         step("optimizing");
+        let optimized = bound.with_extension("opt.wasm");
         let mut cmd = Command::new(wasm_opt);
-        cmd.current_dir(&root).args(WASM_FEATURES).args([
-            "-Oz",
-            "--converge",
+        cmd.current_dir(&root).args(WASM_FEATURES).arg("-Oz");
+        if opts.converge {
+            cmd.arg("--converge");
+        }
+        cmd.args([
             &bound.to_string_lossy(),
             "-o",
-            &bound.to_string_lossy(),
+            &optimized.to_string_lossy(),
         ]);
         run_command(&mut cmd, "wasm-opt")?;
+        std::fs::rename(&optimized, &bound)?;
         Some(file_size(&bound)?)
     } else {
         note("wasm-opt not found; install the `binaryen` npm package or add it to PATH");
