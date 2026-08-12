@@ -261,6 +261,78 @@ class SourceRules(unittest.TestCase):
         self.assertNotIn("std-absolute-to-vfs", counts)
         self.assertNotIn("path-absolute-to-vfs", counts)
 
+    def test_temp_dir_routes_through_the_vfs(self):
+        text, counts = self.rewrite('let lock = std::env::temp_dir().join("uv.lock");\n')
+        self.assertEqual(counts.get("std-env-paths-to-vfs"), 1)
+        self.assertIn('uv_vfs::temp_dir().join("uv.lock")', text)
+
+    def test_a_bare_temp_dir_routes_through_the_vfs(self):
+        text, counts = self.rewrite('let lock = env::temp_dir().join("uv.lock");\n')
+        self.assertEqual(counts.get("env-paths-to-vfs"), 1)
+        self.assertIn('uv_vfs::temp_dir().join("uv.lock")', text)
+
+    def test_split_paths_routes_through_the_vfs(self):
+        text, counts = self.rewrite("let dirs = env::split_paths(&search_path).collect();\n")
+        self.assertEqual(counts.get("env-paths-to-vfs"), 1)
+        self.assertIn("uv_vfs::split_paths(&search_path)", text)
+
+    def test_a_home_dir_import_routes_through_the_vfs(self):
+        text, counts = self.rewrite("use std::env::home_dir;\n")
+        self.assertEqual(counts.get("std-env-paths-to-vfs"), 1)
+        self.assertEqual(text, "use uv_vfs::home_dir;\n")
+
+    def test_a_qualified_env_path_helper_is_counted_once(self):
+        _, counts = self.rewrite("std::env::temp_dir();\n")
+        self.assertEqual(counts.get("std-env-paths-to-vfs"), 1)
+        self.assertNotIn("env-paths-to-vfs", counts)
+
+    def test_join_paths_is_left_on_std(self):
+        source = "let path = env::join_paths(dirs)?;\n"
+        self.assertEqual(self.rewrite(source), (source, {}))
+
+    def test_other_env_readers_are_left_alone(self):
+        source = "env::var(EnvVars::PATH);\nenv::var_os(name);\nenv::consts::EXE_SUFFIX;\n"
+        self.assertEqual(self.rewrite(source), (source, {}))
+
+    def test_the_env_import_goes_when_the_rewrite_leaves_it_unused(self):
+        text, counts = self.rewrite("use std::env;\n\nfn f() { env::temp_dir(); }\n")
+        self.assertEqual(counts.get("unused-env-import"), 1)
+        self.assertNotIn("use std::env;", text)
+        self.assertIn("uv_vfs::temp_dir()", text)
+
+    def test_a_grouped_env_import_loses_only_its_own_item(self):
+        text, counts = self.rewrite("use std::{env, io};\n\nfn f() { env::temp_dir(); }\n")
+        self.assertEqual(counts.get("unused-env-import"), 1)
+        self.assertIn("use std::io;\n", text)
+
+    def test_a_multi_line_group_keeps_its_shape(self):
+        text, counts = self.rewrite(
+            "use std::{\n    env,\n    ffi::OsString,\n};\n\nfn f() { env::temp_dir(); }\n"
+        )
+        self.assertEqual(counts.get("unused-env-import"), 1)
+        self.assertIn("use std::{\n    ffi::OsString,\n};\n", text)
+
+    def test_the_env_import_stays_when_something_else_needs_it(self):
+        text, counts = self.rewrite(
+            "use std::{env, io};\n\nfn f() { env::temp_dir(); env::var(name); }\n"
+        )
+        self.assertNotIn("unused-env-import", counts)
+        self.assertIn("use std::{env, io};", text)
+
+    def test_a_qualified_env_path_does_not_keep_the_import_alive(self):
+        text, counts = self.rewrite(
+            "use std::env;\nuse std::env::consts::ARCH;\n\nfn f() { env::temp_dir(); }\n"
+        )
+        self.assertEqual(counts.get("unused-env-import"), 1)
+        self.assertIn("use std::env::consts::ARCH;", text)
+
+    def test_the_env_path_rules_are_idempotent(self):
+        once, _ = self.rewrite("std::env::temp_dir();\nenv::split_paths(&p);\n")
+        twice, counts = self.rewrite(once)
+        self.assertEqual(twice, once)
+        self.assertNotIn("std-env-paths-to-vfs", counts)
+        self.assertNotIn("env-paths-to-vfs", counts)
+
 
 class UrlImport(unittest.TestCase):
     def inject(self, source, host_only=False):

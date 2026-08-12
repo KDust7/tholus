@@ -93,6 +93,16 @@ SOURCE_RULES = [
     ("walkdir-to-vfs", re.compile(r"\bwalkdir::"), "uv_vfs::walk::"),
     ("std-absolute-to-vfs", re.compile(r"\bstd::path::absolute\b"), "uv_vfs::absolute"),
     ("path-absolute-to-vfs", re.compile(r"\bpath::absolute\b"), "uv_vfs::absolute"),
+    (
+        "std-env-paths-to-vfs",
+        re.compile(r"\bstd::env::(temp_dir|home_dir|split_paths)\b"),
+        r"uv_vfs::\1",
+    ),
+    (
+        "env-paths-to-vfs",
+        re.compile(r"\benv::(temp_dir|home_dir|split_paths)\b"),
+        r"uv_vfs::\1",
+    ),
 ]
 
 REWRITTEN_DEPENDENCIES = {"http::": "http", "web_time::": "web-time"}
@@ -197,15 +207,52 @@ def runs_only_on_the_host(path):
     return not {"tests", "benches", "examples"}.isdisjoint(path.parts)
 
 
-STD_PATH_IMPORT = re.compile(r"^use std::path;\n", re.M)
-PATH_MODULE_USE = re.compile(r"(?<![:\w])path::")
+STRANDABLE_STD_MODULES = ("path", "env")
+
+STD_MODULE_IMPORT = {
+    module: re.compile(rf"^use std::{module};\n", re.M) for module in STRANDABLE_STD_MODULES
+}
+STD_MODULE_USE = {
+    module: re.compile(rf"(?<![:\w]){module}::") for module in STRANDABLE_STD_MODULES
+}
+STD_GROUP_IMPORT = re.compile(r"^use std::\{(.*?)\};\n", re.M | re.S)
 
 
-def drop_unused_path_import(text):
-    if not STD_PATH_IMPORT.search(text):
-        return text, 0
-    without = STD_PATH_IMPORT.sub("", text, count=1)
-    if PATH_MODULE_USE.search(without):
+def split_import_items(text):
+    items = []
+    current = ""
+    depth = 0
+    for char in text:
+        if char in "{[(":
+            depth += 1
+        elif char in "}])":
+            depth -= 1
+        if char == "," and depth == 0:
+            items.append(current.strip())
+            current = ""
+            continue
+        current += char
+    items.append(current.strip())
+    return [item for item in items if item]
+
+
+def drop_from_group(match, module):
+    items = split_import_items(match.group(1))
+    if module not in items:
+        return match.group(0)
+    kept = [item for item in items if item != module]
+    if not kept:
+        return ""
+    if "\n" in match.group(1):
+        lines = match.group(0).splitlines(keepends=True)
+        return "".join(line for line in lines if line.strip().rstrip(",") != module)
+    return group_import("std", kept) + "\n"
+
+
+def drop_unused_std_import(text, module):
+    without = STD_MODULE_IMPORT[module].sub("", text, count=1)
+    without = STD_GROUP_IMPORT.sub(lambda match: drop_from_group(match, module), without)
+    if without == text or STD_MODULE_USE[module].search(without):
         return text, 0
     return without, 1
 
@@ -216,9 +263,10 @@ def apply_source_rules(text):
         text, hits = pattern.subn(replacement, text)
         if hits:
             counts[name] = counts.get(name, 0) + hits
-    text, dropped = drop_unused_path_import(text)
-    if dropped:
-        counts["unused-path-import"] = dropped
+    for module in STRANDABLE_STD_MODULES:
+        text, dropped = drop_unused_std_import(text, module)
+        if dropped:
+            counts[f"unused-{module}-import"] = dropped
     return text, counts
 
 
