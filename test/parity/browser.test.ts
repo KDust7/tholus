@@ -1,16 +1,26 @@
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Browser, chromium, type Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const assets = resolve(dirname(fileURLToPath(import.meta.url)), "../../packages/core/assets");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const assets = resolve(root, "packages/core/assets");
 const wasmPath = resolve(assets, "engine_bg.wasm");
 const jsPath = resolve(assets, "engine.js");
 const isBuilt = existsSync(wasmPath) && existsSync(jsPath);
+const nativePath = resolve(
+  root,
+  "vendor/uv/target/debug",
+  process.platform === "win32" ? "uv.exe" : "uv",
+);
+const hasNative = existsSync(nativePath);
+const PROGRAM = basename(nativePath);
+const TARGET_TRIPLE = /\b[a-z0-9_]+(?:-[a-z0-9_]+){2,3}\)/;
 
 const PAGE = `<!doctype html>
 <meta charset="utf-8">
@@ -45,6 +55,17 @@ interface Output {
   stderr: string;
 }
 
+async function launchChromium(): Promise<Browser> {
+  try {
+    return await chromium.launch();
+  } catch (error) {
+    if (!String(error).includes("Executable doesn't exist")) {
+      throw error;
+    }
+    return await chromium.launch({ channel: "chrome" });
+  }
+}
+
 describe.skipIf(!isBuilt)("the engine runs in headless chromium", () => {
   let server: Server;
   let browser: Browser;
@@ -66,7 +87,7 @@ describe.skipIf(!isBuilt)("the engine runs in headless chromium", () => {
     await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
     origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
-    browser = await chromium.launch();
+    browser = await launchChromium();
     page = await browser.newPage();
     await page.goto(`${origin}/index.html`);
     await page.evaluate(() => (globalThis as unknown as EngineWindow).__ready);
@@ -75,7 +96,7 @@ describe.skipIf(!isBuilt)("the engine runs in headless chromium", () => {
   afterAll(async () => {
     await browser?.close();
     await new Promise<void>((done) => server?.close(() => done()));
-  });
+  }, 60_000);
 
   async function invoke(argv: string[]): Promise<Output> {
     const captured = await page.evaluate(async (args): Promise<Captured> => {
@@ -136,5 +157,34 @@ describe.skipIf(!isBuilt)("the engine runs in headless chromium", () => {
     const result = await invoke(["uv", "install"]);
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("uv pip install");
+  });
+
+  describe.skipIf(!hasNative)("matches native uv byte for byte", () => {
+    function native(args: string[]): Output {
+      const result = spawnSync(nativePath, args, { encoding: "buffer" });
+      return {
+        code: result.status ?? -1,
+        stdout: result.stdout.toString("utf8"),
+        stderr: result.stderr.toString("utf8"),
+      };
+    }
+
+    it.each([["--help"], ["pip", "--help"], ["python", "--help"], ["--nonesuch"], ["install"]])(
+      "`uv %s`",
+      async (...args: string[]) => {
+        const [there, here] = [native(args), await invoke([PROGRAM, ...args])];
+        expect(here.stdout).toBe(there.stdout);
+        expect(here.stderr).toBe(there.stderr);
+        expect(here.code).toBe(there.code);
+      },
+    );
+
+    it("`uv --version`, once the target triple is normalized", async () => {
+      const [there, here] = [native(["--version"]), await invoke([PROGRAM, "--version"])];
+      const strip = (text: string): string => text.replace(TARGET_TRIPLE, "<target>)");
+      expect(strip(here.stdout)).toBe(strip(there.stdout));
+      expect(here.stdout).toContain("wasm32-unknown-unknown");
+      expect(here.code).toBe(there.code);
+    });
   });
 });
