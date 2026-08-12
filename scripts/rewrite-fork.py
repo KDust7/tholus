@@ -138,6 +138,8 @@ PRESENCE_METHODS = (
     "canonicalize",
     "read_link",
     "read_dir",
+    "is_absolute",
+    "is_relative",
 )
 
 PRESENCE_CALL = re.compile(r"\.(vfs_)?(" + "|".join((*PRESENCE_METHODS, "metadata")) + r")\(\)")

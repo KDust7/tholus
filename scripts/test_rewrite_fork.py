@@ -110,6 +110,28 @@ class UnitTestTail(unittest.TestCase):
 
 
 class PresenceRewrite(unittest.TestCase):
+    def test_is_absolute_is_routed_through_the_extension_trait(self):
+        text, count, _ = rewrite("fn f(p: &Path) -> bool { p.is_absolute() }\n")
+        self.assertEqual(count, 1)
+        self.assertIn("p.vfs_is_absolute()", text)
+
+    def test_is_relative_is_routed_through_the_extension_trait(self):
+        text, count, _ = rewrite("fn f(p: &Path) -> bool { p.is_relative() }\n")
+        self.assertEqual(count, 1)
+        self.assertIn("p.vfs_is_relative()", text)
+
+    def test_an_absoluteness_check_in_the_test_tail_is_left_alone(self):
+        source = "#[cfg(test)]\nmod tests {\n    fn t(p: &Path) { assert!(p.is_absolute()); }\n}\n"
+        text, count, _ = rewrite(source)
+        self.assertEqual(count, 0)
+        self.assertEqual(text, source)
+
+    def test_the_absoluteness_rewrite_is_idempotent(self):
+        once, _, _ = rewrite("fn f(p: &Path) -> bool { p.is_absolute() }\n")
+        twice, count, _ = rewrite(once)
+        self.assertEqual(count, 0)
+        self.assertEqual(twice, once)
+
     def test_a_path_predicate_is_routed_through_the_extension_trait(self):
         text, count, _ = rewrite("use std::path::Path;\n\nfn f(p: &Path) -> bool { p.exists() }\n")
         self.assertEqual(count, 1)
