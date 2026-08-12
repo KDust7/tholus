@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -16,6 +16,7 @@ const nativePath = resolve(
 );
 
 const canCompare = existsSync(wasmPath) && existsSync(jsPath) && existsSync(nativePath);
+const PROGRAM = basename(nativePath);
 
 interface EngineInstance {
   invoke(argv: string[], onOutput: (stream: string, data: Uint8Array) => void): Promise<number>;
@@ -47,18 +48,18 @@ describe.skipIf(!canCompare)("the engine matches native uv byte for byte", () =>
     engine = new mod.Engine();
   });
 
-  async function browser(argv: string[]): Promise<Output> {
+  async function browser(args: string[]): Promise<Output> {
     const stdout: Uint8Array[] = [];
     const stderr: Uint8Array[] = [];
-    const code = await engine.invoke(argv, (stream, data) => {
+    const code = await engine.invoke([PROGRAM, ...args], (stream, data) => {
       (stream === "stdout" ? stdout : stderr).push(data);
     });
     const join = (parts: Uint8Array[]): string => Buffer.concat(parts).toString("utf8");
     return { code, stdout: join(stdout), stderr: join(stderr) };
   }
 
-  function native(argv: string[]): Output {
-    const result = spawnSync(nativePath, argv.slice(1), { encoding: "buffer" });
+  function native(args: string[]): Output {
+    const result = spawnSync(nativePath, args, { encoding: "buffer" });
     return {
       code: result.status ?? -1,
       stdout: result.stdout.toString("utf8"),
@@ -66,38 +67,39 @@ describe.skipIf(!canCompare)("the engine matches native uv byte for byte", () =>
     };
   }
 
-  it.each([["--help"], ["pip", "--help"], ["python", "--help"]])(
+  it.each([["--help"], ["pip", "--help"], ["python", "--help"], ["pip", "install", "--help"]])(
     "matches `uv %s` exactly",
     async (...args: string[]) => {
-      const argv = ["uv", ...args];
-      const [there, here] = [native(argv), await browser(argv)];
+      const [there, here] = [native(args), await browser(args)];
       expect(here.stdout).toBe(there.stdout);
       expect(here.stderr).toBe(there.stderr);
       expect(here.code).toBe(there.code);
     },
   );
 
-  it.each([["--nonesuch"], ["install"]])(
+  it.each([["--nonesuch"], ["install"], ["pip", "--nonesuch"]])(
     "matches the failure for `uv %s` exactly",
     async (...args: string[]) => {
-      const argv = ["uv", ...args];
-      const [there, here] = [native(argv), await browser(argv)];
+      const [there, here] = [native(args), await browser(args)];
       expect(here.stderr).toBe(there.stderr);
       expect(here.stdout).toBe(there.stdout);
       expect(here.code).toBe(there.code);
     },
   );
 
+  it("takes its program name from argv[0], as native takes it from its path", async () => {
+    const here = await browser(["--help"]);
+    expect(here.stdout).toContain(`Usage: ${PROGRAM} [OPTIONS]`);
+  });
+
   it("matches `uv --version` once the target triple is normalized", async () => {
-    const argv = ["uv", "--version"];
-    const [there, here] = [native(argv), await browser(argv)];
+    const [there, here] = [native(["--version"]), await browser(["--version"])];
     expect(withoutTargetTriple(here.stdout)).toBe(withoutTargetTriple(there.stdout));
     expect(here.code).toBe(there.code);
   });
 
   it("reports each build's own target in --version", async () => {
-    const argv = ["uv", "--version"];
-    expect((await browser(argv)).stdout).toContain("wasm32-unknown-unknown");
-    expect(native(argv).stdout).not.toContain("wasm32-unknown-unknown");
+    expect((await browser(["--version"])).stdout).toContain("wasm32-unknown-unknown");
+    expect(native(["--version"]).stdout).not.toContain("wasm32-unknown-unknown");
   });
 });
