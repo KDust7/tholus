@@ -5128,6 +5128,7 @@ name = "uv-console"
 version = "0.0.70"
 dependencies = [
  "console",
+ "uv-wasm-compat",
 ]
 
 [[package]]
