@@ -6,6 +6,7 @@ use uv_wasm_compat::term::{self, TermConfig};
 use wasm_bindgen::prelude::*;
 
 use crate::dispatch::dispatch;
+use crate::fs;
 
 const ALREADY_RUNNING: &str =
     "uv-wasm: an invocation is already running; invocations must be serialized";
@@ -45,6 +46,46 @@ impl Engine {
     #[wasm_bindgen(js_name = isRunning)]
     pub fn is_running(&self) -> bool {
         self.running.get()
+    }
+
+    #[wasm_bindgen(js_name = fsRead)]
+    pub fn fs_read(&self, path: &str) -> Result<Vec<u8>, JsError> {
+        fs::read(path)
+    }
+
+    #[wasm_bindgen(js_name = fsWrite)]
+    pub fn fs_write(&self, path: &str, contents: &[u8]) -> Result<(), JsError> {
+        fs::write(path, contents)
+    }
+
+    #[wasm_bindgen(js_name = fsReadDir)]
+    pub fn fs_read_dir(&self, path: &str) -> Result<Vec<String>, JsError> {
+        fs::read_dir(path)
+    }
+
+    #[wasm_bindgen(js_name = fsMkdirp)]
+    pub fn fs_mkdirp(&self, path: &str) -> Result<(), JsError> {
+        fs::create_dir_all(path)
+    }
+
+    #[wasm_bindgen(js_name = fsExists)]
+    pub fn fs_exists(&self, path: &str) -> bool {
+        fs::exists(path)
+    }
+
+    #[wasm_bindgen(js_name = fsKind)]
+    pub fn fs_kind(&self, path: &str) -> Option<String> {
+        fs::kind(path)
+    }
+
+    #[wasm_bindgen(js_name = fsRemove)]
+    pub fn fs_remove(&self, path: &str) -> Result<(), JsError> {
+        fs::remove_file(path)
+    }
+
+    #[wasm_bindgen(js_name = fsRemoveDir)]
+    pub fn fs_remove_dir(&self, path: &str) -> Result<(), JsError> {
+        fs::remove_dir_all(path)
     }
 
     pub fn invoke(&self, argv: Vec<String>, on_output: js_sys::Function) -> js_sys::Promise {

@@ -6216,6 +6216,7 @@ dependencies = [
  "uv",
  "uv-cli",
  "uv-version",
+ "uv-vfs",
  "uv-wasm-compat",
  "wasm-bindgen",
  "wasm-bindgen-futures",

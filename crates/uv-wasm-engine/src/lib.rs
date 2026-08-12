@@ -6,6 +6,8 @@ mod dispatch;
 #[cfg(target_family = "wasm")]
 mod engine;
 #[cfg(target_family = "wasm")]
+mod fs;
+#[cfg(target_family = "wasm")]
 mod sink;
 
 #[cfg(target_family = "wasm")]
