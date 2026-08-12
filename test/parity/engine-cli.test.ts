@@ -42,12 +42,19 @@ describe.skipIf(!isBuilt)("the built engine answers uv's command line", () => {
   });
 
   async function invoke(argv: string[]): Promise<Invocation> {
-    const collected: Record<string, Uint8Array[]> = { stdout: [], stderr: [] };
+    const stdout: Uint8Array[] = [];
+    const stderr: Uint8Array[] = [];
     const code = await engine.invoke(argv, (stream, data) => {
-      collected[stream]?.push(data);
+      if (stream === "stdout") {
+        stdout.push(data);
+      } else if (stream === "stderr") {
+        stderr.push(data);
+      } else {
+        throw new Error(`engine named an unknown stream: ${stream}`);
+      }
     });
     const join = (parts: Uint8Array[]): string => Buffer.concat(parts).toString("utf8");
-    return { code, stdout: join(collected.stdout), stderr: join(collected.stderr) };
+    return { code, stdout: join(stdout), stderr: join(stderr) };
   }
 
   it("reports the vendored uv version, not a placeholder", () => {
