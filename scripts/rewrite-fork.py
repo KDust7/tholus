@@ -91,6 +91,8 @@ SOURCE_RULES = [
         r"uv_vfs::fs::\1",
     ),
     ("walkdir-to-vfs", re.compile(r"\bwalkdir::"), "uv_vfs::walk::"),
+    ("std-absolute-to-vfs", re.compile(r"\bstd::path::absolute\b"), "uv_vfs::absolute"),
+    ("path-absolute-to-vfs", re.compile(r"\bpath::absolute\b"), "uv_vfs::absolute"),
 ]
 
 REWRITTEN_DEPENDENCIES = {"http::": "http", "web_time::": "web-time"}
@@ -195,12 +197,28 @@ def runs_only_on_the_host(path):
     return not {"tests", "benches", "examples"}.isdisjoint(path.parts)
 
 
+STD_PATH_IMPORT = re.compile(r"^use std::path;\n", re.M)
+PATH_MODULE_USE = re.compile(r"(?<![:\w])path::")
+
+
+def drop_unused_path_import(text):
+    if not STD_PATH_IMPORT.search(text):
+        return text, 0
+    without = STD_PATH_IMPORT.sub("", text, count=1)
+    if PATH_MODULE_USE.search(without):
+        return text, 0
+    return without, 1
+
+
 def apply_source_rules(text):
     counts = {}
     for name, pattern, replacement in SOURCE_RULES:
         text, hits = pattern.subn(replacement, text)
         if hits:
             counts[name] = counts.get(name, 0) + hits
+    text, dropped = drop_unused_path_import(text)
+    if dropped:
+        counts["unused-path-import"] = dropped
     return text, counts
 
 

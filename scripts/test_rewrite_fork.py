@@ -215,6 +215,52 @@ class SourceRules(unittest.TestCase):
         self.assertEqual(twice, once)
         self.assertNotIn("walkdir-to-vfs", counts)
 
+    def test_absolute_routes_through_the_vfs(self):
+        text, counts = self.rewrite("let root = std::path::absolute(cache.root())?;\n")
+        self.assertEqual(counts.get("std-absolute-to-vfs"), 1)
+        self.assertIn("uv_vfs::absolute(cache.root())", text)
+
+    def test_a_bare_path_absolute_routes_through_the_vfs(self):
+        text, counts = self.rewrite("let install = path::absolute(install_path)?;\n")
+        self.assertEqual(counts.get("path-absolute-to-vfs"), 1)
+        self.assertIn("uv_vfs::absolute(install_path)", text)
+
+    def test_a_qualified_absolute_is_counted_once(self):
+        _, counts = self.rewrite("std::path::absolute(a)?;\n")
+        self.assertEqual(counts.get("std-absolute-to-vfs"), 1)
+        self.assertNotIn("path-absolute-to-vfs", counts)
+
+    def test_an_unrelated_absolute_is_left_alone(self):
+        source = "let my_path = 1;\nself.absolute();\nlet other_path_absolute = 2;\n"
+        self.assertEqual(self.rewrite(source), (source, {}))
+
+    def test_the_path_import_goes_when_the_rewrite_leaves_it_unused(self):
+        text, counts = self.rewrite("use std::path;\n\nfn f() { path::absolute(a); }\n")
+        self.assertEqual(counts.get("unused-path-import"), 1)
+        self.assertNotIn("use std::path;", text)
+        self.assertIn("uv_vfs::absolute(a)", text)
+
+    def test_a_fully_qualified_path_does_not_keep_the_import_alive(self):
+        text, counts = self.rewrite(
+            "use std::path;\n\nfn f(p: std::path::PathBuf) { path::absolute(p); }\n"
+        )
+        self.assertEqual(counts.get("unused-path-import"), 1)
+        self.assertNotIn("use std::path;", text)
+
+    def test_the_path_import_stays_when_something_else_needs_it(self):
+        text, counts = self.rewrite(
+            "use std::path;\n\nfn f() -> path::PathBuf { path::absolute(a) }\n"
+        )
+        self.assertNotIn("unused-path-import", counts)
+        self.assertIn("use std::path;", text)
+
+    def test_the_absolute_rule_is_idempotent(self):
+        once, _ = self.rewrite("std::path::absolute(a)?;\npath::absolute(b)?;\n")
+        twice, counts = self.rewrite(once)
+        self.assertEqual(twice, once)
+        self.assertNotIn("std-absolute-to-vfs", counts)
+        self.assertNotIn("path-absolute-to-vfs", counts)
+
 
 class UrlImport(unittest.TestCase):
     def inject(self, source, host_only=False):
