@@ -1,0 +1,15 @@
+{
+  "name": "@uv-wasm/parity",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0 OR MIT",
+  "description": "Phase-1 gate: the built engine artifact answering uv's command line",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "vitest": "^4.1.10"
+  }
+}

@@ -59,6 +59,14 @@
         "vitest": "^4.1.10",
       },
     },
+    "test/parity": {
+      "name": "@uv-wasm/parity",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/node": "^24.13.3",
+        "vitest": "^4.1.10",
+      },
+    },
     "tools/size-report": {
       "name": "@uv-wasm/size-report",
       "version": "0.0.0",
@@ -156,6 +164,8 @@
     "@uv-wasm/engine-protocol": ["@uv-wasm/engine-protocol@workspace:packages/engine-protocol"],
 
     "@uv-wasm/mock-engine": ["@uv-wasm/mock-engine@workspace:packages/mock-engine"],
+
+    "@uv-wasm/parity": ["@uv-wasm/parity@workspace:test/parity"],
 
     "@uv-wasm/size-report": ["@uv-wasm/size-report@workspace:tools/size-report"],
 
