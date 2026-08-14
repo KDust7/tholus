@@ -8,6 +8,8 @@ mod engine;
 #[cfg(target_family = "wasm")]
 mod fs;
 #[cfg(target_family = "wasm")]
+mod python;
+#[cfg(target_family = "wasm")]
 mod sink;
 
 #[cfg(target_family = "wasm")]

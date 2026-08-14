@@ -1,0 +1,63 @@
+{
+  "result": "success",
+  "platform": {
+    "os": {
+      "name": "pyemscripten",
+      "major": 2026,
+      "minor": 0
+    },
+    "arch": "wasm32"
+  },
+  "manylinux_compatible": false,
+  "standalone": false,
+  "markers": {
+    "implementation_name": "cpython",
+    "implementation_version": "3.14.0",
+    "os_name": "posix",
+    "platform_machine": "wasm32",
+    "platform_python_implementation": "CPython",
+    "platform_release": "5.0.3",
+    "platform_system": "Emscripten",
+    "platform_version": "#1",
+    "python_full_version": "3.14.0",
+    "python_version": "3.14",
+    "sys_platform": "emscripten"
+  },
+  "sys_base_exec_prefix": "/",
+  "sys_base_prefix": "/",
+  "sys_prefix": "/",
+  "sys_base_executable": null,
+  "sys_executable": "/bin/python3",
+  "sys_path": [
+    "",
+    "/lib/python314.zip",
+    "/lib/python3.14",
+    "/lib/python3.14/lib-dynload",
+    "/lib/python3.14/site-packages"
+  ],
+  "site_packages": [
+    "/lib/python3.14/site-packages"
+  ],
+  "stdlib": "/lib/python3.14",
+  "extension_suffixes": [
+    ".cpython-314-wasm32-emscripten.so",
+    ".so"
+  ],
+  "scheme": {
+    "purelib": "/lib/python3.14/site-packages",
+    "platlib": "/lib/python3.14/site-packages",
+    "include": "/include/python3.14",
+    "scripts": "/bin",
+    "data": "/"
+  },
+  "virtualenv": {
+    "purelib": "lib/python3.14/site-packages",
+    "platlib": "lib/python3.14/site-packages",
+    "include": "include/site/python3.14",
+    "scripts": "bin",
+    "data": ""
+  },
+  "pointer_size": "32",
+  "gil_disabled": false,
+  "debug_enabled": false
+}

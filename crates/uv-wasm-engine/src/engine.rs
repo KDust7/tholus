@@ -7,6 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::dispatch::dispatch;
 use crate::fs;
+use crate::python;
 
 const ALREADY_RUNNING: &str =
     "uv-wasm: an invocation is already running; invocations must be serialized";
@@ -17,20 +18,15 @@ pub struct Engine {
     running: Rc<Cell<bool>>,
 }
 
-impl Default for Engine {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[wasm_bindgen]
 impl Engine {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Engine, JsError> {
+        python::seed_default_runtime()?;
+        Ok(Self {
             initialized: Cell::new(false),
             running: Rc::new(Cell::new(false)),
-        }
+        })
     }
 
     #[wasm_bindgen(js_name = setTermSize)]

@@ -21,6 +21,7 @@ console_error_panic_hook = { workspace = true }
 js-sys = { workspace = true }
 uv = { path = "../../vendor/uv/crates/uv", default-features = false }
 uv-cli = { path = "../../vendor/uv/crates/uv-cli" }
+uv-python = { path = "../../vendor/uv/crates/uv-python" }
 uv-vfs = { path = "../../vendor/uv/crates/uv-vfs" }
 uv-wasm-compat = { path = "../../vendor/uv/crates/uv-wasm-compat" }
 wasm-bindgen-futures = { workspace = true }

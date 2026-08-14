@@ -6216,6 +6216,7 @@ dependencies = [
  "js-sys",
  "uv",
  "uv-cli",
+ "uv-python",
  "uv-version",
  "uv-vfs",
  "uv-wasm-compat",
