@@ -312,9 +312,43 @@ class SourceRules(unittest.TestCase):
         source = "let path = env::join_paths(dirs)?;\n"
         self.assertEqual(self.rewrite(source), (source, {}))
 
-    def test_other_env_readers_are_left_alone(self):
-        source = "env::var(EnvVars::PATH);\nenv::var_os(name);\nenv::consts::EXE_SUFFIX;\n"
+    def test_env_constants_are_left_alone(self):
+        source = "env::consts::EXE_SUFFIX;\nenv::consts::ARCH;\n"
         self.assertEqual(self.rewrite(source), (source, {}))
+
+    def test_a_variable_read_routes_through_the_vfs(self):
+        text, counts = self.rewrite("let home = std::env::var(EnvVars::HOME)?;\n")
+        self.assertEqual(counts.get("std-env-vars-to-vfs"), 1)
+        self.assertIn("uv_vfs::var(EnvVars::HOME)?", text)
+
+    def test_a_bare_variable_read_routes_through_the_vfs(self):
+        text, counts = self.rewrite("let home = env::var(EnvVars::HOME)?;\n")
+        self.assertEqual(counts.get("env-vars-to-vfs"), 1)
+        self.assertIn("uv_vfs::var(EnvVars::HOME)?", text)
+
+    def test_var_os_routes_through_the_vfs(self):
+        text, counts = self.rewrite("let path = env::var_os(EnvVars::PATH);\n")
+        self.assertEqual(counts.get("env-vars-to-vfs"), 1)
+        self.assertIn("uv_vfs::var_os(EnvVars::PATH)", text)
+
+    def test_a_qualified_variable_read_is_counted_once(self):
+        _, counts = self.rewrite("std::env::var_os(name);\n")
+        self.assertEqual(counts.get("std-env-vars-to-vfs"), 1)
+        self.assertNotIn("env-vars-to-vfs", counts)
+
+    def test_vars_is_left_on_std_because_nothing_calls_it(self):
+        source = "for (key, value) in env::vars() {}\n"
+        self.assertEqual(self.rewrite(source), (source, {}))
+
+    def test_set_var_is_left_on_std(self):
+        source = "unsafe { std::env::set_var(EnvVars::UV, current_exe) };\n"
+        self.assertEqual(self.rewrite(source), (source, {}))
+
+    def test_a_rewritten_variable_read_is_not_rewritten_again(self):
+        once, _ = self.rewrite("env::var(EnvVars::HOME);\n")
+        twice, counts = self.rewrite(once)
+        self.assertEqual(twice, once)
+        self.assertEqual(counts, {})
 
     def test_current_dir_routes_through_the_vfs(self):
         text, counts = self.rewrite("options.relative_to(&std::env::current_dir()?)\n")
@@ -361,9 +395,23 @@ class SourceRules(unittest.TestCase):
         self.assertEqual(counts.get("unused-env-import"), 1)
         self.assertIn("use std::{\n    ffi::OsString,\n};\n", text)
 
+    def test_a_shared_line_in_a_group_loses_only_the_stranded_item(self):
+        text, counts = self.rewrite(
+            "use std::{\n    env, io,\n    path::{Path, PathBuf},\n};\n\nfn f() { env::var(name); }\n"
+        )
+        self.assertEqual(counts.get("unused-env-import"), 1)
+        self.assertIn("    io,\n", text)
+        self.assertIn("    path::{Path, PathBuf},\n", text)
+        self.assertNotIn("env,", text)
+
+    def test_an_indented_import_is_dropped_when_it_is_stranded(self):
+        text, counts = self.rewrite("fn f() {\n    use std::env;\n    env::var(name);\n}\n")
+        self.assertEqual(counts.get("unused-env-import"), 1)
+        self.assertNotIn("use std::env;", text)
+
     def test_the_env_import_stays_when_something_else_needs_it(self):
         text, counts = self.rewrite(
-            "use std::{env, io};\n\nfn f() { env::temp_dir(); env::var(name); }\n"
+            "use std::{env, io};\n\nfn f() { env::temp_dir(); env::join_paths(dirs); }\n"
         )
         self.assertNotIn("unused-env-import", counts)
         self.assertIn("use std::{env, io};", text)

@@ -104,6 +104,16 @@ SOURCE_RULES = [
         r"uv_vfs::\1",
     ),
     (
+        "std-env-vars-to-vfs",
+        re.compile(r"\bstd::env::(var_os|var)\b"),
+        r"uv_vfs::\1",
+    ),
+    (
+        "env-vars-to-vfs",
+        re.compile(r"\benv::(var_os|var)\b"),
+        r"uv_vfs::\1",
+    ),
+    (
         "std-set-current-dir-to-fs",
         re.compile(r"\bstd::env::set_current_dir\b"),
         "uv_fs::set_current_dir",
@@ -220,7 +230,7 @@ def runs_only_on_the_host(path):
 STRANDABLE_STD_MODULES = ("path", "env")
 
 STD_MODULE_IMPORT = {
-    module: re.compile(rf"^use std::{module};\n", re.M) for module in STRANDABLE_STD_MODULES
+    module: re.compile(rf"^[ \t]*use std::{module};\n", re.M) for module in STRANDABLE_STD_MODULES
 }
 STD_MODULE_USE = {
     module: re.compile(rf"(?<![:\w]){module}::") for module in STRANDABLE_STD_MODULES
@@ -254,8 +264,19 @@ def drop_from_group(match, module):
     if not kept:
         return ""
     if "\n" in match.group(1):
-        lines = match.group(0).splitlines(keepends=True)
-        return "".join(line for line in lines if line.strip().rstrip(",") != module)
+        rebuilt = []
+        for line in match.group(0).splitlines(keepends=True):
+            body = line.strip().rstrip(",")
+            if body == module:
+                continue
+            on_this_line = split_import_items(body)
+            if module in on_this_line:
+                indent = line[: len(line) - len(line.lstrip())]
+                comma = "," if line.strip().endswith(",") else ""
+                remaining = ", ".join(item for item in on_this_line if item != module)
+                line = f"{indent}{remaining}{comma}\n"
+            rebuilt.append(line)
+        return "".join(rebuilt)
     return group_import("std", kept) + "\n"
 
 

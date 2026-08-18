@@ -84,6 +84,49 @@ impl Engine {
         fs::remove_dir_all(path)
     }
 
+    #[cfg(target_family = "wasm")]
+    #[wasm_bindgen(js_name = envSet)]
+    pub fn env_set(&self, key: &str, value: &str) {
+        uv_vfs::env::set(key, value);
+    }
+
+    #[cfg(target_family = "wasm")]
+    #[wasm_bindgen(js_name = envGet)]
+    pub fn env_get(&self, key: &str) -> Option<String> {
+        uv_vfs::var(key).ok()
+    }
+
+    #[cfg(target_family = "wasm")]
+    #[wasm_bindgen(js_name = envUnset)]
+    pub fn env_unset(&self, key: &str) {
+        uv_vfs::env::unset(key);
+    }
+
+    #[cfg(target_family = "wasm")]
+    #[wasm_bindgen(js_name = envReplace)]
+    pub fn env_replace(&self, entries: Vec<String>) -> Result<(), JsError> {
+        if entries.len() % 2 != 0 {
+            return Err(JsError::new(
+                "envReplace takes a flat key/value list, so it needs an even number of entries",
+            ));
+        }
+        uv_vfs::env::replace(
+            entries
+                .chunks_exact(2)
+                .map(|pair| (pair[0].clone().into(), pair[1].clone().into())),
+        );
+        Ok(())
+    }
+
+    #[cfg(target_family = "wasm")]
+    #[wasm_bindgen(js_name = envKeys)]
+    pub fn env_keys(&self) -> Vec<String> {
+        uv_vfs::env::snapshot()
+            .into_iter()
+            .map(|(key, _)| key.to_string_lossy().into_owned())
+            .collect()
+    }
+
     pub fn invoke(&self, argv: Vec<String>, on_output: js_sys::Function) -> js_sys::Promise {
         if self.running.replace(true) {
             return js_sys::Promise::reject(&JsValue::from_str(ALREADY_RUNNING));
