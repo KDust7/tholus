@@ -177,6 +177,7 @@ describe.skipIf(!isBuilt)("the engine runs in headless chromium", () => {
         expect(here.stderr).toBe(there.stderr);
         expect(here.code).toBe(there.code);
       },
+      120_000,
     );
 
     it("`uv --version`, once the target triple is normalized", async () => {

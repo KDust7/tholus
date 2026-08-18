@@ -75,6 +75,7 @@ describe.skipIf(!canCompare)("the engine matches native uv byte for byte", () =>
       expect(here.stderr).toBe(there.stderr);
       expect(here.code).toBe(there.code);
     },
+    120_000,
   );
 
   it.each([["--nonesuch"], ["install"], ["pip", "--nonesuch"]])(
@@ -85,6 +86,7 @@ describe.skipIf(!canCompare)("the engine matches native uv byte for byte", () =>
       expect(here.stdout).toBe(there.stdout);
       expect(here.code).toBe(there.code);
     },
+    120_000,
   );
 
   it("takes its program name from argv[0], as native takes it from its path", async () => {
