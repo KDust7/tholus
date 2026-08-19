@@ -136,7 +136,6 @@ describe.skipIf(!isBuilt)("a real browser Worker drives the engine", () => {
         type: "exec",
         invocationId: "inv-1",
         argv: ["uv", "--version"],
-        stdin: false,
       }),
     );
 

@@ -52,7 +52,6 @@ describe.skipIf(!isBuilt)("the worker drives the real engine over the protocol",
       type: "exec",
       invocationId,
       argv: [PROGRAM, ...args],
-      stdin: false,
     });
     await worker.settled;
     const messages = emitted.slice(before);

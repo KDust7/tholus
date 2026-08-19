@@ -43,6 +43,7 @@ interface EngineModule {
 interface Snapshot {
   requirements: string[];
   args: string[];
+  failing?: boolean;
 }
 
 interface NativeRun {
@@ -138,6 +139,49 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
       }
     }, 180_000);
   }
+
+  it.skipIf(!existsSync(resolve(fixtures, "conflicts", "snapshot.json")))(
+    "reports an unsatisfiable resolution in native uv's exact words",
+    async () => {
+      const dir = resolve(fixtures, "conflicts");
+      const snapshot = JSON.parse(await readFile(resolve(dir, "snapshot.json"), "utf8")) as Snapshot;
+      const requirements = `${snapshot.requirements.join("\n")}\n`;
+
+      let server: ReplayServer | undefined;
+      try {
+        server = await startReplayServer(dir);
+        const args = (directory: string): string[] => [
+          ...snapshot.args,
+          "--index-url",
+          `${server?.origin}/simple`,
+          "--directory",
+          directory,
+        ];
+
+        writeFileSync(join(workspace, "requirements.in"), requirements);
+        const nativeRun = await runNative(args(workspace));
+        expect(nativeRun.status, "the conflict fixture should not resolve").not.toBe(0);
+        expect(nativeRun.stderr).toContain("No solution found");
+
+        engine.fsMkdirp("/conflicts");
+        engine.fsWrite("/conflicts/requirements.in", new TextEncoder().encode(requirements));
+        let browserErr = "";
+        const decoder = new TextDecoder();
+        const code = await engine.invoke([PROGRAM, ...args("/conflicts")], (stream, data) => {
+          if (stream !== "stdout") {
+            browserErr += decoder.decode(data);
+          }
+        });
+
+        expect(server.misses, "the hand-authored snapshot is missing a response").toEqual([]);
+        expect(code).toBe(nativeRun.status);
+        expect(browserErr).toBe(nativeRun.stderr);
+      } finally {
+        await server?.close();
+      }
+    },
+    180_000,
+  );
 
   it("resolves the same requirements read from standard input", async () => {
     const name = available[0] as string;

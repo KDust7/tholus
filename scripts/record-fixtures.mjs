@@ -40,13 +40,21 @@ const scenarios = {
 
 const METADATA_SUFFIX = ".metadata";
 
-const encodeFileUrl = (url) => `/files/${Buffer.from(url, "utf8").toString("base64url")}`;
+const encodeFileUrl = (url) => {
+  const [bare, fragment] = url.split("#");
+  const filename = bare.split("/").pop();
+  const encoded = Buffer.from(url, "utf8").toString("base64url");
+  return `/files/${encoded}/${filename}${fragment ? `#${fragment}` : ""}`;
+};
 
 function decodeFileUrl(path) {
-  const encoded = path.slice("/files/".length);
-  const [segment, suffix] = encoded.endsWith(METADATA_SUFFIX)
-    ? [encoded.slice(0, -METADATA_SUFFIX.length), METADATA_SUFFIX]
-    : [encoded, ""];
+  const rest = path.slice("/files/".length);
+  const slash = rest.indexOf("/");
+  const encoded = slash === -1 ? rest : rest.slice(0, slash);
+  const last = slash === -1 ? encoded : rest.slice(slash + 1);
+  const suffix = last.endsWith(METADATA_SUFFIX) ? METADATA_SUFFIX : "";
+  const segment =
+    slash === -1 && suffix ? encoded.slice(0, -METADATA_SUFFIX.length) : encoded;
   return `${Buffer.from(segment, "base64url").toString("utf8")}${suffix}`;
 }
 
