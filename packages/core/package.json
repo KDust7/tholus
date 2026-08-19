@@ -16,7 +16,8 @@
     "assets"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && bun run bundle-worker",
+    "bundle-worker": "esbuild dist/worker.js --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/worker.js --allow-overwrite",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@types/node": "^24.13.3",
     "@uv-wasm/mock-engine": "workspace:*",
+    "esbuild": "^0.27.2",
     "vitest": "^4.1.10"
   }
 }
