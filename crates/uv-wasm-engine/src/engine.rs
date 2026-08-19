@@ -48,6 +48,16 @@ impl Engine {
         self.running.get()
     }
 
+    #[wasm_bindgen(js_name = setStdin)]
+    pub fn set_stdin(&self, bytes: Vec<u8>) {
+        uv_wasm_compat::stdin::set(bytes);
+    }
+
+    #[wasm_bindgen(js_name = clearStdin)]
+    pub fn clear_stdin(&self) {
+        uv_wasm_compat::stdin::reset();
+    }
+
     #[cfg(target_family = "wasm")]
     #[wasm_bindgen(js_name = setCwd)]
     pub fn set_cwd(&self, path: &str) -> Result<(), JsError> {
