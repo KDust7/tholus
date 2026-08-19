@@ -18,10 +18,10 @@ const jsPath = resolve(assets, "engine.js");
 const isBuilt = existsSync(resolve(assets, "engine_bg.wasm")) && existsSync(jsPath);
 
 const OUT_OF_REACH: Record<string, string> = {
-  "exec-cancel": "engine has no stdin or cancel token, and the prompt is the mock's script",
+  "exec-cancel": "asserts the mock's scripted progress line, and its pause is the mock's",
   "exec-progress-events": "engine emits no reporter events",
   "exec-resize-and-ack": "engine has no ack flow control, and the output is the mock's script",
-  "exec-stdin-roundtrip": "engine has no stdin, and the prompt is the mock's script",
+  "exec-stdin-buffer": "asserts the mock's scripted compile output, not uv's",
   "exec-stdout-exit": "asserts the mock's scripted `pip list` output, not uv's",
   "exec-structured-error": "asserts the mock's scripted resolver error, not uv's",
 };

@@ -9,7 +9,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const FIXTURE_ORIGIN = "http://uv-wasm-fixture.invalid";
 const UPSTREAM_INDEX = "https://pypi.org/simple";
+const PYODIDE_INDEX = "https://index.pyodide.org/314.0.5";
 const REWRITABLE = /json|html|text/i;
+const HOSTED_FILES = /https:\/\/(?:files\.pythonhosted\.org|cdn\.jsdelivr\.net)\/[^"'\s<>]+/g;
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const nativeUv = resolve(
@@ -28,6 +30,11 @@ const scenarios = {
   },
   transitive: { requirements: ["requests==2.32.5"], extraArgs: [] },
   universal: { requirements: ["requests==2.32.5"], extraArgs: ["--universal"] },
+  "pyodide-wheel": {
+    requirements: ["msgpack==1.1.2"],
+    extraArgs: ["--python-platform", "wasm32-pyodide2026", "--python-version", "3.14"],
+    index: PYODIDE_INDEX,
+  },
 };
 
 const METADATA_SUFFIX = ".metadata";
@@ -48,7 +55,7 @@ function rewriteFileUrls(body, contentType, origin) {
   }
   const text = body.toString("utf8");
   const stored = text.replace(
-    /https:\/\/files\.pythonhosted\.org\/[^"'\s<>]+/g,
+    HOSTED_FILES,
     (match) => `${FIXTURE_ORIGIN}${encodeFileUrl(match)}`,
   );
   const rewrite = stored !== text;
@@ -107,6 +114,50 @@ function runNative(args) {
   });
 }
 
+const BYTE_RANGE = /^bytes=(\d*)-(\d*)$/;
+
+function sliceForRange(header, size) {
+  const match = header === undefined ? null : BYTE_RANGE.exec(header.trim());
+  if (!match) {
+    return undefined;
+  }
+  const [, rawStart, rawEnd] = match;
+  if (rawStart === "") {
+    const length = Number(rawEnd);
+    if (rawEnd === "" || !Number.isFinite(length) || length <= 0) {
+      return undefined;
+    }
+    return { start: Math.max(0, size - length), end: size - 1 };
+  }
+  const start = Number(rawStart);
+  const end = rawEnd === "" ? size - 1 : Math.min(Number(rawEnd), size - 1);
+  if (!Number.isFinite(start) || start > end) {
+    return undefined;
+  }
+  return { start, end };
+}
+
+function respond(response, rangeHeader, status, headers, body) {
+  const range = status === 200 ? sliceForRange(rangeHeader, body.byteLength) : undefined;
+  if (!range) {
+    response.writeHead(status, {
+      ...headers,
+      "accept-ranges": "bytes",
+      "content-length": String(body.byteLength),
+    });
+    response.end(body);
+    return;
+  }
+  const slice = body.subarray(range.start, range.end + 1);
+  response.writeHead(206, {
+    ...headers,
+    "accept-ranges": "bytes",
+    "content-range": `bytes ${range.start}-${range.end}/${body.byteLength}`,
+    "content-length": String(slice.byteLength),
+  });
+  response.end(slice);
+}
+
 async function record(name, scenario) {
   const responses = {};
   let origin = FIXTURE_ORIGIN;
@@ -115,7 +166,7 @@ async function record(name, scenario) {
     const key = request.url ?? "/";
     const upstream = key.startsWith("/files/")
       ? decodeFileUrl(key)
-      : `${UPSTREAM_INDEX}${key.replace(/^\/simple/, "")}`;
+      : `${scenario.index ?? UPSTREAM_INDEX}${key.replace(/^\/simple/, "")}`;
 
     const accept = request.headers.accept;
     fetch(upstream, { headers: accept ? { accept } : {} })
@@ -137,11 +188,7 @@ async function record(name, scenario) {
           body: gzipSync(stored, { level: 9 }).toString("base64"),
           ...(rewrite ? { rewrite: true } : {}),
         };
-        response.writeHead(upstreamResponse.status, {
-          ...headers,
-          "content-length": String(served.byteLength),
-        });
-        response.end(served);
+        respond(response, request.headers.range, upstreamResponse.status, headers, served);
       })
       .catch((error) => {
         console.error(`  upstream failed for ${key}: ${error.message}`);

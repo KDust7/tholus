@@ -19,7 +19,7 @@ const nativePath = resolve(
 );
 const fixtures = resolve(root, "test/fixtures");
 
-const SCENARIOS = ["pure-python", "markers", "transitive", "universal"] as const;
+const SCENARIOS = ["pure-python", "markers", "transitive", "universal", "pyodide-wheel"] as const;
 
 const available = SCENARIOS.filter((name) => existsSync(resolve(fixtures, name, "snapshot.json")));
 const canCompare =
@@ -31,6 +31,8 @@ interface EngineInstance {
   invoke(argv: string[], onOutput: (stream: string, data: Uint8Array) => void): Promise<number>;
   fsMkdirp(path: string): void;
   fsWrite(path: string, contents: Uint8Array): void;
+  setStdin(bytes: Uint8Array): void;
+  clearStdin(): void;
 }
 
 interface EngineModule {
@@ -49,9 +51,14 @@ interface NativeRun {
   stderr: string;
 }
 
-function runNative(args: string[]): Promise<NativeRun> {
+function runNative(args: string[], stdin?: string): Promise<NativeRun> {
   return new Promise((done, fail) => {
     const child = spawn(nativePath, args);
+    if (stdin === undefined) {
+      child.stdin.end();
+    } else {
+      child.stdin.end(stdin);
+    }
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf8");
@@ -131,6 +138,78 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
       }
     }, 180_000);
   }
+
+  it("resolves the same requirements read from standard input", async () => {
+    const name = available[0] as string;
+    const dir = resolve(fixtures, name);
+    const snapshot = JSON.parse(await readFile(resolve(dir, "snapshot.json"), "utf8")) as Snapshot;
+    const requirements = `${snapshot.requirements.join("\n")}\n`;
+
+    let server: ReplayServer | undefined;
+    try {
+      server = await startReplayServer(dir);
+      const args = (directory: string): string[] => [
+        ...snapshot.args.map((arg) => (arg === "requirements.in" ? "-" : arg)),
+        "--index-url",
+        `${server?.origin}/simple`,
+        "--directory",
+        directory,
+      ];
+
+      const nativeRun = await runNative(args(workspace), requirements);
+      expect(nativeRun.status, `native uv failed: ${nativeRun.stderr}`).toBe(0);
+
+      engine.fsMkdirp("/stdin");
+      engine.setStdin(new TextEncoder().encode(requirements));
+      let browserOut = "";
+      let browserErr = "";
+      const decoder = new TextDecoder();
+      const code = await engine.invoke([PROGRAM, ...args("/stdin")], (stream, data) => {
+        if (stream === "stdout") {
+          browserOut += decoder.decode(data);
+        } else {
+          browserErr += decoder.decode(data);
+        }
+      });
+      expect(code, `the engine failed: ${browserErr}`).toBe(0);
+
+      expect(
+        server.misses,
+        "one of the two sides asked for something the snapshot does not hold; re-record it",
+      ).toEqual([]);
+      expect(browserOut).toBe(nativeRun.stdout);
+    } finally {
+      engine.clearStdin();
+      await server?.close();
+    }
+  }, 180_000);
+
+  it("refuses to read standard input the host never supplied", async () => {
+    const name = available[0] as string;
+    const dir = resolve(fixtures, name);
+    const snapshot = JSON.parse(await readFile(resolve(dir, "snapshot.json"), "utf8")) as Snapshot;
+
+    engine.clearStdin();
+    engine.fsMkdirp("/no-stdin");
+    let browserErr = "";
+    const decoder = new TextDecoder();
+    const code = await engine.invoke(
+      [
+        PROGRAM,
+        ...snapshot.args.map((arg) => (arg === "requirements.in" ? "-" : arg)),
+        "--directory",
+        "/no-stdin",
+      ],
+      (stream, data) => {
+        if (stream !== "stdout") {
+          browserErr += decoder.decode(data);
+        }
+      },
+    );
+
+    expect(code).not.toBe(0);
+    expect(browserErr).toContain("standard input");
+  }, 180_000);
 
   it("retries a failing index request rather than aborting the worker", async () => {
     const name = available[0] as string;

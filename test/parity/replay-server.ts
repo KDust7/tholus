@@ -34,6 +34,39 @@ export interface ReplayOptions {
 
 const NOT_RECORDED = 599;
 const SERVICE_UNAVAILABLE = 503;
+const PARTIAL_CONTENT = 206;
+const RANGE_NOT_SATISFIABLE = 416;
+
+const BYTE_RANGE = /^bytes=(\d*)-(\d*)$/;
+
+interface ByteRange {
+  start: number;
+  end: number;
+}
+
+export function parseByteRange(header: string | undefined, size: number): ByteRange | undefined {
+  if (header === undefined) {
+    return undefined;
+  }
+  const match = BYTE_RANGE.exec(header.trim());
+  if (!match) {
+    return undefined;
+  }
+  const [, rawStart, rawEnd] = match;
+  if (rawStart === "") {
+    const length = Number(rawEnd);
+    if (rawEnd === "" || !Number.isFinite(length) || length <= 0) {
+      return undefined;
+    }
+    return { start: Math.max(0, size - length), end: size - 1 };
+  }
+  const start = Number(rawStart);
+  const end = rawEnd === "" ? size - 1 : Math.min(Number(rawEnd), size - 1);
+  if (!Number.isFinite(start) || start > end) {
+    return undefined;
+  }
+  return { start, end };
+}
 
 export async function startReplayServer(
   snapshotDir: string,
@@ -74,8 +107,30 @@ export async function startReplayServer(
     const body = recorded.rewrite
       ? Buffer.from(raw.toString("utf8").split(FIXTURE_ORIGIN).join(origin), "utf8")
       : raw;
+    const rangeHeader = request.headers.range;
+    if (rangeHeader !== undefined && recorded.status === 200) {
+      const range = parseByteRange(rangeHeader, body.byteLength);
+      if (!range) {
+        response.writeHead(RANGE_NOT_SATISFIABLE, {
+          "content-range": `bytes */${body.byteLength}`,
+        });
+        response.end();
+        return;
+      }
+      const slice = body.subarray(range.start, range.end + 1);
+      response.writeHead(PARTIAL_CONTENT, {
+        ...recorded.headers,
+        "accept-ranges": "bytes",
+        "content-range": `bytes ${range.start}-${range.end}/${body.byteLength}`,
+        "content-length": String(slice.byteLength),
+      });
+      response.end(slice);
+      return;
+    }
+
     response.writeHead(recorded.status, {
       ...recorded.headers,
+      "accept-ranges": "bytes",
       "content-length": String(body.byteLength),
     });
     response.end(body);
