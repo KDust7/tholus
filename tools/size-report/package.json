@@ -7,7 +7,7 @@
   "description": "Measures shipped artifact sizes and compares them against budgets",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "report": "pnpm build && node dist/cli.js",
+    "report": "bun run build && node dist/cli.js",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },
