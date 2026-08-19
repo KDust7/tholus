@@ -34,6 +34,7 @@ const scenarios = {
     requirements: ["msgpack==1.1.2"],
     extraArgs: ["--python-platform", "wasm32-pyodide2026", "--python-version", "3.14"],
     index: PYODIDE_INDEX,
+    excludeNewer: false,
   },
 };
 
@@ -208,8 +209,7 @@ async function record(name, scenario) {
     "pip",
     "compile",
     "requirements.in",
-    "--exclude-newer",
-    EXCLUDE_NEWER,
+    ...(scenario.excludeNewer === false ? [] : ["--exclude-newer", EXCLUDE_NEWER]),
     "--no-cache",
     "--no-header",
     ...scenario.extraArgs,
