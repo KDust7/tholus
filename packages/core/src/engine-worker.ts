@@ -15,6 +15,8 @@ export interface EngineHandle {
   envReplace(entries: string[]): void;
   cancel(): boolean;
   setCwd(path: string): void;
+  setStdin(bytes: Uint8Array): void;
+  clearStdin(): void;
 }
 
 export interface EngineExports {
@@ -157,9 +159,10 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       fail(unsupported("the engine is not initialized; send `init` first"), 1);
       return;
     }
-    if (message.stdin) {
-      fail(unsupported("stdin is not implemented by this engine build"), 1);
-      return;
+    if (message.stdin === undefined) {
+      engine.clearStdin();
+    } else {
+      engine.setStdin(message.stdin);
     }
 
     if (message.tty) {
@@ -236,7 +239,6 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
         engine?.setTermSize(message.size.cols, message.size.rows);
         return;
       }
-      case "stdinResponse":
       case "ack":
         return;
       case "dispose":

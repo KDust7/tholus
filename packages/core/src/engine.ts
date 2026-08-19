@@ -2,6 +2,7 @@ import {
   type BuildIdentity,
   type EngineEvent,
   EXIT_CODE_CANCELLED,
+  MAX_STDIN_BYTES,
   PROTOCOL_VERSION,
   type PromptPolicy,
   parseWorkerMessage,
@@ -30,17 +31,13 @@ export interface EngineConfigInput {
   logFilter?: string;
 }
 
-export interface StdinProvider {
-  readLine(request: { prompt?: string; echo: boolean }): Promise<string | null>;
-}
-
 export interface ExecOptions {
   cwd?: string;
   env?: Record<string, string>;
   tty?: TtyConfig;
   stdout?: (chunk: Uint8Array) => void;
   stderr?: (chunk: Uint8Array) => void;
-  stdin?: StdinProvider;
+  stdin?: Uint8Array | string;
   promptPolicy?: PromptPolicy;
   signal?: AbortSignal;
   onEvent?: (event: EngineEvent) => void;
@@ -86,6 +83,16 @@ interface PendingInvocation {
 }
 
 const DEFAULT_HANDSHAKE_TIMEOUT_MS = 30_000;
+
+function encodeStdin(stdin: Uint8Array | string): Uint8Array {
+  const bytes = typeof stdin === "string" ? new TextEncoder().encode(stdin) : stdin;
+  if (bytes.byteLength > MAX_STDIN_BYTES) {
+    throw new RangeError(
+      `standard input is ${bytes.byteLength} bytes, which exceeds the ${MAX_STDIN_BYTES}-byte limit`,
+    );
+  }
+  return bytes;
+}
 
 export async function createEngine(options: EngineOptions = {}): Promise<Engine> {
   const factory: EndpointFactory =
@@ -201,20 +208,6 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
         });
         return;
       }
-      case "stdinRequest": {
-        const provider = invocation.options.stdin;
-        const request = {
-          ...(message.prompt === undefined ? {} : { prompt: message.prompt }),
-          echo: message.echo,
-        };
-        const answer = provider ? provider.readLine(request) : Promise.resolve<string | null>(null);
-        void answer
-          .catch(() => null)
-          .then((data) => {
-            endpoint.postMessage({ type: "stdinResponse", id: message.id, data });
-          });
-        return;
-      }
       case "exit": {
         invocation.detach();
         invocations.delete(message.invocationId);
@@ -235,6 +228,8 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
     if (disposed) {
       throw new EngineCrashedError("engine has been disposed");
     }
+
+    const stdin = execOptions.stdin === undefined ? undefined : encodeStdin(execOptions.stdin);
 
     invocationCounter += 1;
     const invocationId = `inv-${invocationCounter}`;
@@ -271,7 +266,7 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
       cwd: execOptions.cwd ?? options.config?.cwd ?? DEFAULT_CWD,
       ...(execOptions.env === undefined ? {} : { env: execOptions.env }),
       ...(execOptions.tty === undefined ? {} : { tty: execOptions.tty }),
-      stdin: execOptions.stdin !== undefined,
+      ...(stdin === undefined ? {} : { stdin }),
       ...(execOptions.promptPolicy === undefined ? {} : { promptPolicy: execOptions.promptPolicy }),
     });
 

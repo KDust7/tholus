@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION } from "@uv-wasm/engine-protocol";
+import { MAX_STDIN_BYTES, PROTOCOL_VERSION } from "@uv-wasm/engine-protocol";
 import { createMockEngine, type MockScript } from "@uv-wasm/mock-engine";
 import { describe, expect, it } from "vitest";
 import { createEngine } from "./engine.js";
@@ -210,73 +210,77 @@ describe("events", () => {
 });
 
 describe("stdin", () => {
-  const promptScript: MockScript = {
-    commands: [
-      {
-        argv: ["ask"],
-        steps: [
-          { kind: "prompt", prompt: "Proceed? ", echo: true },
-          { kind: "stdout", text: "done\n" },
-        ],
-      },
-    ],
+  const readScript: MockScript = {
+    commands: [{ argv: ["read"], steps: [{ kind: "stdout", text: "done\n" }] }],
   };
 
-  it("answers a prompt from the provider", async () => {
-    const { endpoint } = engineWith(promptScript);
+  it("sends a byte buffer with the invocation", async () => {
+    const { mock, endpoint } = engineWith(readScript);
     const engine = await createEngine({ endpoint });
-    const prompts: string[] = [];
-    const out = collectText();
 
-    const result = await engine.exec(["ask"], {
-      stdout: out.sink,
-      stdin: {
-        readLine: async (request) => {
-          prompts.push(request.prompt ?? "");
-          return "y\n";
-        },
-      },
-    }).exit;
+    await engine.exec(["read"], { stdin: new Uint8Array([0x61, 0x0a]) }).exit;
 
-    expect(prompts).toEqual(["Proceed? "]);
-    expect(out.text()).toBe("done\n");
-    expect(result.code).toBe(0);
+    const exec = mock.received.find((message) => message.type === "exec");
+    expect(exec?.type === "exec" && exec.stdin).toEqual(new Uint8Array([0x61, 0x0a]));
     engine.terminate();
   });
 
-  it("answers with end-of-input when no provider is supplied", async () => {
-    const { endpoint } = engineWith(promptScript);
+  it("encodes a string as UTF-8", async () => {
+    const { mock, endpoint } = engineWith(readScript);
     const engine = await createEngine({ endpoint });
 
-    const result = await engine.exec(["ask"]).exit;
+    await engine.exec(["read"], { stdin: "café\n" }).exit;
 
-    expect(result.code).toBe(0);
+    const exec = mock.received.find((message) => message.type === "exec");
+    expect(exec?.type === "exec" && exec.stdin).toEqual(
+      new Uint8Array([0x63, 0x61, 0x66, 0xc3, 0xa9, 0x0a]),
+    );
     engine.terminate();
   });
 
-  it("treats a failing provider as end-of-input", async () => {
-    const { endpoint } = engineWith(promptScript);
+  it("omits stdin entirely when none is supplied", async () => {
+    const { mock, endpoint } = engineWith(readScript);
     const engine = await createEngine({ endpoint });
 
-    const result = await engine.exec(["ask"], {
-      stdin: { readLine: async () => Promise.reject(new Error("no tty")) },
-    }).exit;
+    await engine.exec(["read"]).exit;
 
-    expect(result.code).toBe(0);
+    const exec = mock.received.find((message) => message.type === "exec");
+    expect(exec?.type === "exec" && exec.stdin).toBeUndefined();
+    engine.terminate();
+  });
+
+  it("sends an empty buffer rather than omitting it", async () => {
+    const { mock, endpoint } = engineWith(readScript);
+    const engine = await createEngine({ endpoint });
+
+    await engine.exec(["read"], { stdin: "" }).exit;
+
+    const exec = mock.received.find((message) => message.type === "exec");
+    expect(exec?.type === "exec" && exec.stdin).toEqual(new Uint8Array(0));
+    engine.terminate();
+  });
+
+  it("refuses a buffer past the size limit", async () => {
+    const { endpoint } = engineWith(readScript);
+    const engine = await createEngine({ endpoint });
+
+    expect(() => engine.exec(["read"], { stdin: new Uint8Array(MAX_STDIN_BYTES + 1) })).toThrow(
+      RangeError,
+    );
     engine.terminate();
   });
 });
 
 describe("cancellation", () => {
   const slowScript: MockScript = {
-    commands: [{ argv: ["slow"], steps: [{ kind: "prompt", echo: false }] }],
+    commands: [{ argv: ["slow"], steps: [{ kind: "pause" }] }],
   };
 
   it("cancels through the handle", async () => {
     const { endpoint } = engineWith(slowScript);
     const engine = await createEngine({ endpoint });
 
-    const handle = engine.exec(["slow"], { stdin: { readLine: () => new Promise(() => {}) } });
+    const handle = engine.exec(["slow"]);
     handle.cancel("user interrupt");
     const result = await handle.exit;
 
@@ -290,10 +294,7 @@ describe("cancellation", () => {
     const engine = await createEngine({ endpoint });
     const controller = new AbortController();
 
-    const handle = engine.exec(["slow"], {
-      signal: controller.signal,
-      stdin: { readLine: () => new Promise(() => {}) },
-    });
+    const handle = engine.exec(["slow"], { signal: controller.signal });
     controller.abort("stop");
     const result = await handle.exit;
 
@@ -307,7 +308,6 @@ describe("cancellation", () => {
 
     const result = await engine.exec(["slow"], {
       signal: AbortSignal.abort("too late"),
-      stdin: { readLine: () => new Promise(() => {}) },
     }).exit;
 
     expect(result.cancelled).toBe(true);
@@ -341,11 +341,11 @@ describe("lifecycle", () => {
 
   it("fails an in-flight command when terminated", async () => {
     const { endpoint } = engineWith({
-      commands: [{ argv: ["slow"], steps: [{ kind: "prompt", echo: false }] }],
+      commands: [{ argv: ["slow"], steps: [{ kind: "pause" }] }],
     });
     const engine = await createEngine({ endpoint });
 
-    const handle = engine.exec(["slow"], { stdin: { readLine: () => new Promise(() => {}) } });
+    const handle = engine.exec(["slow"]);
     engine.terminate();
 
     await expect(handle.exit).rejects.toBeInstanceOf(EngineCrashedError);

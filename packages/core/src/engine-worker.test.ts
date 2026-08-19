@@ -29,12 +29,21 @@ class FakeEngine implements EngineHandle {
   cancels = 0;
   readonly environments: string[][] = [];
   readonly directories: string[] = [];
+  readonly stdins: (Uint8Array | undefined)[] = [];
   private release: ((code: number) => void) | undefined;
 
   constructor(private readonly options: FakeOptions) {}
 
   envReplace(entries: string[]): void {
     this.environments.push(entries);
+  }
+
+  setStdin(bytes: Uint8Array): void {
+    this.stdins.push(bytes);
+  }
+
+  clearStdin(): void {
+    this.stdins.push(undefined);
   }
 
   setCwd(path: string): void {
@@ -169,7 +178,7 @@ describe("the engine worker speaks the host protocol", () => {
     const test = harness({ stdout: "hello\n", stderr: "warn\n", exitCode: 2 });
     await init(test);
     test.emitted.length = 0;
-    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv", "--help"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv", "--help"] });
     await test.worker.settled;
 
     expect(test.emitted).toEqual([
@@ -193,7 +202,7 @@ describe("the engine worker speaks the host protocol", () => {
 
   it("refuses to exec before init rather than crashing", async () => {
     const test = harness();
-    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"] });
     await test.worker.settled;
     expect(test.emitted).toEqual([
       {
@@ -207,16 +216,41 @@ describe("the engine worker speaks the host protocol", () => {
     ]);
   });
 
-  it("declines stdin, which this engine build cannot provide", async () => {
+  it("hands the engine the standard input the host supplied", async () => {
     const test = harness();
     await init(test);
-    test.emitted.length = 0;
-    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: true });
+    const stdin = encoder.encode("anyio\n");
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin });
     await test.worker.settled;
-    expect(test.emitted.at(-1)).toMatchObject({
-      type: "exit",
-      error: { code: "unsupported" },
+    expect(test.engines[0]?.stdins).toEqual([stdin]);
+  });
+
+  it("clears standard input when the host supplies none, so it cannot leak forward", async () => {
+    const test = harness();
+    await init(test);
+    test.worker.receive({
+      type: "exec",
+      invocationId: "x1",
+      argv: ["uv"],
+      stdin: encoder.encode("a"),
     });
+    await test.worker.settled;
+    test.worker.receive({ type: "exec", invocationId: "x2", argv: ["uv"] });
+    await test.worker.settled;
+    expect(test.engines[0]?.stdins).toEqual([encoder.encode("a"), undefined]);
+  });
+
+  it("passes an empty buffer through rather than treating it as absent", async () => {
+    const test = harness();
+    await init(test);
+    test.worker.receive({
+      type: "exec",
+      invocationId: "x1",
+      argv: ["uv"],
+      stdin: new Uint8Array(0),
+    });
+    await test.worker.settled;
+    expect(test.engines[0]?.stdins).toEqual([new Uint8Array(0)]);
   });
 
   it("declares a terminal when the host attaches one", async () => {
@@ -226,7 +260,6 @@ describe("the engine worker speaks the host protocol", () => {
       type: "exec",
       invocationId: "x1",
       argv: ["uv"],
-      stdin: false,
       tty: { cols: 120, rows: 40 },
     });
     await test.worker.settled;
@@ -236,7 +269,7 @@ describe("the engine worker speaks the host protocol", () => {
   it("clears the terminal when the host attaches none", async () => {
     const test = harness();
     await init(test);
-    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"] });
     await test.worker.settled;
     expect(test.engines[0]?.cleared).toBe(true);
   });
@@ -252,7 +285,7 @@ describe("the engine worker speaks the host protocol", () => {
     const test = harness({ stdout: "partial" });
     await init(test);
     test.emitted.length = 0;
-    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"] });
     test.worker.receive({ type: "cancel", invocationId: "x1" });
     await test.worker.settled;
     expect(test.emitted).toEqual([
@@ -264,8 +297,8 @@ describe("the engine worker speaks the host protocol", () => {
     const test = harness({ stdout: "partial" });
     await init(test);
     test.emitted.length = 0;
-    test.worker.receive({ type: "exec", invocationId: "a", argv: ["uv"], stdin: false });
-    test.worker.receive({ type: "exec", invocationId: "b", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "a", argv: ["uv"] });
+    test.worker.receive({ type: "exec", invocationId: "b", argv: ["uv"] });
     test.worker.receive({ type: "cancel", invocationId: "b" });
     await test.worker.settled;
     expect(test.emitted).toEqual([
@@ -284,7 +317,7 @@ describe("the engine worker speaks the host protocol", () => {
   it("enters the working directory the config named", async () => {
     const test = harness();
     await init(test, { cwd: "/work" });
-    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"] });
     await test.worker.settled;
     expect(test.engines[0]?.directories).toEqual(["/work"]);
   });
@@ -296,10 +329,9 @@ describe("the engine worker speaks the host protocol", () => {
       type: "exec",
       invocationId: "x1",
       argv: ["uv"],
-      stdin: false,
       cwd: "/elsewhere",
     });
-    test.worker.receive({ type: "exec", invocationId: "x2", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x2", argv: ["uv"] });
     await test.worker.settled;
     expect(test.engines[0]?.directories).toEqual(["/elsewhere", "/work"]);
   });
@@ -308,7 +340,7 @@ describe("the engine worker speaks the host protocol", () => {
     const test = harness({ rejectsCwd: true });
     await init(test, { cwd: "/missing" });
     test.emitted.length = 0;
-    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"] });
     await test.worker.settled;
     expect(test.emitted).toHaveLength(1);
     const [exit] = test.emitted;
@@ -320,7 +352,7 @@ describe("the engine worker speaks the host protocol", () => {
     const test = harness({ blocks: true, stdout: "started" });
     await init(test);
     test.emitted.length = 0;
-    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"] });
     await Promise.resolve();
     expect(test.engines[0]?.isRunning()).toBe(true);
     test.worker.receive({ type: "cancel", invocationId: "x1" });
@@ -356,7 +388,7 @@ describe("the engine worker speaks the host protocol", () => {
     const test = harness({ throws: "unreachable executed" });
     await init(test);
     test.emitted.length = 0;
-    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"] });
     await test.worker.settled;
     expect(typesOf(test.emitted)).toEqual(["exit", "fatal"]);
     expect(test.emitted.at(-1)).toMatchObject({
@@ -369,8 +401,8 @@ describe("the engine worker speaks the host protocol", () => {
     const test = harness({ stdout: "one" });
     await init(test);
     test.emitted.length = 0;
-    test.worker.receive({ type: "exec", invocationId: "a", argv: ["uv"], stdin: false });
-    test.worker.receive({ type: "exec", invocationId: "b", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "a", argv: ["uv"] });
+    test.worker.receive({ type: "exec", invocationId: "b", argv: ["uv"] });
     await test.worker.settled;
     const order = test.emitted.map((message) =>
       "invocationId" in message ? message.invocationId : "",
@@ -389,7 +421,7 @@ describe("the engine worker speaks the host protocol", () => {
     await init(test);
     test.worker.receive({ type: "dispose" });
     test.emitted.length = 0;
-    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"] });
     await test.worker.settled;
     expect(test.emitted).toEqual([]);
   });
@@ -405,7 +437,7 @@ describe("the engine worker hands the environment to the engine", () => {
   it("re-applies the configured environment for an invocation that names none", async () => {
     const test = harness();
     await init(test, { env: { HOME: "/home/browser" } });
-    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"] });
     await test.worker.settled;
     expect(test.engines[0]?.environments.at(-1)).toEqual(["HOME", "/home/browser"]);
   });
@@ -418,7 +450,6 @@ describe("the engine worker hands the environment to the engine", () => {
       invocationId: "x1",
       argv: ["uv"],
       env: { UV_CACHE_DIR: "/override" },
-      stdin: false,
     });
     await test.worker.settled;
     expect(test.engines[0]?.environments.at(-1)).toEqual([
@@ -437,9 +468,8 @@ describe("the engine worker hands the environment to the engine", () => {
       invocationId: "x1",
       argv: ["uv"],
       env: { UV_NO_CACHE: "1" },
-      stdin: false,
     });
-    test.worker.receive({ type: "exec", invocationId: "x2", argv: ["uv"], stdin: false });
+    test.worker.receive({ type: "exec", invocationId: "x2", argv: ["uv"] });
     await test.worker.settled;
     expect(test.engines[0]?.environments.at(-1)).toEqual(["HOME", "/home/browser"]);
   });
