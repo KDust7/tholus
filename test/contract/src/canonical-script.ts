@@ -38,17 +38,13 @@ export const canonicalScript: MockScript = {
       exitCode: 0,
     },
     {
-      argv: ["pip", "uninstall", "rich"],
-      steps: [
-        { kind: "stderr", text: "Proceed? [y/n] " },
-        { kind: "prompt", echo: true },
-        { kind: "stderr", text: "Uninstalled 1 package\n" },
-      ],
+      argv: ["pip", "compile", "-"],
+      steps: [{ kind: "stdout", text: "anyio==4.6.2\nidna==3.10\n" }],
       exitCode: 0,
     },
     {
       argv: ["pip", "install", "slow"],
-      steps: [{ kind: "prompt", echo: false }],
+      steps: [{ kind: "stderr", text: "Resolving dependencies\n" }, { kind: "pause" }],
       exitCode: 0,
     },
     {

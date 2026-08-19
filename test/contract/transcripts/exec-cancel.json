@@ -1,6 +1,6 @@
 {
   "name": "exec-cancel",
-  "summary": "Cancelling an in-flight invocation ends it with the conventional interrupt code",
+  "summary": "A parked invocation is cancelled and reports the cancellation exit code",
   "protocolVersion": "0",
   "steps": [
     {
@@ -73,17 +73,19 @@
           "pip",
           "install",
           "slow"
-        ],
-        "stdin": true
+        ]
       }
     },
     {
       "from": "worker",
       "message": {
-        "type": "stdinRequest",
-        "id": "$any",
+        "type": "output",
         "invocationId": "inv-1",
-        "echo": false
+        "stream": "stderr",
+        "seq": 0,
+        "data": {
+          "$text": "Resolving dependencies\n"
+        }
       }
     },
     {

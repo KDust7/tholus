@@ -30,7 +30,7 @@ const encoder = new TextEncoder();
 interface Invocation {
   cancelled: boolean;
   seq: number;
-  pendingStdin?: (value: string | null) => void;
+  resume: (() => void) | undefined;
 }
 
 export function createMockEngine(script: MockScript = {}): MockEngineEndpoint {
@@ -40,7 +40,6 @@ export function createMockEngine(script: MockScript = {}): MockEngineEndpoint {
   const invocations = new Map<string, Invocation>();
   let terminated = false;
   let booted = false;
-  let stdinRequestCounter = 0;
 
   const emit = (message: WorkerMessage): void => {
     if (terminated) {
@@ -88,28 +87,18 @@ export function createMockEngine(script: MockScript = {}): MockEngineEndpoint {
         emit({ type: "event", event: step.event });
         return;
       }
-      case "prompt": {
-        stdinRequestCounter += 1;
-        const id = `stdin-${stdinRequestCounter}`;
-        const answer = new Promise<string | null>((resolve) => {
-          invocation.pendingStdin = resolve;
+      case "pause": {
+        await new Promise<void>((resolve) => {
+          invocation.resume = resolve;
         });
-        emit({
-          type: "stdinRequest",
-          id,
-          invocationId,
-          ...(step.prompt === undefined ? {} : { prompt: step.prompt }),
-          echo: step.echo,
-        });
-        await answer;
-        invocation.pendingStdin = undefined as unknown as (value: string | null) => void;
+        invocation.resume = undefined;
         return;
       }
     }
   };
 
   const runCommand = async (message: Extract<HostMessage, { type: "exec" }>): Promise<void> => {
-    const invocation: Invocation = { cancelled: false, seq: 0 };
+    const invocation: Invocation = { cancelled: false, seq: 0, resume: undefined };
     invocations.set(message.invocationId, invocation);
 
     const command = matchCommand(script, message.argv);
@@ -172,24 +161,13 @@ export function createMockEngine(script: MockScript = {}): MockEngineEndpoint {
         void runCommand(message);
         return;
       }
-      case "stdinResponse": {
-        for (const invocation of invocations.values()) {
-          if (invocation.pendingStdin) {
-            const resolve = invocation.pendingStdin;
-            invocation.pendingStdin = undefined as unknown as (value: string | null) => void;
-            resolve(message.data);
-            return;
-          }
-        }
-        return;
-      }
       case "cancel": {
         const invocation = invocations.get(message.invocationId);
         if (!invocation) {
           return;
         }
         invocation.cancelled = true;
-        invocation.pendingStdin?.(null);
+        invocation.resume?.();
         emit({
           type: "exit",
           invocationId: message.invocationId,

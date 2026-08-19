@@ -4,7 +4,7 @@ export type MockStep =
   | { kind: "stdout"; text: string }
   | { kind: "stderr"; text: string }
   | { kind: "event"; event: EngineEvent }
-  | { kind: "prompt"; prompt?: string; echo: boolean };
+  | { kind: "pause" };
 
 export interface MockCommand {
   argv: string[];

@@ -1,6 +1,6 @@
 {
-  "name": "exec-stdin-roundtrip",
-  "summary": "The engine asks the host for a line and waits for the answer before continuing",
+  "name": "exec-stdin-buffer",
+  "summary": "The host hands the invocation its standard input as bytes in the exec message",
   "protocolVersion": "0",
   "steps": [
     {
@@ -71,50 +71,23 @@
         "invocationId": "inv-1",
         "argv": [
           "pip",
-          "uninstall",
-          "rich"
+          "compile",
+          "-"
         ],
-        "stdin": true
-      }
-    },
-    {
-      "from": "worker",
-      "message": {
-        "type": "output",
-        "invocationId": "inv-1",
-        "stream": "stderr",
-        "seq": 0,
-        "data": {
-          "$text": "Proceed? [y/n] "
+        "stdin": {
+          "$text": "anyio\nidna\n"
         }
       }
     },
     {
       "from": "worker",
       "message": {
-        "type": "stdinRequest",
-        "id": "$any",
-        "invocationId": "inv-1",
-        "echo": true
-      }
-    },
-    {
-      "from": "host",
-      "message": {
-        "type": "stdinResponse",
-        "id": "stdin-1",
-        "data": "y\n"
-      }
-    },
-    {
-      "from": "worker",
-      "message": {
         "type": "output",
         "invocationId": "inv-1",
-        "stream": "stderr",
-        "seq": 1,
+        "stream": "stdout",
+        "seq": 0,
         "data": {
-          "$text": "Uninstalled 1 package\n"
+          "$text": "anyio==4.6.2\nidna==3.10\n"
         }
       }
     },

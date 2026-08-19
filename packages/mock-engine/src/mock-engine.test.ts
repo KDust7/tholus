@@ -186,50 +186,55 @@ describe("command execution", () => {
 });
 
 describe("stdin", () => {
-  it("waits for the host before continuing", async () => {
+  it("carries a buffer on the exec message", async () => {
     const engine = createMockEngine({
-      commands: [
-        {
-          argv: ["ask"],
-          steps: [
-            { kind: "prompt", prompt: "Proceed? ", echo: true },
-            { kind: "stdout", text: "done\n" },
-          ],
-        },
-      ],
+      commands: [{ argv: ["read"], steps: [{ kind: "stdout", text: "done\n" }] }],
     });
     const seen = collect(engine);
-    engine.postMessage({ type: "exec", invocationId: "inv-1", argv: ["ask"], stdin: true });
+    const stdin = new TextEncoder().encode("anyio\n");
+    engine.postMessage({ type: "exec", invocationId: "inv-1", argv: ["read"], stdin });
     await settle();
 
-    expect(seen.map((message) => message.type)).toEqual(["stdinRequest"]);
-    const request = seen[0];
-    if (request?.type !== "stdinRequest") throw new Error("unreachable");
-    expect(request.prompt).toBe("Proceed? ");
-
-    engine.postMessage({ type: "stdinResponse", id: request.id, data: "y\n" });
-    await settle();
-
-    expect(seen.map((message) => message.type)).toEqual(["stdinRequest", "output", "exit"]);
+    expect(seen.map((message) => message.type)).toEqual(["output", "exit"]);
+    const received = engine.received.at(-1);
+    expect(received?.type === "exec" && received.stdin).toEqual(stdin);
   });
 
-  it("ignores a stdin response nobody asked for", async () => {
-    const engine = createMockEngine();
-    const seen = collect(engine);
-    engine.postMessage({ type: "stdinResponse", id: "stdin-1", data: "y" });
+  it("leaves stdin absent when the host supplies none", async () => {
+    const engine = createMockEngine({
+      commands: [{ argv: ["read"], steps: [] }],
+    });
+    engine.postMessage({ type: "exec", invocationId: "inv-1", argv: ["read"] });
     await settle();
 
-    expect(seen).toEqual([]);
+    const received = engine.received.at(-1);
+    expect(received?.type === "exec" && received.stdin).toBeUndefined();
+  });
+
+  it("distinguishes an empty buffer from an absent one", async () => {
+    const engine = createMockEngine({
+      commands: [{ argv: ["read"], steps: [] }],
+    });
+    engine.postMessage({
+      type: "exec",
+      invocationId: "inv-1",
+      argv: ["read"],
+      stdin: new Uint8Array(0),
+    });
+    await settle();
+
+    const received = engine.received.at(-1);
+    expect(received?.type === "exec" && received.stdin).toEqual(new Uint8Array(0));
   });
 });
 
 describe("cancellation", () => {
   it("ends a waiting invocation with the interrupt code", async () => {
     const engine = createMockEngine({
-      commands: [{ argv: ["slow"], steps: [{ kind: "prompt", echo: false }] }],
+      commands: [{ argv: ["slow"], steps: [{ kind: "pause" }] }],
     });
     const seen = collect(engine);
-    engine.postMessage({ type: "exec", invocationId: "inv-1", argv: ["slow"], stdin: true });
+    engine.postMessage({ type: "exec", invocationId: "inv-1", argv: ["slow"] });
     await settle();
     engine.postMessage({ type: "cancel", invocationId: "inv-1" });
     await settle();
