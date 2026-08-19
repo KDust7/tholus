@@ -13,6 +13,7 @@ export interface EngineHandle {
   clearTerm(): void;
   isRunning(): boolean;
   envReplace(entries: string[]): void;
+  cancel(): boolean;
 }
 
 export interface EngineExports {
@@ -212,6 +213,7 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
         const invocation = running.get(message.invocationId);
         if (invocation) {
           invocation.cancelled = true;
+          engine?.cancel();
         } else {
           cancelled.add(message.invocationId);
         }

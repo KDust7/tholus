@@ -1,4 +1,8 @@
-import { PROTOCOL_VERSION, type WorkerMessage } from "@uv-wasm/engine-protocol";
+import {
+  EXIT_CODE_CANCELLED,
+  PROTOCOL_VERSION,
+  type WorkerMessage,
+} from "@uv-wasm/engine-protocol";
 import { describe, expect, it } from "vitest";
 import {
   createEngineWorker,
@@ -14,13 +18,16 @@ interface FakeOptions {
   stdout?: string;
   stderr?: string;
   throws?: string;
+  blocks?: boolean;
 }
 
 class FakeEngine implements EngineHandle {
   columns = 0;
   rows = 0;
   cleared = false;
+  cancels = 0;
   readonly environments: string[][] = [];
+  private release: ((code: number) => void) | undefined;
 
   constructor(private readonly options: FakeOptions) {}
 
@@ -41,7 +48,22 @@ class FakeEngine implements EngineHandle {
     if (this.options.stderr) {
       onOutput("stderr", encoder.encode(this.options.stderr));
     }
+    if (this.options.blocks) {
+      return new Promise<number>((resolve) => {
+        this.release = resolve;
+      });
+    }
     return this.options.exitCode ?? 0;
+  }
+
+  cancel(): boolean {
+    this.cancels += 1;
+    if (!this.release) {
+      return false;
+    }
+    this.release(EXIT_CODE_CANCELLED);
+    this.release = undefined;
+    return true;
   }
 
   setTermSize(columns: number, rows: number): void {
@@ -54,7 +76,7 @@ class FakeEngine implements EngineHandle {
   }
 
   isRunning(): boolean {
-    return false;
+    return this.release !== undefined;
   }
 }
 
@@ -248,6 +270,42 @@ describe("the engine worker speaks the host protocol", () => {
       { type: "exit", invocationId: "a", code: 0, cancelled: false, durationMs: 0 },
       { type: "exit", invocationId: "b", code: 130, cancelled: true, durationMs: 0 },
     ]);
+  });
+
+  it("interrupts an invocation that is already running", async () => {
+    const test = harness({ blocks: true, stdout: "started" });
+    await init(test);
+    test.emitted.length = 0;
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    await Promise.resolve();
+    expect(test.engines[0]?.isRunning()).toBe(true);
+    test.worker.receive({ type: "cancel", invocationId: "x1" });
+    await test.worker.settled;
+    expect(test.engines[0]?.cancels).toBe(1);
+    expect(test.emitted).toEqual([
+      {
+        type: "output",
+        invocationId: "x1",
+        stream: "stdout",
+        seq: 0,
+        data: encoder.encode("started"),
+      },
+      {
+        type: "exit",
+        invocationId: "x1",
+        code: EXIT_CODE_CANCELLED,
+        cancelled: true,
+        durationMs: 0,
+      },
+    ]);
+  });
+
+  it("does not reach for the engine when the cancelled invocation is only queued", async () => {
+    const test = harness({ stdout: "partial" });
+    await init(test);
+    test.worker.receive({ type: "cancel", invocationId: "never-sent" });
+    await test.worker.settled;
+    expect(test.engines[0]?.cancels).toBe(0);
   });
 
   it("turns an engine crash into an exit and a fatal", async () => {

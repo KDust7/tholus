@@ -19,6 +19,7 @@ js-sys = "0.3"
 console_error_panic_hook = "0.1"
 web-time = "1.1"
 anyhow = "1"
+futures = "0.3"
 
 [patch.crates-io]
 astral_async_http_range_reader = { path = "vendor/uv/patches/astral-async-http-range-reader" }

@@ -1,6 +1,8 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+use futures::channel::oneshot;
+use futures::future::{Either, select};
 use uv::GlobalInitialization;
 use uv_wasm_compat::term::{self, TermConfig};
 use wasm_bindgen::prelude::*;
@@ -12,10 +14,13 @@ use crate::python;
 const ALREADY_RUNNING: &str =
     "uv-wasm: an invocation is already running; invocations must be serialized";
 
+const EXIT_CODE_CANCELLED: u8 = 130;
+
 #[wasm_bindgen]
 pub struct Engine {
     initialized: Cell<bool>,
     running: Rc<Cell<bool>>,
+    cancel: Rc<RefCell<Option<oneshot::Sender<()>>>>,
 }
 
 #[wasm_bindgen]
@@ -26,6 +31,7 @@ impl Engine {
         Ok(Self {
             initialized: Cell::new(false),
             running: Rc::new(Cell::new(false)),
+            cancel: Rc::new(RefCell::new(None)),
         })
     }
 
@@ -133,11 +139,26 @@ impl Engine {
         }
         let initialization = self.next_initialization();
         let running = Rc::clone(&self.running);
+        let cancel = Rc::clone(&self.cancel);
+        let (sender, receiver) = oneshot::channel();
+        *cancel.borrow_mut() = Some(sender);
         wasm_bindgen_futures::future_to_promise(async move {
-            let code = dispatch(argv, on_output, initialization).await;
+            let invocation = Box::pin(dispatch(argv, on_output, initialization));
+            let code = match select(invocation, receiver).await {
+                Either::Left((code, _)) => code,
+                Either::Right((_, _)) => EXIT_CODE_CANCELLED,
+            };
+            cancel.borrow_mut().take();
             running.set(false);
             Ok(JsValue::from(code))
         })
+    }
+
+    pub fn cancel(&self) -> bool {
+        match self.cancel.borrow_mut().take() {
+            Some(sender) => sender.send(()).is_ok(),
+            None => false,
+        }
     }
 }
 
