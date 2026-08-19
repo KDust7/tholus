@@ -136,11 +136,7 @@ fn build(args: &[String]) -> Result<()> {
         if opts.converge {
             cmd.arg("--converge");
         }
-        cmd.args([
-            &bound.to_string_lossy(),
-            "-o",
-            &optimized.to_string_lossy(),
-        ]);
+        cmd.args([&bound.to_string_lossy(), "-o", &optimized.to_string_lossy()]);
         run_command(&mut cmd, "wasm-opt")?;
         std::fs::rename(&optimized, &bound)?;
         Some(file_size(&bound)?)
@@ -167,7 +163,11 @@ fn find_tool(root: &Path, name: &str) -> Option<PathBuf> {
         return Some(PathBuf::from(name));
     }
     let bin_dir = root.join("node_modules").join(".bin");
-    for candidate in [format!("{name}.exe"), format!("{name}.cmd"), name.to_string()] {
+    for candidate in [
+        format!("{name}.exe"),
+        format!("{name}.cmd"),
+        name.to_string(),
+    ] {
         let path = bin_dir.join(candidate);
         if path.exists() {
             return Some(path);

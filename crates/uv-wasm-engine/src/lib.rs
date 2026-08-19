@@ -84,10 +84,9 @@ mod tests {
             "not a release version: {reported:?}"
         );
         assert!(
-            reported.split('.').all(|part| part
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_ascii_digit())),
+            reported
+                .split('.')
+                .all(|part| part.chars().next().is_some_and(|c| c.is_ascii_digit())),
             "not a release version: {reported:?}"
         );
     }
