@@ -255,6 +255,21 @@ class SourceRules(unittest.TestCase):
         self.assertEqual(twice, once)
         self.assertNotIn("glob-to-vfs", counts)
 
+    def test_a_stdin_read_routes_through_the_shim(self):
+        text, counts = self.rewrite("std::io::stdin().read_to_end(&mut buf)?;\n")
+        self.assertEqual(counts.get("std-stdin-to-compat"), 1)
+        self.assertIn("uv_wasm_compat::stdin().read_to_end(&mut buf)?;", text)
+
+    def test_a_terminal_check_keeps_the_host_stdin(self):
+        source = "let interactive = std::io::stdin().is_terminal();\n"
+        self.assertEqual(self.rewrite(source), (source, {}))
+
+    def test_the_stdin_rule_is_idempotent(self):
+        once, _ = self.rewrite("std::io::stdin().read_line(&mut input)?;\n")
+        twice, counts = self.rewrite(once)
+        self.assertEqual(twice, once)
+        self.assertNotIn("std-stdin-to-compat", counts)
+
     def test_absolute_routes_through_the_vfs(self):
         text, counts = self.rewrite("let root = std::path::absolute(cache.root())?;\n")
         self.assertEqual(counts.get("std-absolute-to-vfs"), 1)

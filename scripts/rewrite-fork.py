@@ -80,6 +80,11 @@ SOURCE_RULES = [
         "uv_wasm_compat::spawn_blocking",
     ),
     (
+        "std-stdin-to-compat",
+        re.compile(r"\bstd::io::stdin\b(?!\(\)\.is_terminal)"),
+        "uv_wasm_compat::stdin",
+    ),
+    (
         "reqwest-reexports-to-http",
         re.compile(r"\breqwest::(header|StatusCode|Method|Version)\b"),
         r"http::\1",
