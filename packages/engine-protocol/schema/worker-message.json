@@ -468,33 +468,6 @@
       "properties": {
         "type": {
           "type": "string",
-          "const": "stdinRequest"
-        },
-        "id": {
-          "type": "string"
-        },
-        "invocationId": {
-          "type": "string"
-        },
-        "prompt": {
-          "type": "string"
-        },
-        "echo": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "type",
-        "id",
-        "invocationId",
-        "echo"
-      ]
-    },
-    {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
           "const": "exit"
         },
         "invocationId": {

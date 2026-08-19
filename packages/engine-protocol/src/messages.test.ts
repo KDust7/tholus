@@ -5,6 +5,7 @@ import {
   EXIT_CODE_CANCELLED,
   HOST_MESSAGE_TYPES,
   hostMessageSchema,
+  MAX_STDIN_BYTES,
   WORKER_MESSAGE_TYPES,
   workerMessageSchema,
 } from "./messages.js";
@@ -32,7 +33,7 @@ describe("host messages", () => {
     expect(message.config.env).toEqual({});
   });
 
-  it("defaults exec stdin to false", () => {
+  it("leaves exec stdin absent when the host sends none", () => {
     const message = parseHostMessage({
       type: "exec",
       invocationId: "inv-1",
@@ -40,8 +41,31 @@ describe("host messages", () => {
     });
 
     if (message.type !== "exec") throw new Error("unreachable");
-    expect(message.stdin).toBe(false);
+    expect(message.stdin).toBeUndefined();
     expect(message.argv).toEqual(["pip", "list"]);
+  });
+
+  it("carries exec stdin as bytes, and keeps an empty buffer", () => {
+    const message = parseHostMessage({
+      type: "exec",
+      invocationId: "inv-1",
+      argv: ["pip", "compile", "-"],
+      stdin: new Uint8Array(0),
+    });
+
+    if (message.type !== "exec") throw new Error("unreachable");
+    expect(message.stdin).toEqual(new Uint8Array(0));
+  });
+
+  it("rejects standard input past the size limit", () => {
+    expect(() =>
+      parseHostMessage({
+        type: "exec",
+        invocationId: "inv-1",
+        argv: ["pip", "compile", "-"],
+        stdin: new Uint8Array(MAX_STDIN_BYTES + 1),
+      }),
+    ).toThrow();
   });
 
   it("rejects a tty size of zero columns", () => {

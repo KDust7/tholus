@@ -240,10 +240,7 @@
             "rows"
           ]
         },
-        "stdin": {
-          "default": false,
-          "type": "boolean"
-        },
+        "stdin": {},
         "promptPolicy": {
           "anyOf": [
             {
@@ -278,33 +275,6 @@
         "type",
         "invocationId",
         "argv"
-      ]
-    },
-    {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string",
-          "const": "stdinResponse"
-        },
-        "id": {
-          "type": "string"
-        },
-        "data": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "type",
-        "id",
-        "data"
       ]
     },
     {

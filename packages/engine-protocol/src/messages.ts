@@ -7,6 +7,12 @@ export const binarySchema = z.custom<Uint8Array>((value) => value instanceof Uin
   message: "expected a Uint8Array",
 });
 
+export const MAX_STDIN_BYTES = 8 * 1024 * 1024;
+
+export const stdinSchema = binarySchema.refine((value) => value.byteLength <= MAX_STDIN_BYTES, {
+  message: `standard input may not exceed ${MAX_STDIN_BYTES} bytes`,
+});
+
 export const ttySizeSchema = z.object({
   cols: z.number().int().positive(),
   rows: z.number().int().positive(),
@@ -43,14 +49,8 @@ export const execMessageSchema = z.object({
   cwd: z.string().optional(),
   env: z.record(z.string(), z.string()).optional(),
   tty: ttyConfigSchema.optional(),
-  stdin: z.boolean().default(false),
+  stdin: stdinSchema.optional(),
   promptPolicy: promptPolicySchema.optional(),
-});
-
-export const stdinResponseMessageSchema = z.object({
-  type: z.literal("stdinResponse"),
-  id: z.string(),
-  data: z.string().nullable(),
 });
 
 export const resizeMessageSchema = z.object({
@@ -79,7 +79,6 @@ export const disposeMessageSchema = z.object({
 export const hostMessageSchema = z.discriminatedUnion("type", [
   initMessageSchema,
   execMessageSchema,
-  stdinResponseMessageSchema,
   resizeMessageSchema,
   cancelMessageSchema,
   ackMessageSchema,
@@ -115,14 +114,6 @@ export const eventMessageSchema = z.object({
   event: engineEventSchema,
 });
 
-export const stdinRequestMessageSchema = z.object({
-  type: z.literal("stdinRequest"),
-  id: z.string(),
-  invocationId: z.string(),
-  prompt: z.string().optional(),
-  echo: z.boolean(),
-});
-
 export const exitMessageSchema = z.object({
   type: z.literal("exit"),
   invocationId: z.string(),
@@ -143,7 +134,6 @@ export const workerMessageSchema = z.discriminatedUnion("type", [
   bootProgressMessageSchema,
   outputMessageSchema,
   eventMessageSchema,
-  stdinRequestMessageSchema,
   exitMessageSchema,
   fatalMessageSchema,
 ]);
@@ -151,7 +141,6 @@ export type WorkerMessage = z.infer<typeof workerMessageSchema>;
 
 export type InitMessage = z.infer<typeof initMessageSchema>;
 export type ExecMessage = z.infer<typeof execMessageSchema>;
-export type StdinResponseMessage = z.infer<typeof stdinResponseMessageSchema>;
 export type ResizeMessage = z.infer<typeof resizeMessageSchema>;
 export type CancelMessage = z.infer<typeof cancelMessageSchema>;
 export type AckMessage = z.infer<typeof ackMessageSchema>;
@@ -160,26 +149,16 @@ export type InitResultMessage = z.infer<typeof initResultMessageSchema>;
 export type BootProgressMessage = z.infer<typeof bootProgressMessageSchema>;
 export type OutputMessage = z.infer<typeof outputMessageSchema>;
 export type EventMessage = z.infer<typeof eventMessageSchema>;
-export type StdinRequestMessage = z.infer<typeof stdinRequestMessageSchema>;
 export type ExitMessage = z.infer<typeof exitMessageSchema>;
 export type FatalMessage = z.infer<typeof fatalMessageSchema>;
 
-export const HOST_MESSAGE_TYPES = [
-  "init",
-  "exec",
-  "stdinResponse",
-  "resize",
-  "cancel",
-  "ack",
-  "dispose",
-] as const;
+export const HOST_MESSAGE_TYPES = ["init", "exec", "resize", "cancel", "ack", "dispose"] as const;
 
 export const WORKER_MESSAGE_TYPES = [
   "initResult",
   "bootProgress",
   "output",
   "event",
-  "stdinRequest",
   "exit",
   "fatal",
 ] as const;
