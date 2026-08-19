@@ -20,8 +20,13 @@ class FakeEngine implements EngineHandle {
   columns = 0;
   rows = 0;
   cleared = false;
+  readonly environments: string[][] = [];
 
   constructor(private readonly options: FakeOptions) {}
+
+  envReplace(entries: string[]): void {
+    this.environments.push(entries);
+  }
 
   async invoke(
     _argv: string[],
@@ -82,8 +87,8 @@ function harness(options: FakeOptions = {}): Harness {
   return { worker, emitted, engines };
 }
 
-async function init(test: Harness): Promise<void> {
-  test.worker.receive({ type: "init", id: "i1", protocolVersion: PROTOCOL_VERSION, config: {} });
+async function init(test: Harness, config: Record<string, unknown> = {}): Promise<void> {
+  test.worker.receive({ type: "init", id: "i1", protocolVersion: PROTOCOL_VERSION, config });
   await test.worker.settled;
 }
 
@@ -285,5 +290,55 @@ describe("the engine worker speaks the host protocol", () => {
     test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
     await test.worker.settled;
     expect(test.emitted).toEqual([]);
+  });
+});
+
+describe("the engine worker hands the environment to the engine", () => {
+  it("installs the configured environment when it initializes", async () => {
+    const test = harness();
+    await init(test, { env: { HOME: "/home/browser" } });
+    expect(test.engines[0]?.environments).toEqual([["HOME", "/home/browser"]]);
+  });
+
+  it("re-applies the configured environment for an invocation that names none", async () => {
+    const test = harness();
+    await init(test, { env: { HOME: "/home/browser" } });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    await test.worker.settled;
+    expect(test.engines[0]?.environments.at(-1)).toEqual(["HOME", "/home/browser"]);
+  });
+
+  it("overlays an invocation's environment onto the configured one", async () => {
+    const test = harness();
+    await init(test, { env: { HOME: "/home/browser", UV_CACHE_DIR: "/base" } });
+    test.worker.receive({
+      type: "exec",
+      invocationId: "x1",
+      argv: ["uv"],
+      env: { UV_CACHE_DIR: "/override" },
+      stdin: false,
+    });
+    await test.worker.settled;
+    expect(test.engines[0]?.environments.at(-1)).toEqual([
+      "HOME",
+      "/home/browser",
+      "UV_CACHE_DIR",
+      "/override",
+    ]);
+  });
+
+  it("does not let one invocation's environment reach the next", async () => {
+    const test = harness();
+    await init(test, { env: { HOME: "/home/browser" } });
+    test.worker.receive({
+      type: "exec",
+      invocationId: "x1",
+      argv: ["uv"],
+      env: { UV_NO_CACHE: "1" },
+      stdin: false,
+    });
+    test.worker.receive({ type: "exec", invocationId: "x2", argv: ["uv"], stdin: false });
+    await test.worker.settled;
+    expect(test.engines[0]?.environments.at(-1)).toEqual(["HOME", "/home/browser"]);
   });
 });

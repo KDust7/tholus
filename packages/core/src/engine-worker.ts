@@ -12,6 +12,7 @@ export interface EngineHandle {
   setTermSize(columns: number, rows: number): void;
   clearTerm(): void;
   isRunning(): boolean;
+  envReplace(entries: string[]): void;
 }
 
 export interface EngineExports {
@@ -46,12 +47,17 @@ function unsupported(message: string): StructuredErrorInfo {
   return { code: "unsupported", message };
 }
 
+function flatten(env: Record<string, string>): string[] {
+  return Object.entries(env).flat();
+}
+
 export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
   const now = options.now ?? (() => Date.now());
   const running = new Map<string, Running>();
   const cancelled = new Set<string>();
   let engine: EngineHandle | undefined;
   let booting: Promise<EngineHandle> | undefined;
+  let baseEnv: Record<string, string> = {};
   let queue: Promise<void> = Promise.resolve();
   let disposed = false;
 
@@ -91,7 +97,9 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
     }
     try {
       booting ??= boot();
-      await booting;
+      const handle = await booting;
+      baseEnv = message.config.env;
+      handle.envReplace(flatten(baseEnv));
       const exports = await options.load();
       const build = JSON.parse(exports.buildInfo()) as {
         engine: string;
@@ -155,6 +163,10 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
     } else {
       engine.clearTerm();
     }
+
+    engine.envReplace(
+      flatten(message.env === undefined ? baseEnv : { ...baseEnv, ...message.env }),
+    );
 
     try {
       const code = await engine.invoke(message.argv, (stream, data) => {
