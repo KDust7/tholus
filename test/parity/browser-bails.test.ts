@@ -109,17 +109,17 @@ describe.skipIf(!isBuilt)("the browser names what it cannot do", () => {
     expect(result.output).toContain("Upload distributions to an index");
   });
 
-  it("lists a workspace root but none of the members its glob should have matched", async () => {
+  it("finds every workspace member its glob matches", async () => {
     const result = await run("workspace", "list", "--directory", "/ws");
     expect(result.code).toBe(0);
     expect(result.output).toContain("root");
-    expect(result.output).not.toContain("alpha");
-    expect(result.output).not.toContain("beta");
+    expect(result.output).toContain("alpha");
+    expect(result.output).toContain("beta");
   });
 
-  it("locks that workspace as though it had no members, and reports success", async () => {
+  it("locks the workspace with its members rather than without them", async () => {
     const result = await run("lock", "--directory", "/ws", "--offline");
     expect(result.code).toBe(0);
-    expect(result.output).toContain("Resolved 1 package");
+    expect(result.output).toContain("Resolved 3 packages");
   });
 });

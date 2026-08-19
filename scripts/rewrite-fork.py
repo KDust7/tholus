@@ -91,6 +91,11 @@ SOURCE_RULES = [
         r"uv_vfs::fs::\1",
     ),
     ("walkdir-to-vfs", re.compile(r"\bwalkdir::"), "uv_vfs::walk::"),
+    (
+        "glob-to-vfs",
+        re.compile(r"(?<!crate::)(?<!uv_vfs::)\bglob::"),
+        "uv_vfs::glob::",
+    ),
     ("std-absolute-to-vfs", re.compile(r"\bstd::path::absolute\b"), "uv_vfs::absolute"),
     ("path-absolute-to-vfs", re.compile(r"\bpath::absolute\b"), "uv_vfs::absolute"),
     (

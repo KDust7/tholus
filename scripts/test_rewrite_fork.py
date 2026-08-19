@@ -237,6 +237,24 @@ class SourceRules(unittest.TestCase):
         self.assertEqual(twice, once)
         self.assertNotIn("walkdir-to-vfs", counts)
 
+    def test_glob_paths_route_through_the_shim(self):
+        text, counts = self.rewrite(
+            "use glob::{GlobError, Pattern, glob};\n\nlet p = glob::Pattern::escape(root);\n"
+        )
+        self.assertEqual(counts.get("glob-to-vfs"), 2)
+        self.assertIn("use uv_vfs::glob::{GlobError, Pattern, glob};", text)
+        self.assertIn("uv_vfs::glob::Pattern::escape", text)
+
+    def test_uvs_own_glob_module_is_left_alone(self):
+        source = "use crate::glob::cluster_globs;\nmod glob;\nlet globs = 1;\n"
+        self.assertEqual(self.rewrite(source), (source, {}))
+
+    def test_the_glob_rule_is_idempotent(self):
+        once, _ = self.rewrite("use glob::{Pattern, glob};\n")
+        twice, counts = self.rewrite(once)
+        self.assertEqual(twice, once)
+        self.assertNotIn("glob-to-vfs", counts)
+
     def test_absolute_routes_through_the_vfs(self):
         text, counts = self.rewrite("let root = std::path::absolute(cache.root())?;\n")
         self.assertEqual(counts.get("std-absolute-to-vfs"), 1)
