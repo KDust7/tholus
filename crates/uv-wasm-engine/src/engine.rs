@@ -18,7 +18,6 @@ const EXIT_CODE_CANCELLED: u8 = 130;
 
 #[wasm_bindgen]
 pub struct Engine {
-    initialized: Cell<bool>,
     running: Rc<Cell<bool>>,
     cancel: Rc<RefCell<Option<oneshot::Sender<()>>>>,
 }
@@ -29,7 +28,6 @@ impl Engine {
     pub fn new() -> Result<Engine, JsError> {
         python::seed_default_runtime()?;
         Ok(Self {
-            initialized: Cell::new(false),
             running: Rc::new(Cell::new(false)),
             cancel: Rc::new(RefCell::new(None)),
         })
@@ -162,9 +160,13 @@ impl Engine {
     }
 }
 
+thread_local! {
+    static GLOBALS_INITIALIZED: Cell<bool> = const { Cell::new(false) };
+}
+
 impl Engine {
     fn next_initialization(&self) -> GlobalInitialization {
-        if self.initialized.replace(true) {
+        if GLOBALS_INITIALIZED.with(|initialized| initialized.replace(true)) {
             GlobalInitialization::Reuse
         } else {
             GlobalInitialization::Initialize
