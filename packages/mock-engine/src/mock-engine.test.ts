@@ -21,10 +21,45 @@ describe("initialization", () => {
     const seen = collect(engine);
     engine.postMessage({ type: "init", id: "i1", protocolVersion: PROTOCOL_VERSION, config: {} });
 
-    const first = seen[0];
+    const first = seen.find((message) => message.type === "initResult");
     expect(first?.type).toBe("initResult");
     if (first?.type !== "initResult") throw new Error("unreachable");
     expect(first.outcome.ok).toBe(true);
+  });
+
+  it("reports boot progress before the build identity", () => {
+    const engine = createMockEngine();
+    const seen = collect(engine);
+    engine.postMessage({ type: "init", id: "i1", protocolVersion: PROTOCOL_VERSION, config: {} });
+
+    expect(seen.map((message) => message.type)).toEqual([
+      "bootProgress",
+      "bootProgress",
+      "bootProgress",
+      "bootProgress",
+      "initResult",
+    ]);
+    expect(
+      seen.flatMap((message) => (message.type === "bootProgress" ? [message.phase] : [])),
+    ).toEqual(["compile-start", "compile-done", "init-start", "ready"]);
+  });
+
+  it("does not boot for a host it is about to reject", () => {
+    const engine = createMockEngine();
+    const seen = collect(engine);
+    engine.postMessage({ type: "init", id: "i1", protocolVersion: "999", config: {} });
+
+    expect(seen.map((message) => message.type)).toEqual(["initResult"]);
+  });
+
+  it("boots once per engine, not once per handshake", () => {
+    const engine = createMockEngine();
+    const seen = collect(engine);
+    engine.postMessage({ type: "init", id: "i1", protocolVersion: PROTOCOL_VERSION, config: {} });
+    engine.postMessage({ type: "init", id: "i2", protocolVersion: PROTOCOL_VERSION, config: {} });
+
+    expect(seen.filter((message) => message.type === "bootProgress")).toHaveLength(4);
+    expect(seen.filter((message) => message.type === "initResult")).toHaveLength(2);
   });
 
   it("refuses a handshake from a different protocol", () => {
@@ -44,7 +79,7 @@ describe("initialization", () => {
     const seen = collect(engine);
     engine.postMessage({ type: "init", id: "i1", protocolVersion: PROTOCOL_VERSION, config: {} });
 
-    const first = seen[0];
+    const first = seen.find((message) => message.type === "initResult");
     if (first?.type !== "initResult" || !first.outcome.ok) throw new Error("unreachable");
     expect(first.outcome.build).toEqual(build);
   });
@@ -260,7 +295,7 @@ describe("lifecycle", () => {
     engine.postMessage({ type: "init", id: "i1", protocolVersion: PROTOCOL_VERSION, config: {} });
 
     expect(engine.received).toHaveLength(1);
-    expect(engine.emitted).toHaveLength(1);
+    expect(engine.emitted).toHaveLength(5);
   });
 
   it("rejects a malformed host message", () => {

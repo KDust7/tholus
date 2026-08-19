@@ -39,6 +39,7 @@ export function createMockEngine(script: MockScript = {}): MockEngineEndpoint {
   const emitted: WorkerMessage[] = [];
   const invocations = new Map<string, Invocation>();
   let terminated = false;
+  let booted = false;
   let stdinRequestCounter = 0;
 
   const emit = (message: WorkerMessage): void => {
@@ -49,6 +50,17 @@ export function createMockEngine(script: MockScript = {}): MockEngineEndpoint {
     for (const listener of listeners) {
       listener({ data: message });
     }
+  };
+
+  const boot = (): void => {
+    if (booted) {
+      return;
+    }
+    booted = true;
+    emit({ type: "bootProgress", phase: "compile-start" });
+    emit({ type: "bootProgress", phase: "compile-done", ms: 0 });
+    emit({ type: "bootProgress", phase: "init-start" });
+    emit({ type: "bootProgress", phase: "ready", ms: 0 });
   };
 
   const runStep = async (
@@ -148,6 +160,7 @@ export function createMockEngine(script: MockScript = {}): MockEngineEndpoint {
           });
           return;
         }
+        boot();
         emit({
           type: "initResult",
           id: message.id,

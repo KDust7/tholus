@@ -22,6 +22,36 @@
     {
       "from": "worker",
       "message": {
+        "type": "bootProgress",
+        "phase": "compile-start"
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "bootProgress",
+        "phase": "compile-done",
+        "ms": "$any"
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "bootProgress",
+        "phase": "init-start"
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "bootProgress",
+        "phase": "ready",
+        "ms": "$any"
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
         "type": "initResult",
         "id": "init-1",
         "outcome": {

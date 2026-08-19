@@ -6,6 +6,67 @@
     {
       "from": "host",
       "message": {
+        "type": "init",
+        "id": "init-1",
+        "protocolVersion": "0",
+        "config": {
+          "fs": {
+            "kind": "memory"
+          },
+          "cache": {
+            "kind": "memory"
+          }
+        }
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "bootProgress",
+        "phase": "compile-start"
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "bootProgress",
+        "phase": "compile-done",
+        "ms": "$any"
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "bootProgress",
+        "phase": "init-start"
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "bootProgress",
+        "phase": "ready",
+        "ms": "$any"
+      }
+    },
+    {
+      "from": "worker",
+      "message": {
+        "type": "initResult",
+        "id": "init-1",
+        "outcome": {
+          "ok": true,
+          "build": {
+            "engine": "$any",
+            "uv": "$any",
+            "protocol": "0"
+          }
+        }
+      }
+    },
+    {
+      "from": "host",
+      "message": {
         "type": "exec",
         "invocationId": "inv-1",
         "argv": [
