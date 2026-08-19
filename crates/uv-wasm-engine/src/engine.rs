@@ -48,6 +48,23 @@ impl Engine {
         self.running.get()
     }
 
+    #[cfg(target_family = "wasm")]
+    #[wasm_bindgen(js_name = setCwd)]
+    pub fn set_cwd(&self, path: &str) -> Result<(), JsError> {
+        uv_vfs::set_current_dir(path).map_err(|error| {
+            JsError::new(&format!("uv-wasm: could not enter `{path}`: {error}"))
+        })
+    }
+
+    #[cfg(target_family = "wasm")]
+    #[wasm_bindgen(js_name = cwd)]
+    pub fn cwd(&self) -> String {
+        uv_vfs::current_dir()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned()
+    }
+
     #[wasm_bindgen(js_name = fsRead)]
     pub fn fs_read(&self, path: &str) -> Result<Vec<u8>, JsError> {
         fs::read(path)

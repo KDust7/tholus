@@ -19,6 +19,7 @@ interface FakeOptions {
   stderr?: string;
   throws?: string;
   blocks?: boolean;
+  rejectsCwd?: boolean;
 }
 
 class FakeEngine implements EngineHandle {
@@ -27,12 +28,20 @@ class FakeEngine implements EngineHandle {
   cleared = false;
   cancels = 0;
   readonly environments: string[][] = [];
+  readonly directories: string[] = [];
   private release: ((code: number) => void) | undefined;
 
   constructor(private readonly options: FakeOptions) {}
 
   envReplace(entries: string[]): void {
     this.environments.push(entries);
+  }
+
+  setCwd(path: string): void {
+    if (this.options.rejectsCwd) {
+      throw new Error(`uv-wasm: could not enter \`${path}\``);
+    }
+    this.directories.push(path);
   }
 
   async invoke(
@@ -270,6 +279,41 @@ describe("the engine worker speaks the host protocol", () => {
       { type: "exit", invocationId: "a", code: 0, cancelled: false, durationMs: 0 },
       { type: "exit", invocationId: "b", code: 130, cancelled: true, durationMs: 0 },
     ]);
+  });
+
+  it("enters the working directory the config named", async () => {
+    const test = harness();
+    await init(test, { cwd: "/work" });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    await test.worker.settled;
+    expect(test.engines[0]?.directories).toEqual(["/work"]);
+  });
+
+  it("lets an invocation name a working directory of its own", async () => {
+    const test = harness();
+    await init(test, { cwd: "/work" });
+    test.worker.receive({
+      type: "exec",
+      invocationId: "x1",
+      argv: ["uv"],
+      stdin: false,
+      cwd: "/elsewhere",
+    });
+    test.worker.receive({ type: "exec", invocationId: "x2", argv: ["uv"], stdin: false });
+    await test.worker.settled;
+    expect(test.engines[0]?.directories).toEqual(["/elsewhere", "/work"]);
+  });
+
+  it("reports a working directory it cannot enter as a failed invocation", async () => {
+    const test = harness({ rejectsCwd: true });
+    await init(test, { cwd: "/missing" });
+    test.emitted.length = 0;
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"], stdin: false });
+    await test.worker.settled;
+    expect(test.emitted).toHaveLength(1);
+    const [exit] = test.emitted;
+    expect(exit?.type).toBe("exit");
+    expect(exit).toMatchObject({ code: 1, cancelled: false });
   });
 
   it("interrupts an invocation that is already running", async () => {

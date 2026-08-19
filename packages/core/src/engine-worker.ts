@@ -14,6 +14,7 @@ export interface EngineHandle {
   isRunning(): boolean;
   envReplace(entries: string[]): void;
   cancel(): boolean;
+  setCwd(path: string): void;
 }
 
 export interface EngineExports {
@@ -59,6 +60,7 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
   let engine: EngineHandle | undefined;
   let booting: Promise<EngineHandle> | undefined;
   let baseEnv: Record<string, string> = {};
+  let baseCwd: string | undefined;
   let queue: Promise<void> = Promise.resolve();
   let disposed = false;
 
@@ -100,6 +102,7 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       booting ??= boot();
       const handle = await booting;
       baseEnv = message.config.env;
+      baseCwd = message.config.cwd;
       handle.envReplace(flatten(baseEnv));
       const exports = await options.load();
       const build = JSON.parse(exports.buildInfo()) as {
@@ -168,6 +171,16 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
     engine.envReplace(
       flatten(message.env === undefined ? baseEnv : { ...baseEnv, ...message.env }),
     );
+
+    const cwd = message.cwd ?? baseCwd;
+    if (cwd !== undefined) {
+      try {
+        engine.setCwd(cwd);
+      } catch (error) {
+        fail(unsupported(describe(error)), 1);
+        return;
+      }
+    }
 
     try {
       const code = await engine.invoke(message.argv, (stream, data) => {
