@@ -73,7 +73,9 @@ describe.skipIf(!isBuilt)("the browser names what it cannot do", () => {
   it("refuses to initialize a git repository, by name", async () => {
     const result = await run("init", "--directory", "/bails", "--vcs", "git", "child");
     expect(result.code).toBe(2);
-    expect(result.output).toContain("Initializing a Git repository is not supported in the browser");
+    expect(result.output).toContain(
+      "Initializing a Git repository is not supported in the browser",
+    );
   });
 
   it("refuses to fetch a git dependency, by name", async () => {
