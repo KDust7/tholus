@@ -1,0 +1,220 @@
+import { createServer } from "node:http";
+import { gzipSync } from "node:zlib";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve, dirname } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const FIXTURE_ORIGIN = "http://uv-wasm-fixture.invalid";
+const UPSTREAM_INDEX = "https://pypi.org/simple";
+const REWRITABLE = /json|html|text/i;
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const nativeUv = resolve(
+  root,
+  "vendor/uv/target/debug",
+  process.platform === "win32" ? "uv.exe" : "uv",
+);
+
+const EXCLUDE_NEWER = "2026-08-01T00:00:00Z";
+
+const scenarios = {
+  "pure-python": { requirements: ["idna==3.11"], extraArgs: [] },
+  markers: {
+    requirements: ["idna==3.11; python_version >= '3.10'"],
+    extraArgs: [],
+  },
+  transitive: { requirements: ["requests==2.32.5"], extraArgs: [] },
+  universal: { requirements: ["requests==2.32.5"], extraArgs: ["--universal"] },
+};
+
+const METADATA_SUFFIX = ".metadata";
+
+const encodeFileUrl = (url) => `/files/${Buffer.from(url, "utf8").toString("base64url")}`;
+
+function decodeFileUrl(path) {
+  const encoded = path.slice("/files/".length);
+  const [segment, suffix] = encoded.endsWith(METADATA_SUFFIX)
+    ? [encoded.slice(0, -METADATA_SUFFIX.length), METADATA_SUFFIX]
+    : [encoded, ""];
+  return `${Buffer.from(segment, "base64url").toString("utf8")}${suffix}`;
+}
+
+function rewriteFileUrls(body, contentType, origin) {
+  if (!REWRITABLE.test(contentType)) {
+    return { stored: body, served: body, rewrite: false };
+  }
+  const text = body.toString("utf8");
+  const stored = text.replace(
+    /https:\/\/files\.pythonhosted\.org\/[^"'\s<>]+/g,
+    (match) => `${FIXTURE_ORIGIN}${encodeFileUrl(match)}`,
+  );
+  const rewrite = stored !== text;
+  const served = rewrite ? stored.split(FIXTURE_ORIGIN).join(origin) : text;
+  return {
+    stored: Buffer.from(stored, "utf8"),
+    served: Buffer.from(served, "utf8"),
+    rewrite,
+  };
+}
+
+let enginePromise;
+
+async function loadEngine() {
+  const assets = resolve(root, "packages/core/assets");
+  const mod = await import(pathToFileURL(resolve(assets, "engine.js")).href);
+  await mod.default({
+    module_or_path: new Uint8Array(await readFile(resolve(assets, "engine_bg.wasm"))),
+  });
+  return mod;
+}
+
+async function runBrowser(name, requirements, args) {
+  enginePromise ??= loadEngine();
+  const mod = await enginePromise;
+  const engine = new mod.Engine();
+  const directory = `/record-${name}`;
+  engine.fsMkdirp(directory);
+  engine.fsWrite(`${directory}/requirements.in`, new TextEncoder().encode(requirements));
+  const decoder = new TextDecoder();
+  let stderr = "";
+  const status = await engine.invoke(
+    ["uv", ...args, "--directory", directory],
+    (stream, data) => {
+      if (stream !== "stdout") {
+        stderr += decoder.decode(data);
+      }
+    },
+  );
+  return { status, stderr };
+}
+
+function runNative(args) {
+  return new Promise((done, fail) => {
+    const child = spawn(nativeUv, args, { encoding: "utf8" });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", fail);
+    child.on("close", (status) => done({ status, stdout, stderr }));
+  });
+}
+
+async function record(name, scenario) {
+  const responses = {};
+  let origin = FIXTURE_ORIGIN;
+
+  const server = createServer((request, response) => {
+    const key = request.url ?? "/";
+    const upstream = key.startsWith("/files/")
+      ? decodeFileUrl(key)
+      : `${UPSTREAM_INDEX}${key.replace(/^\/simple/, "")}`;
+
+    const accept = request.headers.accept;
+    fetch(upstream, { headers: accept ? { accept } : {} })
+      .then(async (upstreamResponse) => {
+        const raw = Buffer.from(await upstreamResponse.arrayBuffer());
+        const contentType = upstreamResponse.headers.get("content-type") ?? "";
+        const { stored, served, rewrite } = rewriteFileUrls(raw, contentType, origin);
+        const headers = { "content-type": contentType };
+        for (const header of ["etag", "last-modified", "x-pypi-last-serial"]) {
+          const value = upstreamResponse.headers.get(header);
+          if (value) {
+            headers[header] = value;
+          }
+        }
+        responses[key] = {
+          status: upstreamResponse.status,
+          headers,
+          gzip: true,
+          body: gzipSync(stored, { level: 9 }).toString("base64"),
+          ...(rewrite ? { rewrite: true } : {}),
+        };
+        response.writeHead(upstreamResponse.status, {
+          ...headers,
+          "content-length": String(served.byteLength),
+        });
+        response.end(served);
+      })
+      .catch((error) => {
+        console.error(`  upstream failed for ${key}: ${error.message}`);
+        response.writeHead(502).end();
+      });
+  });
+
+  await new Promise((ready) => server.listen(0, "127.0.0.1", ready));
+  const { port } = server.address();
+  origin = `http://127.0.0.1:${port}`;
+
+  const requirements = `${scenario.requirements.join("\n")}\n`;
+  const workspace = mkdtempSync(join(tmpdir(), `uv-wasm-record-${name}-`));
+  writeFileSync(join(workspace, "requirements.in"), requirements);
+
+  const args = [
+    "pip",
+    "compile",
+    "requirements.in",
+    "--exclude-newer",
+    EXCLUDE_NEWER,
+    "--no-cache",
+    "--no-header",
+    ...scenario.extraArgs,
+  ];
+  const indexed = [...args, "--index-url", `${origin}/simple`];
+
+  const native = await runNative([...indexed, "--directory", workspace]);
+  rmSync(workspace, { recursive: true, force: true });
+  if (native.status !== 0) {
+    await new Promise((done) => server.close(done));
+    throw new Error(`native uv failed for ${name}:\n${native.stderr}`);
+  }
+  const afterNative = Object.keys(responses).length;
+
+  const browser = await runBrowser(name, requirements, indexed);
+  await new Promise((done) => server.close(done));
+  if (browser.status !== 0) {
+    throw new Error(`the engine failed for ${name}:\n${browser.stderr}`);
+  }
+  const added = Object.keys(responses).length - afterNative;
+
+  const outDir = resolve(root, "test/fixtures", name);
+  await mkdir(outDir, { recursive: true });
+  await writeFile(
+    join(outDir, "snapshot.json"),
+    `${JSON.stringify(
+      {
+        recordedAt: new Date().toISOString(),
+        requirements: scenario.requirements,
+        args,
+        responses,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
+  const bytes = Object.values(responses).reduce(
+    (total, entry) => total + Buffer.from(entry.body, "base64").byteLength,
+    0,
+  );
+  console.log(
+    `${name}: ${Object.keys(responses).length} responses (${added} only the browser asked for), ${(bytes / 1024).toFixed(1)} KiB gzipped`,
+  );
+}
+
+const wanted = process.argv.slice(2);
+const selected = wanted.length > 0 ? wanted : Object.keys(scenarios);
+for (const name of selected) {
+  const scenario = scenarios[name];
+  if (!scenario) {
+    throw new Error(`unknown scenario: ${name}`);
+  }
+  await record(name, scenario);
+}
