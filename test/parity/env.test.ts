@@ -43,12 +43,16 @@ describe.skipIf(!canRun)("uv reads the environment the host installed", () => {
     return Buffer.concat(chunks).toString("utf8").trim();
   }
 
-  it("falls back to a relative cache root when the host installs nothing", async () => {
-    expect(await run({}, ["cache", "dir"])).toBe(".uv_cache");
+  it("has an absolute cache root even when the host installs nothing", async () => {
+    expect(await run({}, ["cache", "dir"])).toBe("/home/browser/.cache/uv");
+  });
+
+  it("puts the default state root under the same home", async () => {
+    expect(await run({}, ["tool", "dir"])).toBe("/home/browser/.local/share/uv/tools");
   });
 
   it("builds the xdg cache root from a host-set HOME", async () => {
-    expect(await run({ HOME: "/home/browser" }, ["cache", "dir"])).toBe("/home/browser/.cache/uv");
+    expect(await run({ HOME: "/elsewhere" }, ["cache", "dir"])).toBe("/elsewhere/.cache/uv");
   });
 
   it("lets XDG_CACHE_HOME move the cache root", async () => {
