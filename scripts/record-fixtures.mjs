@@ -37,7 +37,11 @@ const scenarios = {
     index: PYODIDE_INDEX,
     excludeNewer: false,
   },
+  install: { requirements: ["idna==3.11"], extraArgs: [], command: "install" },
 };
+
+const NATIVE_PYTHON = "3.14";
+const ENVIRONMENT = /^Using Python .*$/gm;
 
 const METADATA_SUFFIX = ".metadata";
 
@@ -88,10 +92,29 @@ async function loadEngine() {
   return mod;
 }
 
-async function runBrowser(name, requirements, args, stdin) {
+async function browserEngine() {
   enginePromise ??= loadEngine();
   const mod = await enginePromise;
-  const engine = new mod.Engine();
+  return new mod.Engine();
+}
+
+function invokeBrowser(engine, args) {
+  const decoder = new TextDecoder();
+  let stdout = "";
+  let stderr = "";
+  return engine
+    .invoke(["uv", ...args], (stream, data) => {
+      if (stream === "stdout") {
+        stdout += decoder.decode(data);
+      } else {
+        stderr += decoder.decode(data);
+      }
+    })
+    .then((status) => ({ status, stdout, stderr }));
+}
+
+async function runBrowser(name, requirements, args, stdin) {
+  const engine = await browserEngine();
   const directory = `/record-${name}`;
   engine.fsMkdirp(directory);
   engine.fsWrite(`${directory}/requirements.in`, new TextEncoder().encode(requirements));
@@ -100,17 +123,20 @@ async function runBrowser(name, requirements, args, stdin) {
   } else {
     engine.setStdin(new TextEncoder().encode(stdin));
   }
-  const decoder = new TextDecoder();
-  let stderr = "";
-  const status = await engine.invoke(
-    ["uv", ...args, "--directory", directory],
-    (stream, data) => {
-      if (stream !== "stdout") {
-        stderr += decoder.decode(data);
-      }
-    },
-  );
-  return { status, stderr };
+  return invokeBrowser(engine, [...args, "--directory", directory]);
+}
+
+async function runBrowserInstall(name, args) {
+  const engine = await browserEngine();
+  const directory = `/record-${name}`;
+  engine.clearStdin();
+  engine.fsMkdirp(directory);
+  const venv = `${directory}/.venv`;
+  const created = await invokeBrowser(engine, ["venv", venv, "--python", "/bin/python3"]);
+  if (created.status !== 0) {
+    throw new Error(`the engine could not create a venv for ${name}:\n${created.stderr}`);
+  }
+  return invokeBrowser(engine, [...args, "--python", venv]);
 }
 
 function runNative(args, stdin) {
@@ -226,19 +252,40 @@ async function record(name, scenario) {
   const workspace = mkdtempSync(join(tmpdir(), `uv-wasm-record-${name}-`));
   writeFileSync(join(workspace, "requirements.in"), requirements);
 
-  const args = [
-    "pip",
-    "compile",
-    scenario.stdin ? "-" : "requirements.in",
-    ...(scenario.excludeNewer === false ? [] : ["--exclude-newer", EXCLUDE_NEWER]),
-    "--no-cache",
-    "--no-header",
-    ...scenario.extraArgs,
-  ];
+  const installing = scenario.command === "install";
+  const args = installing
+    ? [
+        "pip",
+        "install",
+        ...scenario.requirements,
+        ...(scenario.excludeNewer === false ? [] : ["--exclude-newer", EXCLUDE_NEWER]),
+        "--no-cache",
+        ...scenario.extraArgs,
+      ]
+    : [
+        "pip",
+        "compile",
+        scenario.stdin ? "-" : "requirements.in",
+        ...(scenario.excludeNewer === false ? [] : ["--exclude-newer", EXCLUDE_NEWER]),
+        "--no-cache",
+        "--no-header",
+        ...scenario.extraArgs,
+      ];
   const indexed = [...args, "--index-url", `${origin}/simple`];
 
   const stdin = scenario.stdin ? requirements : undefined;
-  const native = await runNative([...indexed, "--directory", workspace], stdin);
+  let native;
+  if (installing) {
+    const venv = join(workspace, ".venv");
+    const created = await runNative(["venv", venv, "--python", NATIVE_PYTHON]);
+    if (created.status !== 0) {
+      await new Promise((done) => server.close(done));
+      throw new Error(`native uv could not create a venv for ${name}:\n${created.stderr}`);
+    }
+    native = await runNative([...indexed, "--python", venv]);
+  } else {
+    native = await runNative([...indexed, "--directory", workspace], stdin);
+  }
   rmSync(workspace, { recursive: true, force: true });
   if (native.status !== 0) {
     await new Promise((done) => server.close(done));
@@ -246,7 +293,9 @@ async function record(name, scenario) {
   }
   const afterNative = Object.keys(responses).length;
 
-  const browser = await runBrowser(name, requirements, indexed, stdin);
+  const browser = installing
+    ? await runBrowserInstall(name, indexed)
+    : await runBrowser(name, requirements, indexed, stdin);
   await new Promise((done) => server.close(done));
   if (browser.status !== 0) {
     throw new Error(`the engine failed for ${name}:\n${browser.stderr}`);
@@ -263,7 +312,12 @@ async function record(name, scenario) {
         recordedFrom: nativeStamp(),
         requirements: scenario.requirements,
         args,
-        expected: native.stdout,
+        ...(installing
+          ? {
+              command: "install",
+              expectedReport: native.stderr.replace(ENVIRONMENT, "Using Python <ENVIRONMENT>"),
+            }
+          : { expected: native.stdout }),
         responses,
       },
       null,
