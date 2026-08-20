@@ -61,13 +61,11 @@ describe("a config the engine cannot honor fails rather than being ignored", () 
     expect(() => derivedEnv(parse({ cache: { kind: "opfs" } }))).toThrow(/OPFS cold store/);
   });
 
-  it("names the target fields it cannot honor rather than dropping them", () => {
-    expect(() =>
-      derivedEnv(parse({ target: { pythonVersion: "3.14", platform: "wasm32" } })),
-    ).toThrow(/target \(pythonVersion, platform\)/);
-  });
-
-  it("accepts a target that names nothing", () => {
-    expect(derivedEnv(parse({ target: {} }))).toEqual({});
+  it("has no resolution target to honor, because that is per-invocation", () => {
+    const config = parse({ target: { pythonVersion: "3.13" } }) as Record<string, unknown>;
+    expect(
+      "target" in config,
+      "the config still carries a resolution target; uv resolves per invocation, not per engine",
+    ).toBe(false);
   });
 });

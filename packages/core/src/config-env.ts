@@ -28,23 +28,10 @@ function storageEnv(config: EngineConfig): Record<string, string> {
   }
 }
 
-function targetEnv(config: EngineConfig): Record<string, string> {
-  const named = Object.entries(config.target).filter(([, value]) => value !== undefined);
-  if (named.length > 0) {
-    throw unsupported(
-      `target (${named.map(([key]) => key).join(", ")})`,
-      "uv has no environment variable for the resolution target, so it is still per-invocation; " +
-        "pass --python-version and --python-platform, or overwrite the interpreter at /bin/python3",
-    );
-  }
-  return {};
-}
-
 export function derivedEnv(config: EngineConfig): Record<string, string> {
   return {
     ...indexEnv(config.index),
     ...storageEnv(config),
-    ...targetEnv(config),
     ...(config.logFilter === undefined ? {} : { [RUST_LOG]: config.logFilter }),
   };
 }

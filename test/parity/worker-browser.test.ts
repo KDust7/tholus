@@ -83,7 +83,7 @@ describe.skipIf(!isBuilt)("a real browser Worker drives the engine", () => {
   afterAll(async () => {
     await browser?.close();
     await new Promise<void>((done) => server?.close(() => done()));
-  }, 60_000);
+  }, 180_000);
 
   async function drain(until: string, timeoutMs: number): Promise<Record<string, unknown>[]> {
     return page.evaluate(

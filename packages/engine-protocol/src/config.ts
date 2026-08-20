@@ -28,18 +28,10 @@ export const indexOptionsSchema = z.object({
 });
 export type IndexOptions = z.infer<typeof indexOptionsSchema>;
 
-export const targetEnvSchema = z.object({
-  pythonVersion: z.string().optional(),
-  platform: z.string().optional(),
-  pyodideAbi: z.string().optional(),
-});
-export type TargetEnv = z.infer<typeof targetEnvSchema>;
-
 export const engineConfigSchema = z.object({
   fs: fsBackendSpecSchema.default({ kind: "memory" }),
   cache: cacheSpecSchema.default({ kind: "memory" }),
   index: indexOptionsSchema.default({}),
-  target: targetEnvSchema.default({}),
   env: z.record(z.string(), z.string()).default({}),
   cwd: z.string().default("/work"),
   logFilter: z.string().optional(),

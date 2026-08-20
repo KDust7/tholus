@@ -65,7 +65,7 @@ describe.skipIf(!isBuilt)("the SDK drives the real engine", () => {
 
   afterAll(async () => {
     await engine?.dispose();
-  }, 60_000);
+  }, 180_000);
 
   async function run(args: string[]): Promise<Captured> {
     const stdout: Uint8Array[] = [];

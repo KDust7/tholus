@@ -122,21 +122,6 @@
         }
       }
     },
-    "target": {
-      "default": {},
-      "type": "object",
-      "properties": {
-        "pythonVersion": {
-          "type": "string"
-        },
-        "platform": {
-          "type": "string"
-        },
-        "pyodideAbi": {
-          "type": "string"
-        }
-      }
-    },
     "env": {
       "default": {},
       "type": "object",

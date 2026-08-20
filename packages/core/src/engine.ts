@@ -25,7 +25,6 @@ export interface EngineConfigInput {
     indexStrategy?: "first-index" | "unsafe-first-match" | "unsafe-best-match";
     pyodideIndex?: string;
   };
-  target?: { pythonVersion?: string; platform?: string; pyodideAbi?: string };
   env?: Record<string, string>;
   cwd?: string;
   logFilter?: string;
