@@ -25,6 +25,7 @@ export interface ReplayServer {
   requested: readonly string[];
   misses: readonly string[];
   rejected: readonly string[];
+  revalidated: readonly string[];
   close: () => Promise<void>;
 }
 
@@ -35,6 +36,7 @@ export interface ReplayOptions {
 const NOT_RECORDED = 599;
 const SERVICE_UNAVAILABLE = 503;
 const PARTIAL_CONTENT = 206;
+const NOT_MODIFIED = 304;
 const RANGE_NOT_SATISFIABLE = 416;
 
 const BYTE_RANGE = /^bytes=(\d*)-(\d*)$/;
@@ -79,6 +81,7 @@ export async function startReplayServer(
   const requested: string[] = [];
   const misses: string[] = [];
   const rejected: string[] = [];
+  const revalidated: string[] = [];
   const failures = new Map<string, number>();
   const failFirst = options.failFirst ?? 0;
   let origin = FIXTURE_ORIGIN;
@@ -102,6 +105,14 @@ export async function startReplayServer(
       response.end("the fixture is pretending to be unavailable");
       return;
     }
+    const etag = recorded.headers.etag;
+    if (etag !== undefined && request.headers["if-none-match"] === etag) {
+      revalidated.push(key);
+      response.writeHead(NOT_MODIFIED, { etag });
+      response.end();
+      return;
+    }
+
     const encoded = Buffer.from(recorded.body, "base64");
     const raw = recorded.gzip ? gunzipSync(encoded) : encoded;
     const body = recorded.rewrite
@@ -147,6 +158,7 @@ export async function startReplayServer(
     requested,
     misses,
     rejected,
+    revalidated,
     close: () =>
       new Promise<void>((done, fail) => {
         server.close((error) => (error ? fail(error) : done()));
