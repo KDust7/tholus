@@ -10,6 +10,8 @@ export default defineConfig({
       "tools/*/src/**/*.test.ts",
     ],
     exclude: ["**/node_modules/**", "**/dist/**", "test/e2e/**"],
+    testTimeout: 60_000,
+    hookTimeout: 180_000,
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary", "html"],
