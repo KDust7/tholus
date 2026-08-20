@@ -186,16 +186,8 @@ impl Engine {
     }
 }
 
-thread_local! {
-    static GLOBALS_INITIALIZED: Cell<bool> = const { Cell::new(false) };
-}
-
 impl Engine {
     fn next_initialization(&self) -> GlobalInitialization {
-        if GLOBALS_INITIALIZED.with(|initialized| initialized.replace(true)) {
-            GlobalInitialization::Reuse
-        } else {
-            GlobalInitialization::Initialize
-        }
+        GlobalInitialization::detect()
     }
 }
