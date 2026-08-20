@@ -8,16 +8,40 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { jsPath, PROGRAM, root, wasmPath } from "./cli-goldens.js";
 import { type ReplayServer, startReplayServer } from "./replay-server.js";
 
-const fixture = resolve(root, "test/fixtures/install");
-const snapshotPath = resolve(fixture, "snapshot.json");
+interface Scenario {
+  name: string;
+  distribution: string;
+  distInfo: string;
+  contains?: string;
+  intoTarget: boolean;
+}
+
+const SCENARIOS: readonly Scenario[] = [
+  {
+    name: "install",
+    distribution: "idna",
+    distInfo: "idna-3.11.dist-info",
+    intoTarget: false,
+  },
+  {
+    name: "install-pyodide",
+    distribution: "msgpack",
+    distInfo: "msgpack-1.1.2.dist-info",
+    contains: "_cmsgpack.cpython-314-wasm32-emscripten.so",
+    intoTarget: true,
+  },
+];
 
 const hasEngine = existsSync(wasmPath) && existsSync(jsPath);
-const hasFixture = existsSync(snapshotPath);
-const canCompare = hasEngine && hasFixture;
+const fixtureOf = (name: string): string => resolve(root, "test/fixtures", name);
+const available = SCENARIOS.filter((scenario) =>
+  existsSync(resolve(fixtureOf(scenario.name), "snapshot.json")),
+);
+const canCompare = hasEngine && available.length === SCENARIOS.length;
 
 if (process.env.CI && !canCompare) {
   throw new Error(
-    "the install gate cannot run: the engine artifact or the install fixture is missing. " +
+    "the install gate cannot run: the engine artifact or an install fixture is missing. " +
       "Skipping here would report a gate that never ran.",
   );
 }
@@ -37,14 +61,12 @@ interface EngineModule {
 }
 
 interface Snapshot {
-  requirements: string[];
   args: string[];
-  command?: string;
   expectedReport?: string;
 }
 
 const DURATION = /\bin \d+(?:\.\d+)?(?:ms|s)\b/g;
-const ENVIRONMENT = /^Using Python .*$/gm;
+const ENVIRONMENT = /^Using (?:C?Python) .*$/gm;
 
 function normalize(text: string): string {
   return text.replace(DURATION, "in <DURATION>").replace(ENVIRONMENT, "Using Python <ENVIRONMENT>");
@@ -66,123 +88,152 @@ function parseRecord(text: string): RecordEntry[] {
     });
 }
 
-describe.skipIf(!canCompare)("uv pip install lands a wheel in the virtual filesystem", () => {
-  let engine: EngineInstance;
-  let snapshot: Snapshot;
-  const venv = "/install/.venv";
-  const sitePackages = `${venv}/lib/python3.14/site-packages`;
+let enginePromise: Promise<EngineInstance> | undefined;
 
-  let installed: { code: number; stderr: string };
-  let server: ReplayServer | undefined;
-
-  beforeAll(async () => {
+async function sharedEngine(): Promise<EngineInstance> {
+  enginePromise ??= (async () => {
     const mod = (await import(pathToFileURL(jsPath).href)) as unknown as EngineModule;
     await mod.default({ module_or_path: new Uint8Array(await readFile(wasmPath)) });
-    engine = new mod.Engine();
-    snapshot = JSON.parse(await readFile(snapshotPath, "utf8")) as Snapshot;
+    return new mod.Engine();
+  })();
+  return enginePromise;
+}
 
-    server = await startReplayServer(fixture);
-    engine.clearStdin();
-    engine.fsMkdirp("/install");
+for (const scenario of SCENARIOS) {
+  describe.skipIf(!canCompare)(`uv pip install lands \`${scenario.name}\` in the vfs`, () => {
+    let engine: EngineInstance;
+    let snapshot: Snapshot;
+    let installed: { code: number; stderr: string };
+    let server: ReplayServer | undefined;
+    let siteDir: string;
 
-    const run = async (args: string[]): Promise<{ code: number; stderr: string }> => {
-      let stderr = "";
-      const decoder = new TextDecoder();
-      const code = await engine.invoke([PROGRAM, ...args], (stream, data) => {
-        if (stream !== "stdout") {
-          stderr += decoder.decode(data);
-        }
-      });
-      return { code, stderr };
-    };
+    const home = `/${scenario.name}`;
+    const venv = `${home}/.venv`;
 
-    const created = await run(["venv", venv, "--python", "/bin/python3"]);
-    expect(created.code, `the engine could not create a venv: ${created.stderr}`).toBe(0);
+    beforeAll(async () => {
+      engine = await sharedEngine();
+      snapshot = JSON.parse(
+        await readFile(resolve(fixtureOf(scenario.name), "snapshot.json"), "utf8"),
+      ) as Snapshot;
 
-    installed = await run([
-      ...snapshot.args,
-      "--index-url",
-      `${server.origin}/simple`,
-      "--python",
-      venv,
-    ]);
-    await server.close();
-  }, 300_000);
+      server = await startReplayServer(fixtureOf(scenario.name));
+      engine.clearStdin();
+      engine.fsMkdirp(home);
 
-  it("installs the package", () => {
-    expect(installed.code, `the install failed: ${installed.stderr}`).toBe(0);
-  });
-
-  it("reaches the index rather than resolving from nothing", () => {
-    expect(server?.requested.length ?? 0).toBeGreaterThan(0);
-    expect(server?.misses, "the install asked for something the snapshot does not hold").toEqual(
-      [],
-    );
-  });
-
-  it("reports the install in native uv's words", () => {
-    const golden = snapshot.expectedReport;
-    expect(golden, "the install fixture carries no golden; re-record it").toBeDefined();
-    expect(golden).toContain("+ idna==3.11");
-    expect(normalize(installed.stderr)).toBe(normalize(golden as string));
-  });
-
-  it("unpacks the distribution into site-packages", () => {
-    const entries = engine.fsReadDir(sitePackages);
-    expect(entries).toContain("idna");
-    expect(entries).toContain("idna-3.11.dist-info");
-  });
-
-  it("writes a RECORD every entry of which is in the filesystem at the recorded hash", () => {
-    const record = new TextDecoder().decode(
-      engine.fsRead(`${sitePackages}/idna-3.11.dist-info/RECORD`),
-    );
-    const entries = parseRecord(record);
-    expect(entries.length, "RECORD is empty, so this check would pass on nothing").toBeGreaterThan(
-      3,
-    );
-
-    const checked: string[] = [];
-    for (const entry of entries) {
-      if (entry.hash === "") {
-        continue;
-      }
-      const path = `${sitePackages}/${entry.path}`;
-      expect(engine.fsExists(path), `RECORD names ${entry.path}, which is not installed`).toBe(
-        true,
-      );
-
-      const bytes = engine.fsRead(path);
-      const digest = createHash("sha256").update(bytes).digest("base64url").replace(/=+$/, "");
-      expect(entry.hash, `RECORD's hash for ${entry.path} is not sha256`).toBe(`sha256=${digest}`);
-      expect(String(bytes.byteLength), `RECORD's size for ${entry.path} is wrong`).toBe(entry.size);
-      checked.push(entry.path);
-    }
-
-    expect(
-      checked.length,
-      "no RECORD entry carried a hash, so nothing was verified",
-    ).toBeGreaterThan(3);
-  });
-
-  it("records itself as installed, so a second install is a no-op", async () => {
-    let stderr = "";
-    const decoder = new TextDecoder();
-    const again = await startReplayServer(fixture);
-    try {
-      const code = await engine.invoke(
-        [PROGRAM, ...snapshot.args, "--index-url", `${again.origin}/simple`, "--python", venv],
-        (stream, data) => {
+      const run = async (args: string[]): Promise<{ code: number; stderr: string }> => {
+        let stderr = "";
+        const decoder = new TextDecoder();
+        const code = await engine.invoke([PROGRAM, ...args], (stream, data) => {
           if (stream !== "stdout") {
             stderr += decoder.decode(data);
           }
-        },
+        });
+        return { code, stderr };
+      };
+
+      const where: string[] = [];
+      if (scenario.intoTarget) {
+        siteDir = `${home}/target`;
+        where.push("--target", siteDir);
+      } else {
+        const created = await run(["venv", venv, "--python", "/bin/python3"]);
+        expect(created.code, `the engine could not create a venv: ${created.stderr}`).toBe(0);
+        siteDir = `${venv}/lib/python3.14/site-packages`;
+        where.push("--python", venv);
+      }
+
+      installed = await run([...snapshot.args, "--index-url", `${server.origin}/simple`, ...where]);
+      await server.close();
+    }, 300_000);
+
+    it("installs the package", () => {
+      expect(installed.code, `the install failed: ${installed.stderr}`).toBe(0);
+    });
+
+    it("reaches the index rather than resolving from nothing", () => {
+      expect(server?.requested.length ?? 0).toBeGreaterThan(0);
+      expect(server?.misses, "the install asked for something the snapshot does not hold").toEqual(
+        [],
       );
-      expect(code, `the second install failed: ${stderr}`).toBe(0);
-      expect(stderr).toContain("Checked 1 package");
-      expect(stderr, "the second install unpacked the wheel again").not.toContain("Installed");
-    } finally {
-      await again.close();
-    }
-  }, 300_000);
-});
+    });
+
+    it("reports the install in native uv's words", () => {
+      const golden = snapshot.expectedReport;
+      expect(golden, "the fixture carries no golden; re-record it").toBeDefined();
+      expect(golden).toContain(`+ ${scenario.distribution}==`);
+      expect(normalize(installed.stderr)).toBe(normalize(golden as string));
+    });
+
+    it("unpacks the distribution", () => {
+      const entries = engine.fsReadDir(siteDir);
+      expect(entries).toContain(scenario.distribution);
+      expect(entries).toContain(scenario.distInfo);
+    });
+
+    it.skipIf(scenario.contains === undefined)("keeps the compiled extension module", () => {
+      expect(engine.fsReadDir(`${siteDir}/${scenario.distribution}`)).toContain(
+        scenario.contains as string,
+      );
+    });
+
+    it("writes a RECORD every entry of which is installed at the recorded hash", () => {
+      const record = new TextDecoder().decode(
+        engine.fsRead(`${siteDir}/${scenario.distInfo}/RECORD`),
+      );
+      const entries = parseRecord(record);
+      expect(
+        entries.length,
+        "RECORD is empty, so this check would pass on nothing",
+      ).toBeGreaterThan(3);
+
+      const checked: string[] = [];
+      for (const entry of entries) {
+        if (entry.hash === "") {
+          continue;
+        }
+        const path = `${siteDir}/${entry.path}`;
+        expect(engine.fsExists(path), `RECORD names ${entry.path}, which is not installed`).toBe(
+          true,
+        );
+
+        const bytes = engine.fsRead(path);
+        const digest = createHash("sha256").update(bytes).digest("base64url").replace(/=+$/, "");
+        expect(entry.hash, `RECORD's hash for ${entry.path} is wrong`).toBe(`sha256=${digest}`);
+        expect(String(bytes.byteLength), `RECORD's size for ${entry.path} is wrong`).toBe(
+          entry.size,
+        );
+        checked.push(entry.path);
+      }
+
+      expect(
+        checked.length,
+        "no RECORD entry carried a hash, so nothing was verified",
+      ).toBeGreaterThan(3);
+    });
+
+    it.skipIf(scenario.intoTarget)(
+      "records itself installed, so a second install is a no-op",
+      async () => {
+        let stderr = "";
+        const decoder = new TextDecoder();
+        const again = await startReplayServer(fixtureOf(scenario.name));
+        try {
+          const code = await engine.invoke(
+            [PROGRAM, ...snapshot.args, "--index-url", `${again.origin}/simple`, "--python", venv],
+            (stream, data) => {
+              if (stream !== "stdout") {
+                stderr += decoder.decode(data);
+              }
+            },
+          );
+          expect(code, `the second install failed: ${stderr}`).toBe(0);
+          expect(stderr).toContain("Checked 1 package");
+          expect(stderr, "the second install unpacked the wheel again").not.toContain("Installed");
+        } finally {
+          await again.close();
+        }
+      },
+      300_000,
+    );
+  });
+}

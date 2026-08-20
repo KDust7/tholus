@@ -38,10 +38,18 @@ const scenarios = {
     excludeNewer: false,
   },
   install: { requirements: ["idna==3.11"], extraArgs: [], command: "install" },
+  "install-pyodide": {
+    requirements: ["msgpack==1.1.2"],
+    extraArgs: ["--python-platform", "wasm32-pyodide2026", "--python-version", "3.14"],
+    command: "install",
+    target: true,
+    index: PYODIDE_INDEX,
+    excludeNewer: false,
+  },
 };
 
 const NATIVE_PYTHON = "3.14";
-const ENVIRONMENT = /^Using Python .*$/gm;
+const ENVIRONMENT = /^Using (?:C?Python) .*$/gm;
 
 const METADATA_SUFFIX = ".metadata";
 
@@ -126,11 +134,14 @@ async function runBrowser(name, requirements, args, stdin) {
   return invokeBrowser(engine, [...args, "--directory", directory]);
 }
 
-async function runBrowserInstall(name, args) {
+async function runBrowserInstall(name, args, intoTarget) {
   const engine = await browserEngine();
   const directory = `/record-${name}`;
   engine.clearStdin();
   engine.fsMkdirp(directory);
+  if (intoTarget) {
+    return invokeBrowser(engine, [...args, "--target", `${directory}/target`]);
+  }
   const venv = `${directory}/.venv`;
   const created = await invokeBrowser(engine, ["venv", venv, "--python", "/bin/python3"]);
   if (created.status !== 0) {
@@ -275,7 +286,9 @@ async function record(name, scenario) {
 
   const stdin = scenario.stdin ? requirements : undefined;
   let native;
-  if (installing) {
+  if (installing && scenario.target) {
+    native = await runNative([...indexed, "--target", join(workspace, "target")]);
+  } else if (installing) {
     const venv = join(workspace, ".venv");
     const created = await runNative(["venv", venv, "--python", NATIVE_PYTHON]);
     if (created.status !== 0) {
@@ -294,7 +307,7 @@ async function record(name, scenario) {
   const afterNative = Object.keys(responses).length;
 
   const browser = installing
-    ? await runBrowserInstall(name, indexed)
+    ? await runBrowserInstall(name, indexed, scenario.target === true)
     : await runBrowser(name, requirements, indexed, stdin);
   await new Promise((done) => server.close(done));
   if (browser.status !== 0) {
@@ -315,6 +328,7 @@ async function record(name, scenario) {
         ...(installing
           ? {
               command: "install",
+              ...(scenario.target === true ? { target: true } : {}),
               expectedReport: native.stderr.replace(ENVIRONMENT, "Using Python <ENVIRONMENT>"),
             }
           : { expected: native.stdout }),
