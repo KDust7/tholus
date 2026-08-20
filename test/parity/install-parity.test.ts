@@ -13,7 +13,10 @@ interface Scenario {
   distribution: string;
   distInfo: string;
   contains?: string;
+  requirementsFile?: string;
   intoTarget: boolean;
+  reinstallIsNoop: boolean;
+  hasFollowUps: boolean;
 }
 
 const SCENARIOS: readonly Scenario[] = [
@@ -22,6 +25,17 @@ const SCENARIOS: readonly Scenario[] = [
     distribution: "idna",
     distInfo: "idna-3.11.dist-info",
     intoTarget: false,
+    reinstallIsNoop: true,
+    hasFollowUps: true,
+  },
+  {
+    name: "sync",
+    distribution: "idna",
+    distInfo: "idna-3.11.dist-info",
+    requirementsFile: "idna==3.11\n",
+    intoTarget: false,
+    reinstallIsNoop: false,
+    hasFollowUps: false,
   },
   {
     name: "install-pyodide",
@@ -29,6 +43,8 @@ const SCENARIOS: readonly Scenario[] = [
     distInfo: "msgpack-1.1.2.dist-info",
     contains: "_cmsgpack.cpython-314-wasm32-emscripten.so",
     intoTarget: true,
+    reinstallIsNoop: false,
+    hasFollowUps: false,
   },
 ];
 
@@ -51,6 +67,7 @@ interface EngineInstance {
   fsRead(path: string): Uint8Array;
   fsReadDir(path: string): string[];
   fsMkdirp(path: string): void;
+  fsWrite(path: string, contents: Uint8Array): void;
   fsExists(path: string): boolean;
   clearStdin(): void;
 }
@@ -60,16 +77,28 @@ interface EngineModule {
   Engine: new () => EngineInstance;
 }
 
+interface FollowUp {
+  args: string[];
+  status: number;
+  stdout: string;
+  stderr: string;
+}
+
 interface Snapshot {
   args: string[];
   expectedReport?: string;
+  followUps?: FollowUp[];
 }
 
 const DURATION = /\bin \d+(?:\.\d+)?(?:ms|s)\b/g;
 const ENVIRONMENT = /^Using (?:C?Python) .*$/gm;
+const LOCATION = /^Location: .*$/gm;
 
 function normalize(text: string): string {
-  return text.replace(DURATION, "in <DURATION>").replace(ENVIRONMENT, "Using Python <ENVIRONMENT>");
+  return text
+    .replace(DURATION, "in <DURATION>")
+    .replace(ENVIRONMENT, "Using Python <ENVIRONMENT>")
+    .replace(LOCATION, "Location: <LOCATION>");
 }
 
 interface RecordEntry {
@@ -131,6 +160,13 @@ for (const scenario of SCENARIOS) {
         return { code, stderr };
       };
 
+      if (scenario.requirementsFile !== undefined) {
+        engine.fsWrite(
+          `${home}/requirements.in`,
+          new TextEncoder().encode(scenario.requirementsFile),
+        );
+      }
+
       const where: string[] = [];
       if (scenario.intoTarget) {
         siteDir = `${home}/target`;
@@ -140,6 +176,9 @@ for (const scenario of SCENARIOS) {
         expect(created.code, `the engine could not create a venv: ${created.stderr}`).toBe(0);
         siteDir = `${venv}/lib/python3.14/site-packages`;
         where.push("--python", venv);
+        if (scenario.requirementsFile !== undefined) {
+          where.push("--directory", home);
+        }
       }
 
       installed = await run([...snapshot.args, "--index-url", `${server.origin}/simple`, ...where]);
@@ -211,7 +250,7 @@ for (const scenario of SCENARIOS) {
       ).toBeGreaterThan(3);
     });
 
-    it.skipIf(scenario.intoTarget)(
+    it.skipIf(!scenario.reinstallIsNoop)(
       "records itself installed, so a second install is a no-op",
       async () => {
         let stderr = "";
@@ -231,6 +270,42 @@ for (const scenario of SCENARIOS) {
           expect(stderr, "the second install unpacked the wheel again").not.toContain("Installed");
         } finally {
           await again.close();
+        }
+      },
+      300_000,
+    );
+
+    it.skipIf(!scenario.hasFollowUps)(
+      "answers the rest of the pip command matrix as native uv does",
+      async () => {
+        const recorded = snapshot.followUps ?? [];
+        expect(
+          recorded.length,
+          "the fixture recorded no follow-up commands; re-record it",
+        ).toBeGreaterThan(3);
+
+        for (const followUp of recorded) {
+          let stdout = "";
+          let stderr = "";
+          const decoder = new TextDecoder();
+          const code = await engine.invoke(
+            [PROGRAM, ...followUp.args, "--python", venv],
+            (stream, data) => {
+              if (stream === "stdout") {
+                stdout += decoder.decode(data);
+              } else {
+                stderr += decoder.decode(data);
+              }
+            },
+          );
+          const where = `uv ${followUp.args.join(" ")}`;
+          expect(code, `${where} exited differently: ${stderr}`).toBe(followUp.status);
+          expect(normalize(stdout), `${where} printed something else`).toBe(
+            normalize(followUp.stdout),
+          );
+          expect(normalize(stderr), `${where} reported something else`).toBe(
+            normalize(followUp.stderr),
+          );
         }
       },
       300_000,
