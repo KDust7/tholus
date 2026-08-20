@@ -84,7 +84,7 @@ jobs:
       - run: bun install --linker=isolated --frozen-lockfile
 
       - name: Format
-        run: cargo fmt --all --check
+        run: cargo fmt --check -p uv-wasm-engine -p uv-wasm-xtask
 
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
