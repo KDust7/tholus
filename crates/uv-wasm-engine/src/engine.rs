@@ -61,9 +61,8 @@ impl Engine {
     #[cfg(target_family = "wasm")]
     #[wasm_bindgen(js_name = setCwd)]
     pub fn set_cwd(&self, path: &str) -> Result<(), JsError> {
-        uv_vfs::set_current_dir(path).map_err(|error| {
-            JsError::new(&format!("uv-wasm: could not enter `{path}`: {error}"))
-        })
+        uv_vfs::set_current_dir(path)
+            .map_err(|error| JsError::new(&format!("uv-wasm: could not enter `{path}`: {error}")))
     }
 
     #[cfg(target_family = "wasm")]
