@@ -15,18 +15,3 @@ export function indexEnv(index: IndexOptions): Record<string, string> {
     ...(index.indexStrategy === undefined ? {} : { [UV_INDEX_STRATEGY]: index.indexStrategy }),
   };
 }
-
-export function applyIndexEnv(
-  env: Record<string, string>,
-  index: IndexOptions,
-): Record<string, string> {
-  const derived = indexEnv(index);
-  const collisions = Object.keys(derived).filter((name) => name in env);
-  if (collisions.length > 0) {
-    throw new Error(
-      `config.index and config.env both set ${collisions.join(", ")}; ` +
-        "set one or the other, so it is clear which index uv resolves against",
-    );
-  }
-  return { ...env, ...derived };
-}

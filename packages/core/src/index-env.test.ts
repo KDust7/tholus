@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  applyIndexEnv,
-  indexEnv,
-  UV_DEFAULT_INDEX,
-  UV_INDEX,
-  UV_INDEX_STRATEGY,
-} from "./index-env.js";
+import { indexEnv, UV_DEFAULT_INDEX, UV_INDEX, UV_INDEX_STRATEGY } from "./index-env.js";
 
 const PYODIDE = "https://index.pyodide.org/314.0.5";
 
@@ -40,40 +34,6 @@ describe("index configuration becomes the environment uv already reads", () => {
   it("carries the index strategy", () => {
     expect(indexEnv({ indexStrategy: "unsafe-best-match" })).toEqual({
       [UV_INDEX_STRATEGY]: "unsafe-best-match",
-    });
-  });
-
-  it("adds the derived variables to the host's environment", () => {
-    expect(applyIndexEnv({ HOME: "/home/browser" }, { pyodideIndex: PYODIDE })).toEqual({
-      HOME: "/home/browser",
-      [UV_INDEX]: PYODIDE,
-    });
-  });
-
-  it("leaves the environment it was given untouched", () => {
-    const env = { HOME: "/home/browser" };
-    applyIndexEnv(env, { pyodideIndex: PYODIDE });
-    expect(env).toEqual({ HOME: "/home/browser" });
-  });
-
-  it("refuses to guess when the environment already sets the same variable", () => {
-    expect(() =>
-      applyIndexEnv({ [UV_INDEX]: "https://host.invalid" }, { pyodideIndex: PYODIDE }),
-    ).toThrow(/config.index and config.env both set UV_INDEX/);
-  });
-
-  it("names every colliding variable, not just the first", () => {
-    expect(() =>
-      applyIndexEnv(
-        { [UV_INDEX]: "https://host.invalid", [UV_INDEX_STRATEGY]: "first-index" },
-        { pyodideIndex: PYODIDE, indexStrategy: "first-index" },
-      ),
-    ).toThrow(/UV_INDEX, UV_INDEX_STRATEGY/);
-  });
-
-  it("does not collide when the config derives nothing", () => {
-    expect(applyIndexEnv({ [UV_INDEX]: "https://host.invalid" }, {})).toEqual({
-      [UV_INDEX]: "https://host.invalid",
     });
   });
 });

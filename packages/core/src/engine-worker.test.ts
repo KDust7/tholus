@@ -521,7 +521,7 @@ describe("the engine worker hands the environment to the engine", () => {
           error: {
             code: "invalid-config",
             message:
-              "config.index and config.env both set UV_INDEX; set one or the other, so it is clear which index uv resolves against",
+              "config and config.env both set UV_INDEX; set one or the other, so it is clear which the engine obeys",
           },
         },
       },

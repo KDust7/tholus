@@ -6,7 +6,7 @@ import {
   type StructuredErrorInfo,
   type WorkerMessage,
 } from "@uv-wasm/engine-protocol";
-import { applyIndexEnv } from "./index-env.js";
+import { resolveEnvironment } from "./config-env.js";
 
 export interface EngineHandle {
   invoke(argv: string[], onOutput: (stream: string, data: Uint8Array) => void): Promise<number>;
@@ -103,7 +103,7 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
     }
     let resolvedEnv: Record<string, string>;
     try {
-      resolvedEnv = applyIndexEnv(message.config.env, message.config.index);
+      resolvedEnv = resolveEnvironment(message.config);
     } catch (error) {
       emit({
         type: "initResult",

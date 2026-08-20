@@ -96,7 +96,7 @@ describe.skipIf(!isBuilt)("the engine runs in headless chromium", () => {
   afterAll(async () => {
     await browser?.close();
     await new Promise<void>((done) => server?.close(() => done()));
-  }, 60_000);
+  }, 180_000);
 
   async function invoke(argv: string[]): Promise<Output> {
     const captured = await page.evaluate(async (args): Promise<Captured> => {
