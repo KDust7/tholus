@@ -7,7 +7,8 @@
   "description": "Phase-1 gate: the built engine artifact answering uv's command line",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "record": "bun record-goldens.ts"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
