@@ -24,7 +24,7 @@ export const indexOptionsSchema = z.object({
   indexUrl: z.string().optional(),
   extraIndexUrls: z.array(z.string()).optional(),
   indexStrategy: indexStrategySchema.optional(),
-  pyodideIndex: z.union([z.boolean(), z.string()]).optional(),
+  pyodideIndex: z.url().optional(),
 });
 export type IndexOptions = z.infer<typeof indexOptionsSchema>;
 

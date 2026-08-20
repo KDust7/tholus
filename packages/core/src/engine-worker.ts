@@ -6,6 +6,7 @@ import {
   type StructuredErrorInfo,
   type WorkerMessage,
 } from "@uv-wasm/engine-protocol";
+import { applyIndexEnv } from "./index-env.js";
 
 export interface EngineHandle {
   invoke(argv: string[], onOutput: (stream: string, data: Uint8Array) => void): Promise<number>;
@@ -100,10 +101,25 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       });
       return;
     }
+    let resolvedEnv: Record<string, string>;
+    try {
+      resolvedEnv = applyIndexEnv(message.config.env, message.config.index);
+    } catch (error) {
+      emit({
+        type: "initResult",
+        id: message.id,
+        outcome: {
+          ok: false,
+          error: { code: "invalid-config", message: describe(error) },
+        },
+      });
+      return;
+    }
+
     try {
       booting ??= boot();
       const handle = await booting;
-      baseEnv = message.config.env;
+      baseEnv = resolvedEnv;
       baseCwd = message.config.cwd;
       handle.envReplace(flatten(baseEnv));
       const exports = await options.load();

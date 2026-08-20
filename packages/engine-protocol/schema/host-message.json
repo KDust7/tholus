@@ -132,14 +132,8 @@
                   ]
                 },
                 "pyodideIndex": {
-                  "anyOf": [
-                    {
-                      "type": "boolean"
-                    },
-                    {
-                      "type": "string"
-                    }
-                  ]
+                  "type": "string",
+                  "format": "uri"
                 }
               }
             },

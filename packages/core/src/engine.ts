@@ -23,7 +23,7 @@ export interface EngineConfigInput {
     indexUrl?: string;
     extraIndexUrls?: string[];
     indexStrategy?: "first-index" | "unsafe-first-match" | "unsafe-best-match";
-    pyodideIndex?: boolean | string;
+    pyodideIndex?: string;
   };
   target?: { pythonVersion?: string; platform?: string; pyodideAbi?: string };
   env?: Record<string, string>;

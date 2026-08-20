@@ -47,6 +47,10 @@ export class UnsupportedError extends EngineError {
   readonly code = "unsupported" as const;
 }
 
+export class InvalidConfigError extends EngineError {
+  readonly code = "invalid-config" as const;
+}
+
 export class CancelledError extends EngineError {
   readonly code = "cancelled" as const;
 }
@@ -69,6 +73,7 @@ const CONSTRUCTORS: Record<ErrorCode, new (message: string, data?: unknown) => E
   "runtime-required": RuntimeRequiredError,
   "build-failed": BuildFailedError,
   unsupported: UnsupportedError,
+  "invalid-config": InvalidConfigError,
   cancelled: CancelledError,
   "engine-crashed": EngineCrashedError,
   "protocol-mismatch": ProtocolMismatchError,

@@ -48,6 +48,7 @@ interface EngineInstance {
   fsWrite(path: string, contents: Uint8Array): void;
   setStdin(bytes: Uint8Array): void;
   clearStdin(): void;
+  envReplace(entries: string[]): void;
 }
 
 interface EngineModule {
@@ -265,6 +266,47 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
 
     expect(code).not.toBe(0);
     expect(browserErr).toContain("standard input");
+  }, 180_000);
+
+  it("resolves against an index named only by the environment", async () => {
+    const name = available[0] as string;
+    const dir = resolve(fixtures, name);
+    const snapshot = JSON.parse(await readFile(resolve(dir, "snapshot.json"), "utf8")) as Snapshot;
+    const requirements = `${snapshot.requirements.join("\n")}\n`;
+
+    let server: ReplayServer | undefined;
+    try {
+      server = await startReplayServer(dir);
+      engine.envReplace(["UV_DEFAULT_INDEX", `${server.origin}/simple`]);
+      engine.clearStdin();
+      engine.fsMkdirp("/env-index");
+      engine.fsWrite("/env-index/requirements.in", new TextEncoder().encode(requirements));
+
+      let browserOut = "";
+      let browserErr = "";
+      const decoder = new TextDecoder();
+      const args = [...snapshot.args, "--directory", "/env-index"];
+      const code = await engine.invoke([PROGRAM, ...args], (stream, data) => {
+        if (stream === "stdout") {
+          browserOut += decoder.decode(data);
+        } else {
+          browserErr += decoder.decode(data);
+        }
+      });
+
+      expect(code, `the engine failed: ${browserErr}`).toBe(0);
+      expect(
+        server.requested.length,
+        "nothing reached the index, so the environment was not what uv resolved against",
+      ).toBeGreaterThan(0);
+      expect(server.misses, "the environment reached an index the snapshot does not hold").toEqual(
+        [],
+      );
+      expect(browserOut).toBe(snapshot.expected);
+    } finally {
+      engine.envReplace([]);
+      await server?.close();
+    }
   }, 180_000);
 
   it("retries a failing index request rather than aborting the worker", async () => {

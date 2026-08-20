@@ -68,6 +68,7 @@
                         "runtime-required",
                         "build-failed",
                         "unsupported",
+                        "invalid-config",
                         "cancelled",
                         "engine-crashed",
                         "protocol-mismatch"
@@ -500,6 +501,7 @@
                 "runtime-required",
                 "build-failed",
                 "unsupported",
+                "invalid-config",
                 "cancelled",
                 "engine-crashed",
                 "protocol-mismatch"

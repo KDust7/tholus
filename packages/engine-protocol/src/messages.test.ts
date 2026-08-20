@@ -222,6 +222,23 @@ describe("engine config", () => {
   it("rejects an unknown filesystem backend", () => {
     expect(() => engineConfigSchema.parse({ fs: { kind: "s3" } })).toThrow();
   });
+
+  it("keeps a pyodide index the host spelled in full", () => {
+    const config = engineConfigSchema.parse({
+      index: { pyodideIndex: "https://index.pyodide.org/314.0.5" },
+    });
+    expect(config.index.pyodideIndex).toBe("https://index.pyodide.org/314.0.5");
+  });
+
+  it("rejects a bare pyodide version, which would resolve against nothing", () => {
+    expect(() => engineConfigSchema.parse({ index: { pyodideIndex: "314.0.5" } })).toThrow();
+  });
+
+  it("rejects a pyodide index with no scheme, which a version sniff would mangle", () => {
+    expect(() =>
+      engineConfigSchema.parse({ index: { pyodideIndex: "index.pyodide.org/314.0.5" } }),
+    ).toThrow();
+  });
 });
 
 describe("protocol version", () => {

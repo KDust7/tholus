@@ -10,6 +10,7 @@ export const errorCodeSchema = z.enum([
   "runtime-required",
   "build-failed",
   "unsupported",
+  "invalid-config",
   "cancelled",
   "engine-crashed",
   "protocol-mismatch",

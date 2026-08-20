@@ -473,4 +473,58 @@ describe("the engine worker hands the environment to the engine", () => {
     await test.worker.settled;
     expect(test.engines[0]?.environments.at(-1)).toEqual(["HOME", "/home/browser"]);
   });
+
+  it("hands the configured indexes to the engine as the variables uv reads", async () => {
+    const test = harness();
+    await init(test, {
+      env: { HOME: "/home/browser" },
+      index: {
+        indexUrl: "https://example.invalid/simple",
+        pyodideIndex: "https://index.pyodide.org/314.0.5",
+      },
+    });
+    expect(test.engines[0]?.environments).toEqual([
+      [
+        "HOME",
+        "/home/browser",
+        "UV_DEFAULT_INDEX",
+        "https://example.invalid/simple",
+        "UV_INDEX",
+        "https://index.pyodide.org/314.0.5",
+      ],
+    ]);
+  });
+
+  it("keeps a configured index out of a later invocation's overlay", async () => {
+    const test = harness();
+    await init(test, { index: { pyodideIndex: "https://index.pyodide.org/314.0.5" } });
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["uv"] });
+    await test.worker.settled;
+    expect(test.engines[0]?.environments.at(-1)).toEqual([
+      "UV_INDEX",
+      "https://index.pyodide.org/314.0.5",
+    ]);
+  });
+
+  it("refuses an init whose env and index config set the same variable", async () => {
+    const test = harness();
+    await init(test, {
+      env: { UV_INDEX: "https://host.invalid" },
+      index: { pyodideIndex: "https://index.pyodide.org/314.0.5" },
+    });
+    expect(test.emitted).toEqual([
+      {
+        type: "initResult",
+        id: "i1",
+        outcome: {
+          ok: false,
+          error: {
+            code: "invalid-config",
+            message:
+              "config.index and config.env both set UV_INDEX; set one or the other, so it is clear which index uv resolves against",
+          },
+        },
+      },
+    ]);
+  });
 });
