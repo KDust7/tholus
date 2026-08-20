@@ -18,6 +18,14 @@ const nativePath = resolve(
 const canCompare = existsSync(wasmPath) && existsSync(jsPath) && existsSync(nativePath);
 const PROGRAM = basename(nativePath);
 
+if (!canCompare) {
+  console.warn(
+    `[native-parity] SKIPPED, this suite needs a natively built uv at ${nativePath}. ` +
+      "Phase 1's byte-parity gate did NOT run. Unlike the compile matrix, it has no recorded " +
+      "golden yet, so it can only run where the binary exists.",
+  );
+}
+
 interface EngineInstance {
   invoke(argv: string[], onOutput: (stream: string, data: Uint8Array) => void): Promise<number>;
 }
@@ -71,6 +79,10 @@ describe.skipIf(!canCompare)("the engine matches native uv byte for byte", () =>
     "matches `uv %s` exactly",
     async (...args: string[]) => {
       const [there, here] = [native(args), await browser(args)];
+      expect(
+        there.stdout.length,
+        "native printed nothing, so this comparison would agree with anything",
+      ).toBeGreaterThan(0);
       expect(here.stdout).toBe(there.stdout);
       expect(here.stderr).toBe(there.stderr);
       expect(here.code).toBe(there.code);
@@ -82,6 +94,10 @@ describe.skipIf(!canCompare)("the engine matches native uv byte for byte", () =>
     "matches the failure for `uv %s` exactly",
     async (...args: string[]) => {
       const [there, here] = [native(args), await browser(args)];
+      expect(
+        there.stderr.length,
+        "native reported nothing, so this comparison would agree with anything",
+      ).toBeGreaterThan(0);
       expect(here.stderr).toBe(there.stderr);
       expect(here.stdout).toBe(there.stdout);
       expect(here.code).toBe(there.code);

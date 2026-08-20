@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { gzipSync } from "node:zlib";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
@@ -30,6 +30,7 @@ const scenarios = {
   },
   transitive: { requirements: ["requests==2.32.5"], extraArgs: [] },
   universal: { requirements: ["requests==2.32.5"], extraArgs: ["--universal"] },
+  stdin: { requirements: ["idna==3.11"], extraArgs: [], stdin: true },
   "pyodide-wheel": {
     requirements: ["msgpack==1.1.2"],
     extraArgs: ["--python-platform", "wasm32-pyodide2026", "--python-version", "3.14"],
@@ -87,13 +88,18 @@ async function loadEngine() {
   return mod;
 }
 
-async function runBrowser(name, requirements, args) {
+async function runBrowser(name, requirements, args, stdin) {
   enginePromise ??= loadEngine();
   const mod = await enginePromise;
   const engine = new mod.Engine();
   const directory = `/record-${name}`;
   engine.fsMkdirp(directory);
   engine.fsWrite(`${directory}/requirements.in`, new TextEncoder().encode(requirements));
+  if (stdin === undefined) {
+    engine.clearStdin();
+  } else {
+    engine.setStdin(new TextEncoder().encode(stdin));
+  }
   const decoder = new TextDecoder();
   let stderr = "";
   const status = await engine.invoke(
@@ -107,9 +113,10 @@ async function runBrowser(name, requirements, args) {
   return { status, stderr };
 }
 
-function runNative(args) {
+function runNative(args, stdin) {
   return new Promise((done, fail) => {
     const child = spawn(nativeUv, args, { encoding: "utf8" });
+    child.stdin.end(stdin ?? "");
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => {
@@ -167,6 +174,12 @@ function respond(response, rangeHeader, status, headers, body) {
   response.end(slice);
 }
 
+function nativeStamp() {
+  const version = spawnSync(nativeUv, ["--version"], { encoding: "utf8" }).stdout ?? "";
+  const commit = /\(([0-9a-f]{7,40}) /.exec(version);
+  return commit ? commit[1] : version.trim();
+}
+
 async function record(name, scenario) {
   const responses = {};
   let origin = FIXTURE_ORIGIN;
@@ -216,7 +229,7 @@ async function record(name, scenario) {
   const args = [
     "pip",
     "compile",
-    "requirements.in",
+    scenario.stdin ? "-" : "requirements.in",
     ...(scenario.excludeNewer === false ? [] : ["--exclude-newer", EXCLUDE_NEWER]),
     "--no-cache",
     "--no-header",
@@ -224,7 +237,8 @@ async function record(name, scenario) {
   ];
   const indexed = [...args, "--index-url", `${origin}/simple`];
 
-  const native = await runNative([...indexed, "--directory", workspace]);
+  const stdin = scenario.stdin ? requirements : undefined;
+  const native = await runNative([...indexed, "--directory", workspace], stdin);
   rmSync(workspace, { recursive: true, force: true });
   if (native.status !== 0) {
     await new Promise((done) => server.close(done));
@@ -232,7 +246,7 @@ async function record(name, scenario) {
   }
   const afterNative = Object.keys(responses).length;
 
-  const browser = await runBrowser(name, requirements, indexed);
+  const browser = await runBrowser(name, requirements, indexed, stdin);
   await new Promise((done) => server.close(done));
   if (browser.status !== 0) {
     throw new Error(`the engine failed for ${name}:\n${browser.stderr}`);
@@ -246,8 +260,10 @@ async function record(name, scenario) {
     `${JSON.stringify(
       {
         recordedAt: new Date().toISOString(),
+        recordedFrom: nativeStamp(),
         requirements: scenario.requirements,
         args,
+        expected: native.stdout,
         responses,
       },
       null,

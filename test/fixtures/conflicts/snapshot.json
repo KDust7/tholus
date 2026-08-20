@@ -1,5 +1,6 @@
 {
-  "recordedAt": "2026-08-19T23:13:16.238Z",
+  "recordedAt": "2026-08-19T23:58:51.245Z",
+  "recordedFrom": "7a5e5a1da",
   "requirements": [
     "uv-wasm-left==1.0.0",
     "uv-wasm-right==1.0.0"
@@ -8,9 +9,12 @@
     "pip",
     "compile",
     "requirements.in",
+    "--python-version",
+    "3.14",
     "--no-cache",
     "--no-header"
   ],
+  "expected": "  × No solution found when resolving dependencies:\n  ╰─▶ Because all versions of uv-wasm-right depend on uv-wasm-shared==2.0.0\n      and all versions of uv-wasm-left depend on uv-wasm-shared==1.0.0, we\n      can conclude that all versions of uv-wasm-left and all versions of\n      uv-wasm-right are incompatible.\n      And because you require uv-wasm-left==1.0.0 and uv-wasm-right==1.0.0, we\n      can conclude that your requirements are unsatisfiable.\n",
   "failing": true,
   "responses": {
     "/files/uv_wasm_left-1.0.0-py3-none-any.whl.metadata": {

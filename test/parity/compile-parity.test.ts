@@ -19,11 +19,26 @@ const nativePath = resolve(
 );
 const fixtures = resolve(root, "test/fixtures");
 
-const SCENARIOS = ["pure-python", "markers", "transitive", "universal", "pyodide-wheel"] as const;
+const SCENARIOS = [
+  "pure-python",
+  "markers",
+  "transitive",
+  "universal",
+  "pyodide-wheel",
+  "stdin",
+] as const;
 
 const available = SCENARIOS.filter((name) => existsSync(resolve(fixtures, name, "snapshot.json")));
-const canCompare =
-  existsSync(wasmPath) && existsSync(jsPath) && existsSync(nativePath) && available.length > 0;
+const hasEngine = existsSync(wasmPath) && existsSync(jsPath);
+const hasNative = existsSync(nativePath);
+const canCompare = hasEngine && available.length > 0;
+
+if (process.env.CI && !canCompare) {
+  throw new Error(
+    "the compile matrix cannot run: the engine artifact or the recorded fixtures are missing. " +
+      "Skipping here would report a gate that never ran.",
+  );
+}
 
 const PROGRAM = basename(nativePath);
 
@@ -43,6 +58,8 @@ interface EngineModule {
 interface Snapshot {
   requirements: string[];
   args: string[];
+  expected?: string;
+  recordedFrom?: string;
   failing?: boolean;
 }
 
@@ -111,12 +128,22 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
           directory,
         ];
 
-        writeFileSync(join(workspace, "requirements.in"), requirements);
-        const nativeRun = await runNative(args(workspace));
-        expect(nativeRun.status, `native uv failed: ${nativeRun.stderr}`).toBe(0);
+        const piped = snapshot.args.includes("-") ? requirements : undefined;
+
+        let live: NativeRun | undefined;
+        if (hasNative) {
+          writeFileSync(join(workspace, "requirements.in"), requirements);
+          live = await runNative(args(workspace), piped);
+          expect(live.status, `native uv failed: ${live.stderr}`).toBe(0);
+        }
 
         engine.fsMkdirp(`/${name}`);
         engine.fsWrite(`/${name}/requirements.in`, new TextEncoder().encode(requirements));
+        if (piped === undefined) {
+          engine.clearStdin();
+        } else {
+          engine.setStdin(new TextEncoder().encode(piped));
+        }
         let browserOut = "";
         let browserErr = "";
         const decoder = new TextDecoder();
@@ -130,10 +157,24 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
         expect(code, `the engine failed: ${browserErr}`).toBe(0);
 
         expect(
+          server.requested.length,
+          "neither side reached the index, so this comparison proves nothing",
+        ).toBeGreaterThan(0);
+        expect(
           server.misses,
           "one of the two sides asked for something the snapshot does not hold; re-record it",
         ).toEqual([]);
-        expect(browserOut).toBe(nativeRun.stdout);
+
+        const golden = snapshot.expected;
+        expect(golden, `${name} was recorded before goldens existed; re-record it`).toBeDefined();
+        expect(
+          golden?.length,
+          "the recorded golden is empty, so it would agree with anything",
+        ).toBeGreaterThan(0);
+        expect(browserOut).toBe(golden);
+        if (live) {
+          expect(live.stdout, "the live binary disagrees with the golden; re-record").toBe(golden);
+        }
       } finally {
         await server?.close();
       }
@@ -144,7 +185,9 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
     "reports an unsatisfiable resolution in native uv's exact words",
     async () => {
       const dir = resolve(fixtures, "conflicts");
-      const snapshot = JSON.parse(await readFile(resolve(dir, "snapshot.json"), "utf8")) as Snapshot;
+      const snapshot = JSON.parse(
+        await readFile(resolve(dir, "snapshot.json"), "utf8"),
+      ) as Snapshot;
       const requirements = `${snapshot.requirements.join("\n")}\n`;
 
       let server: ReplayServer | undefined;
@@ -158,10 +201,12 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
           directory,
         ];
 
-        writeFileSync(join(workspace, "requirements.in"), requirements);
-        const nativeRun = await runNative(args(workspace));
-        expect(nativeRun.status, "the conflict fixture should not resolve").not.toBe(0);
-        expect(nativeRun.stderr).toContain("No solution found");
+        let live: NativeRun | undefined;
+        if (hasNative) {
+          writeFileSync(join(workspace, "requirements.in"), requirements);
+          live = await runNative(args(workspace));
+          expect(live.status, "the conflict fixture should not resolve").not.toBe(0);
+        }
 
         engine.fsMkdirp("/conflicts");
         engine.fsWrite("/conflicts/requirements.in", new TextEncoder().encode(requirements));
@@ -174,59 +219,26 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
         });
 
         expect(server.misses, "the hand-authored snapshot is missing a response").toEqual([]);
-        expect(code).toBe(nativeRun.status);
-        expect(browserErr).toBe(nativeRun.stderr);
+        expect(
+          server.requested.length,
+          "neither side reached the index, so this comparison proves nothing",
+        ).toBeGreaterThan(0);
+
+        const golden = snapshot.expected;
+        expect(golden, "the conflict fixture carries no golden; regenerate it").toBeDefined();
+        expect(golden).toContain("No solution found");
+        expect(code).not.toBe(0);
+        expect(browserErr).toBe(golden);
+        if (live) {
+          expect(live.stderr, "the live binary disagrees with the golden; regenerate").toBe(golden);
+          expect(code).toBe(live.status);
+        }
       } finally {
         await server?.close();
       }
     },
     180_000,
   );
-
-  it("resolves the same requirements read from standard input", async () => {
-    const name = available[0] as string;
-    const dir = resolve(fixtures, name);
-    const snapshot = JSON.parse(await readFile(resolve(dir, "snapshot.json"), "utf8")) as Snapshot;
-    const requirements = `${snapshot.requirements.join("\n")}\n`;
-
-    let server: ReplayServer | undefined;
-    try {
-      server = await startReplayServer(dir);
-      const args = (directory: string): string[] => [
-        ...snapshot.args.map((arg) => (arg === "requirements.in" ? "-" : arg)),
-        "--index-url",
-        `${server?.origin}/simple`,
-        "--directory",
-        directory,
-      ];
-
-      const nativeRun = await runNative(args(workspace), requirements);
-      expect(nativeRun.status, `native uv failed: ${nativeRun.stderr}`).toBe(0);
-
-      engine.fsMkdirp("/stdin");
-      engine.setStdin(new TextEncoder().encode(requirements));
-      let browserOut = "";
-      let browserErr = "";
-      const decoder = new TextDecoder();
-      const code = await engine.invoke([PROGRAM, ...args("/stdin")], (stream, data) => {
-        if (stream === "stdout") {
-          browserOut += decoder.decode(data);
-        } else {
-          browserErr += decoder.decode(data);
-        }
-      });
-      expect(code, `the engine failed: ${browserErr}`).toBe(0);
-
-      expect(
-        server.misses,
-        "one of the two sides asked for something the snapshot does not hold; re-record it",
-      ).toEqual([]);
-      expect(browserOut).toBe(nativeRun.stdout);
-    } finally {
-      engine.clearStdin();
-      await server?.close();
-    }
-  }, 180_000);
 
   it("refuses to read standard input the host never supplied", async () => {
     const name = available[0] as string;

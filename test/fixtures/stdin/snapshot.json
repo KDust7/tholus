@@ -1,19 +1,19 @@
 {
-  "recordedAt": "2026-08-19T23:57:21.193Z",
+  "recordedAt": "2026-08-20T00:01:56.661Z",
   "recordedFrom": "7a5e5a1da",
   "requirements": [
-    "idna==3.11; python_version >= '3.10'"
+    "idna==3.11"
   ],
   "args": [
     "pip",
     "compile",
-    "requirements.in",
+    "-",
     "--exclude-newer",
     "2026-08-01T00:00:00Z",
     "--no-cache",
     "--no-header"
   ],
-  "expected": "idna==3.11\n    # via -r requirements.in\n",
+  "expected": "idna==3.11\n",
   "responses": {
     "/simple/idna/": {
       "status": 200,

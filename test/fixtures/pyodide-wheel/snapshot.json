@@ -1,5 +1,6 @@
 {
-  "recordedAt": "2026-08-19T23:18:53.551Z",
+  "recordedAt": "2026-08-19T23:57:27.180Z",
+  "recordedFrom": "7a5e5a1da",
   "requirements": [
     "msgpack==1.1.2"
   ],
@@ -14,6 +15,7 @@
     "--python-version",
     "3.14"
   ],
+  "expected": "msgpack==1.1.2\n    # via -r requirements.in\n",
   "responses": {
     "/simple/msgpack/": {
       "status": 200,
