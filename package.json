@@ -21,9 +21,9 @@
     "esbuild"
   ],
   "scripts": {
-    "lint": "biome check --files-ignore-unknown=true --indent-style=space --indent-width=2 --line-width=100 packages/core/src packages/engine-protocol/src packages/mock-engine/src test/contract/src test/parity tools/size-report/src",
-    "lint:fix": "biome check --write --files-ignore-unknown=true --indent-style=space --indent-width=2 --line-width=100 packages/core/src packages/engine-protocol/src packages/mock-engine/src test/contract/src test/parity tools/size-report/src",
-    "format": "biome format --write --files-ignore-unknown=true --indent-style=space --indent-width=2 --line-width=100 packages/core/src packages/engine-protocol/src packages/mock-engine/src test/contract/src test/parity tools/size-report/src",
+    "lint": "biome check --files-ignore-unknown=true --indent-style=space --indent-width=2 --line-width=100 packages/core/src packages/engine-protocol/src packages/mock-engine/src packages/pyodide/src test/contract/src test/parity tools/size-report/src",
+    "lint:fix": "biome check --write --files-ignore-unknown=true --indent-style=space --indent-width=2 --line-width=100 packages/core/src packages/engine-protocol/src packages/mock-engine/src packages/pyodide/src test/contract/src test/parity tools/size-report/src",
+    "format": "biome format --write --files-ignore-unknown=true --indent-style=space --indent-width=2 --line-width=100 packages/core/src packages/engine-protocol/src packages/mock-engine/src packages/pyodide/src test/contract/src test/parity tools/size-report/src",
     "typecheck": "bun run --filter '*' typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
