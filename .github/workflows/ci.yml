@@ -26,6 +26,9 @@ jobs:
 
       - run: bun install --linker=isolated --frozen-lockfile
 
+      - name: Build packages
+        run: bun run build
+
       - name: Lint
         run: bun run lint
 
@@ -82,6 +85,9 @@ jobs:
           bun-version: latest
 
       - run: bun install --linker=isolated --frozen-lockfile
+
+      - name: Build packages
+        run: bun run build
 
       - name: Format
         run: cargo fmt --check -p uv-wasm-engine -p uv-wasm-xtask
