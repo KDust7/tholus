@@ -33,6 +33,13 @@ if (process.env.CI && !canRun) {
   );
 }
 
+if (process.env.CI && !hasPyodide) {
+  throw new Error(
+    "the mount gate cannot run: the `pyodide` package is not installed. Skipping here would " +
+      "report phase 4's exit criterion as green while never mounting anything.",
+  );
+}
+
 interface EngineInstance extends ExportVfs {
   invoke(argv: string[], onOutput: (stream: string, data: Uint8Array) => void): Promise<number>;
   fsMkdirp(path: string): void;
