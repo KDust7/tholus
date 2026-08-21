@@ -15,6 +15,7 @@ import type { ColdStore } from "./opfs-store.js";
 const encoder = new TextEncoder();
 
 interface FakeOptions {
+  profile?: string;
   exitCode?: number;
   stdout?: string;
   stderr?: string;
@@ -37,7 +38,11 @@ class FakeEngine implements EngineHandle {
   readonly folders = new Set<string>();
   private release: ((code: number) => void) | undefined;
 
-  constructor(private readonly options: FakeOptions) {}
+  constructor(private readonly options: FakeOptions) {
+    if (options.profile !== undefined) {
+      this.fsWrite("/bin/python3", encoder.encode(options.profile));
+    }
+  }
 
   private ancestors(path: string): void {
     const parts = path.split("/");
@@ -725,6 +730,36 @@ describe("the worker carries uv's cache across a reload when the host asks for o
         event: expect.objectContaining({ type: "log", level: "warn" }),
       }),
     );
+  });
+
+  const profileFor = (release: number): string =>
+    JSON.stringify({
+      platform: { os: { name: "pyemscripten", major: release, minor: 0 }, arch: "wasm32" },
+      markers: { implementation_name: "cpython", python_full_version: "3.14.0" },
+    });
+
+  it("keys the stored cache by the interpreter the wheels were built for", async () => {
+    const test = harness({ profile: profileFor(2026) });
+    await init(test, opfs);
+    test.engines[0]?.fsWrite(`${CACHE_ROOT}/a`, encoder.encode("x"));
+    await exec(test);
+
+    expect(JSON.parse(test.store.manifest ?? "{}").abiTag).toBe(
+      "cpython-3.14.0-pyemscripten_2026_0_wasm32",
+    );
+  });
+
+  it("refuses a cache built for another interpreter rather than mixing the two", async () => {
+    const store = new FakeColdStore();
+    const first = harness({ profile: profileFor(2026) }, store);
+    await init(first, opfs);
+    first.engines[0]?.fsWrite(`${CACHE_ROOT}/a`, encoder.encode("x"));
+    await exec(first);
+    expect(store.blobs.has("a")).toBe(true);
+
+    const second = harness({ profile: profileFor(2025) }, store);
+    await init(second, opfs);
+    expect(second.engines[0]?.fsKind(`${CACHE_ROOT}/a`)).toBeUndefined();
   });
 
   it("reports the exit before it spends time flushing", async () => {

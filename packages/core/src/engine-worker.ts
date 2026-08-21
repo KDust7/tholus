@@ -8,6 +8,7 @@ import {
   type WorkerMessage,
 } from "@uv-wasm/engine-protocol";
 import { cacheRoot, resolveEnvironment } from "./config-env.js";
+import { interpreterAbiTag } from "./interpreter.js";
 import { type ColdStore, openColdStore } from "./opfs-store.js";
 import { createPersistence, type LockRunner, type Persistence, webLocks } from "./persistence.js";
 
@@ -106,7 +107,7 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       store,
       vfs: handle,
       root: cacheRoot(env),
-      abiTag: spec.abiTag ?? "unknown",
+      abiTag: spec.abiTag ?? interpreterAbiTag(handle),
       lock: options.lock ?? webLocks,
       now,
       ...(spec.budgetBytes === undefined ? {} : { budgetBytes: spec.budgetBytes }),
