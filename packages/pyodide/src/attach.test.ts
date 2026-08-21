@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PyodideLike } from "./facts.js";
-import { attachPyodide, DynlibApiUnavailable, type TreeSource } from "./index.js";
+import {
+  attachPyodide,
+  DynlibApiUnavailable,
+  PyodideProbeFailed,
+  type TreeSource,
+} from "./index.js";
 
 const FACTS = {
   pythonVersion: "3.14.2",
@@ -113,5 +118,17 @@ describe("mounting puts a uv environment on the runtime's path", () => {
       writeFile,
       "a refused mount must not leave half an environment behind",
     ).not.toHaveBeenCalled();
+  });
+});
+
+describe("a runtime that will not describe itself is refused at attach", () => {
+  it("says which runtime failed rather than surfacing a python traceback", () => {
+    const broken = fakePyodide({
+      runPython: () => {
+        throw new Error("SystemError: interpreter is shutting down");
+      },
+    });
+    expect(() => attachPyodide(pure, broken)).toThrow(PyodideProbeFailed);
+    expect(() => attachPyodide(pure, broken)).toThrow(/would not describe itself/);
   });
 });

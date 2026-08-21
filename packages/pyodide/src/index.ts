@@ -1,5 +1,5 @@
 import type { ExportedTree } from "@uv-wasm/core";
-import { type PyodideFacts, type PyodideLike, probePyodide, shortVersion } from "./facts.js";
+import { type PyodideFacts, type PyodideLike, probePyodide } from "./facts.js";
 import { checkAbi, MOUNT_ROOT, type WrittenTree, writeTree } from "./mount.js";
 
 export * from "./facts.js";
@@ -72,5 +72,3 @@ export function attachPyodide(engine: TreeSource, pyodide: PyodideLike): Pyodide
     },
   };
 }
-
-export { shortVersion };

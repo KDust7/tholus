@@ -27,7 +27,7 @@
     "typecheck": "bun run --filter '*' typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test:coverage": "vitest run --coverage packages tools test/contract",
     "build": "bun run --filter './packages/*' build",
     "wasm:build": "cargo xtask build",
     "size": "bun run --filter @uv-wasm/size-report report"

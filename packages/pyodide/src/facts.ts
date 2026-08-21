@@ -47,8 +47,3 @@ export function probePyodide(pyodide: PyodideLike): PyodideFacts {
   const parsed = JSON.parse(raw) as Omit<PyodideFacts, "pyodideVersion">;
   return { pyodideVersion: pyodide.version, ...parsed };
 }
-
-export function shortVersion(full: string): string {
-  const parts = full.split(".");
-  return parts.length >= 2 ? `${parts[0]}.${parts[1]}` : full;
-}
