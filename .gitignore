@@ -27,5 +27,4 @@ Thumbs.db
 !.vscode/extensions.json
 size-report.json
 
-vendor/
 __pycache__/

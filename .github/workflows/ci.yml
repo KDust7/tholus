@@ -68,6 +68,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          token: ${{ secrets.FORK_TOKEN || github.token }}
+
+      - name: The submodule pointer is not stale
+        run: |
+          pinned=$(git -C vendor/uv rev-parse HEAD)
+          tip=$(git -C vendor/uv ls-remote origin refs/heads/wasm/v0.12.3 | cut -f1)
+          if [ "$pinned" != "$tip" ]; then
+            echo "vendor/uv is pinned at $pinned but the fork's branch tip is $tip."
+            echo "A fork commit without a pointer bump ships an old fork past the parity gate."
+            exit 1
+          fi
 
       - uses: dtolnay/rust-toolchain@stable
         with:
