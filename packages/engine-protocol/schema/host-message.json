@@ -78,6 +78,14 @@
                     },
                     "scope": {
                       "type": "string"
+                    },
+                    "abiTag": {
+                      "type": "string"
+                    },
+                    "budgetBytes": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
                     }
                   },
                   "required": [
@@ -351,6 +359,26 @@
       },
       "required": [
         "type"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "exportTree"
+        },
+        "id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "path"
       ]
     }
   ]

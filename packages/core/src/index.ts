@@ -6,6 +6,7 @@ export * from "./endpoint.js";
 export * from "./engine.js";
 export * from "./engine-worker.js";
 export * from "./errors.js";
+export * from "./export-tree.js";
 export * from "./interpreter.js";
 export * from "./opfs-store.js";
 export * from "./persistence.js";

@@ -8,6 +8,7 @@ import {
   type WorkerMessage,
 } from "@uv-wasm/engine-protocol";
 import { cacheRoot, resolveEnvironment } from "./config-env.js";
+import { exportTree } from "./export-tree.js";
 import { assertInterpreter, interpreterAbiTag } from "./interpreter.js";
 import { type ColdStore, openColdStore } from "./opfs-store.js";
 import {
@@ -376,6 +377,36 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
         return;
       case "dispose":
         disposed = true;
+        return;
+      case "exportTree":
+        enqueue(async () => {
+          const handle = engine;
+          if (!handle) {
+            emit({
+              type: "exportTreeResult",
+              id: message.id,
+              outcome: {
+                ok: false,
+                error: { code: "invalid-config", message: "the engine is not initialized" },
+              },
+            });
+            return;
+          }
+          try {
+            const { entries, bytes } = exportTree(handle, message.path);
+            emit({
+              type: "exportTreeResult",
+              id: message.id,
+              outcome: { ok: true, entries, bytes },
+            });
+          } catch (error) {
+            emit({
+              type: "exportTreeResult",
+              id: message.id,
+              outcome: { ok: false, error: { code: "unsupported", message: describe(error) } },
+            });
+          }
+        });
         return;
     }
   };

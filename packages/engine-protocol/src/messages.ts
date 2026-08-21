@@ -76,6 +76,12 @@ export const disposeMessageSchema = z.object({
   type: z.literal("dispose"),
 });
 
+export const exportTreeMessageSchema = z.object({
+  type: z.literal("exportTree"),
+  id: z.string(),
+  path: z.string(),
+});
+
 export const hostMessageSchema = z.discriminatedUnion("type", [
   initMessageSchema,
   execMessageSchema,
@@ -83,6 +89,7 @@ export const hostMessageSchema = z.discriminatedUnion("type", [
   cancelMessageSchema,
   ackMessageSchema,
   disposeMessageSchema,
+  exportTreeMessageSchema,
 ]);
 export type HostMessage = z.infer<typeof hostMessageSchema>;
 
@@ -129,6 +136,30 @@ export const fatalMessageSchema = z.object({
   stack: z.string().optional(),
 });
 
+export const treeEntrySchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("file"),
+    path: z.string(),
+    offset: z.number().int().nonnegative(),
+    length: z.number().int().nonnegative(),
+  }),
+  z.object({ kind: z.literal("symlink"), path: z.string(), target: z.string() }),
+]);
+export type TreeEntry = z.infer<typeof treeEntrySchema>;
+
+export const exportTreeResultMessageSchema = z.object({
+  type: z.literal("exportTreeResult"),
+  id: z.string(),
+  outcome: z.discriminatedUnion("ok", [
+    z.object({
+      ok: z.literal(true),
+      entries: z.array(treeEntrySchema),
+      bytes: binarySchema,
+    }),
+    z.object({ ok: z.literal(false), error: structuredErrorSchema }),
+  ]),
+});
+
 export const workerMessageSchema = z.discriminatedUnion("type", [
   initResultMessageSchema,
   bootProgressMessageSchema,
@@ -136,6 +167,7 @@ export const workerMessageSchema = z.discriminatedUnion("type", [
   eventMessageSchema,
   exitMessageSchema,
   fatalMessageSchema,
+  exportTreeResultMessageSchema,
 ]);
 export type WorkerMessage = z.infer<typeof workerMessageSchema>;
 
@@ -151,8 +183,18 @@ export type OutputMessage = z.infer<typeof outputMessageSchema>;
 export type EventMessage = z.infer<typeof eventMessageSchema>;
 export type ExitMessage = z.infer<typeof exitMessageSchema>;
 export type FatalMessage = z.infer<typeof fatalMessageSchema>;
+export type ExportTreeMessage = z.infer<typeof exportTreeMessageSchema>;
+export type ExportTreeResultMessage = z.infer<typeof exportTreeResultMessageSchema>;
 
-export const HOST_MESSAGE_TYPES = ["init", "exec", "resize", "cancel", "ack", "dispose"] as const;
+export const HOST_MESSAGE_TYPES = [
+  "init",
+  "exec",
+  "resize",
+  "cancel",
+  "ack",
+  "dispose",
+  "exportTree",
+] as const;
 
 export const WORKER_MESSAGE_TYPES = [
   "initResult",
@@ -161,6 +203,7 @@ export const WORKER_MESSAGE_TYPES = [
   "event",
   "exit",
   "fatal",
+  "exportTreeResult",
 ] as const;
 
 export const EXIT_CODE_CANCELLED = 130;

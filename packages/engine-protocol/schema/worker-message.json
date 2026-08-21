@@ -544,6 +544,141 @@
         "type",
         "message"
       ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "const": "exportTreeResult"
+        },
+        "id": {
+          "type": "string"
+        },
+        "outcome": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean",
+                  "const": true
+                },
+                "entries": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "file"
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "path",
+                          "offset",
+                          "length"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "symlink"
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "target": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "path",
+                          "target"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "bytes": {}
+              },
+              "required": [
+                "ok",
+                "entries",
+                "bytes"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "ok": {
+                  "type": "boolean",
+                  "const": false
+                },
+                "error": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "network",
+                        "resolution-conflict",
+                        "package-not-found",
+                        "hash-mismatch",
+                        "no-runtime-attached",
+                        "sdist-needs-runtime",
+                        "runtime-required",
+                        "build-failed",
+                        "unsupported",
+                        "invalid-config",
+                        "cancelled",
+                        "engine-crashed",
+                        "protocol-mismatch"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {}
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              },
+              "required": [
+                "ok",
+                "error"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "id",
+        "outcome"
+      ]
     }
   ]
 }

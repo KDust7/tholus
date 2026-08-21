@@ -2,6 +2,7 @@ import {
   type BuildIdentity,
   type EngineEvent,
   EXIT_CODE_CANCELLED,
+  type ExportTreeResultMessage,
   MAX_STDIN_BYTES,
   PROTOCOL_VERSION,
   type PromptPolicy,
@@ -15,6 +16,7 @@ import { DEFAULT_CWD } from "./brand.js";
 import { createPipApi, createVenvApi } from "./commands.js";
 import { type EndpointFactory, workerEndpoint } from "./endpoint.js";
 import { EngineCrashedError, ProtocolMismatchError, toEngineError } from "./errors.js";
+import type { ExportedTree } from "./export-tree.js";
 
 export interface EngineConfigInput {
   fs?: { kind: "memory" } | { kind: "opfs"; root?: string } | { kind: "delegate" };
@@ -72,6 +74,7 @@ export interface Engine {
   readonly pip: ReturnType<typeof createPipApi>;
   readonly venv: ReturnType<typeof createVenvApi>;
   exec(argv: string[], options?: ExecOptions): ExecHandle;
+  exportTree(path: string): Promise<ExportedTree>;
   onEvent(listener: (event: EngineEvent) => void): () => void;
   dispose(): Promise<void>;
   terminate(): void;
@@ -104,8 +107,10 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
   const endpoint = await factory();
   const listeners = new Set<(event: EngineEvent) => void>();
   const invocations = new Map<string, PendingInvocation>();
+  const exports = new Map<string, (outcome: ExportTreeResultMessage["outcome"]) => void>();
 
   let invocationCounter = 0;
+  let exportCounter = 0;
   let disposed = false;
 
   const dispatchEvent = (event: EngineEvent, scoped?: (event: EngineEvent) => void): void => {
@@ -122,6 +127,10 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
       invocation.reject(error);
     }
     invocations.clear();
+    for (const settle of [...exports.values()]) {
+      settle({ ok: false, error: { code: "engine-crashed", message: error.message } });
+    }
+    exports.clear();
   };
 
   const handshake = new Promise<BuildIdentity>((resolve, reject) => {
@@ -189,6 +198,12 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
     }
 
     if (message.type === "bootProgress" || message.type === "initResult") {
+      return;
+    }
+
+    if (message.type === "exportTreeResult") {
+      exports.get(message.id)?.(message.outcome);
+      exports.delete(message.id);
       return;
     }
 
@@ -295,6 +310,23 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
       return createVenvApi(engine);
     },
     exec,
+    exportTree(path) {
+      if (disposed) {
+        return Promise.reject(new EngineCrashedError("engine disposed"));
+      }
+      exportCounter += 1;
+      const id = `x${exportCounter}`;
+      return new Promise<ExportedTree>((resolve, reject) => {
+        exports.set(id, (outcome) => {
+          if (outcome.ok) {
+            resolve({ entries: outcome.entries, bytes: outcome.bytes });
+          } else {
+            reject(toEngineError(outcome.error));
+          }
+        });
+        endpoint.postMessage({ type: "exportTree", id, path });
+      });
+    },
     onEvent(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
