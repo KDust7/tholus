@@ -1,7 +1,7 @@
 import { engineConfigSchema } from "@uv-wasm/engine-protocol";
 import { describe, expect, it } from "vitest";
 
-import { derivedEnv, RUST_LOG, resolveEnvironment, UV_NO_CACHE } from "./config-env.js";
+import { cacheRoot, derivedEnv, RUST_LOG, resolveEnvironment, UV_NO_CACHE } from "./config-env.js";
 import { UV_INDEX } from "./index-env.js";
 
 const PYODIDE = "https://index.pyodide.org/314.0.5";
@@ -57,8 +57,8 @@ describe("a config the engine cannot honor fails rather than being ignored", () 
     expect(() => derivedEnv(parse({ fs: { kind } }))).toThrow(/only has the in-memory filesystem/);
   });
 
-  it("refuses the opfs cache, which is phase 4", () => {
-    expect(() => derivedEnv(parse({ cache: { kind: "opfs" } }))).toThrow(/OPFS cold store/);
+  it("accepts the opfs cache, and derives no environment because uv already caches under HOME", () => {
+    expect(derivedEnv(parse({ cache: { kind: "opfs" } }))).toEqual({});
   });
 
   it("has no resolution target to honor, because that is per-invocation", () => {
@@ -67,5 +67,27 @@ describe("a config the engine cannot honor fails rather than being ignored", () 
       "target" in config,
       "the config still carries a resolution target; uv resolves per invocation, not per engine",
     ).toBe(false);
+  });
+});
+
+describe("the cache root is derived the way uv derives it, so a flush finds the cache", () => {
+  it("defaults to the home the engine seeds", () => {
+    expect(cacheRoot({})).toBe("/home/browser/.cache/uv");
+  });
+
+  it("follows a home the host moved", () => {
+    expect(cacheRoot({ HOME: "/root" })).toBe("/root/.cache/uv");
+  });
+
+  it("prefers an explicit cache directory over everything else", () => {
+    expect(cacheRoot({ UV_CACHE_DIR: "/tmp/uv", HOME: "/root" })).toBe("/tmp/uv");
+  });
+
+  it("honors the xdg cache home between the two", () => {
+    expect(cacheRoot({ XDG_CACHE_HOME: "/xdg", HOME: "/root" })).toBe("/xdg/uv");
+  });
+
+  it("ignores a relative xdg cache home, as the xdg spec requires", () => {
+    expect(cacheRoot({ XDG_CACHE_HOME: "relative", HOME: "/root" })).toBe("/root/.cache/uv");
   });
 });

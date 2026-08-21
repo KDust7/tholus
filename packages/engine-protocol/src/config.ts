@@ -8,7 +8,12 @@ export const fsBackendSpecSchema = z.discriminatedUnion("kind", [
 export type FsBackendSpec = z.infer<typeof fsBackendSpecSchema>;
 
 export const cacheSpecSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("opfs"), scope: z.string().optional() }),
+  z.object({
+    kind: z.literal("opfs"),
+    scope: z.string().optional(),
+    abiTag: z.string().optional(),
+    budgetBytes: z.number().int().positive().optional(),
+  }),
   z.object({ kind: z.literal("memory") }),
   z.object({ kind: z.literal("none") }),
 ]);

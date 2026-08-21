@@ -18,7 +18,10 @@ import { EngineCrashedError, ProtocolMismatchError, toEngineError } from "./erro
 
 export interface EngineConfigInput {
   fs?: { kind: "memory" } | { kind: "opfs"; root?: string } | { kind: "delegate" };
-  cache?: { kind: "opfs"; scope?: string } | { kind: "memory" } | { kind: "none" };
+  cache?:
+    | { kind: "opfs"; scope?: string; abiTag?: string; budgetBytes?: number }
+    | { kind: "memory" }
+    | { kind: "none" };
   index?: {
     indexUrl?: string;
     extraIndexUrls?: string[];

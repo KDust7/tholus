@@ -1,4 +1,5 @@
 import {
+  type CacheSpec,
   EXIT_CODE_CANCELLED,
   type HostMessage,
   PROTOCOL_VERSION,
@@ -6,7 +7,9 @@ import {
   type StructuredErrorInfo,
   type WorkerMessage,
 } from "@uv-wasm/engine-protocol";
-import { resolveEnvironment } from "./config-env.js";
+import { cacheRoot, resolveEnvironment } from "./config-env.js";
+import { type ColdStore, openColdStore } from "./opfs-store.js";
+import { createPersistence, type LockRunner, type Persistence, webLocks } from "./persistence.js";
 
 export interface EngineHandle {
   invoke(argv: string[], onOutput: (stream: string, data: Uint8Array) => void): Promise<number>;
@@ -18,7 +21,17 @@ export interface EngineHandle {
   setCwd(path: string): void;
   setStdin(bytes: Uint8Array): void;
   clearStdin(): void;
+  fsRead(path: string): Uint8Array;
+  fsWrite(path: string, contents: Uint8Array): void;
+  fsReadDir(path: string): string[];
+  fsKind(path: string): string | undefined;
+  fsSize(path: string): number;
+  fsReadLink(path: string): string;
+  fsSymlink(target: string, link: string): void;
+  fsMkdirp(path: string): void;
 }
+
+export type OpfsCacheSpec = Extract<CacheSpec, { kind: "opfs" }>;
 
 export interface EngineExports {
   default: (options?: unknown) => Promise<unknown>;
@@ -32,7 +45,12 @@ export interface EngineWorkerOptions {
   emit: (message: WorkerMessage) => void;
   now?: () => number;
   wasm?: () => Promise<BufferSource | URL> | BufferSource | URL;
+  coldStore?: (spec: OpfsCacheSpec) => Promise<ColdStore>;
+  lock?: LockRunner;
 }
+
+const openOriginStore = async (spec: OpfsCacheSpec): Promise<ColdStore> =>
+  openColdStore(await navigator.storage.getDirectory(), spec.scope);
 
 export interface EngineWorker {
   receive(raw: unknown): void;
@@ -66,10 +84,54 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
   let baseCwd: string | undefined;
   let queue: Promise<void> = Promise.resolve();
   let disposed = false;
+  let persistence: Persistence | undefined;
 
   const emit = (message: WorkerMessage): void => {
     if (!disposed) {
       options.emit(message);
+    }
+  };
+
+  const warn = (message: string): void => {
+    emit({ type: "event", event: { type: "log", level: "warn", message } });
+  };
+
+  const attachPersistence = async (
+    handle: EngineHandle,
+    spec: OpfsCacheSpec,
+    env: Record<string, string>,
+  ): Promise<void> => {
+    const store = await (options.coldStore ?? openOriginStore)(spec);
+    persistence = createPersistence({
+      store,
+      vfs: handle,
+      root: cacheRoot(env),
+      abiTag: spec.abiTag ?? "unknown",
+      lock: options.lock ?? webLocks,
+      now,
+      ...(spec.budgetBytes === undefined ? {} : { budgetBytes: spec.budgetBytes }),
+    });
+    const report = await persistence.hydrate();
+    if (report.missing.length > 0) {
+      warn(
+        `the cold store had lost ${report.missing.length} cached file(s); uv will fetch them again`,
+      );
+    }
+  };
+
+  const flushCache = async (): Promise<void> => {
+    if (!persistence) {
+      return;
+    }
+    try {
+      const report = await persistence.flush();
+      if (report.failed.length > 0) {
+        warn(
+          `the cold store rejected ${report.failed.length} cached file(s); the cache is partial`,
+        );
+      }
+    } catch (error) {
+      warn(`the cache could not be saved: ${describe(error)}`);
     }
   };
 
@@ -122,6 +184,14 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       baseEnv = resolvedEnv;
       baseCwd = message.config.cwd;
       handle.envReplace(flatten(baseEnv));
+      if (message.config.cache.kind === "opfs") {
+        try {
+          await attachPersistence(handle, message.config.cache, resolvedEnv);
+        } catch (error) {
+          persistence = undefined;
+          warn(`the cache could not be restored: ${describe(error)}`);
+        }
+      }
       const exports = await options.load();
       const build = JSON.parse(exports.buildInfo()) as {
         engine: string;
@@ -223,6 +293,9 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
         cancelled: invocation.cancelled,
         durationMs: now() - started,
       });
+      if (code === 0 && !invocation.cancelled) {
+        await flushCache();
+      }
     } catch (error) {
       fail({ code: "engine-crashed", message: describe(error) }, 1);
       emit({ type: "fatal", message: describe(error) });

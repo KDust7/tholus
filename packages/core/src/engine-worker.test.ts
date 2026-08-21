@@ -10,6 +10,7 @@ import {
   type EngineHandle,
   type EngineWorker,
 } from "./engine-worker.js";
+import type { ColdStore } from "./opfs-store.js";
 
 const encoder = new TextEncoder();
 
@@ -22,6 +23,8 @@ interface FakeOptions {
   rejectsCwd?: boolean;
 }
 
+type FsNode = { kind: "file"; bytes: Uint8Array } | { kind: "symlink"; target: string };
+
 class FakeEngine implements EngineHandle {
   columns = 0;
   rows = 0;
@@ -30,9 +33,76 @@ class FakeEngine implements EngineHandle {
   readonly environments: string[][] = [];
   readonly directories: string[] = [];
   readonly stdins: (Uint8Array | undefined)[] = [];
+  readonly nodes = new Map<string, FsNode>();
+  readonly folders = new Set<string>();
   private release: ((code: number) => void) | undefined;
 
   constructor(private readonly options: FakeOptions) {}
+
+  private ancestors(path: string): void {
+    const parts = path.split("/");
+    for (let index = parts.length - 1; index > 1; index -= 1) {
+      this.folders.add(parts.slice(0, index).join("/"));
+    }
+  }
+
+  fsRead(path: string): Uint8Array {
+    const node = this.nodes.get(path);
+    if (node?.kind !== "file") {
+      throw new Error(`${path} was not found`);
+    }
+    return node.bytes;
+  }
+
+  fsWrite(path: string, contents: Uint8Array): void {
+    this.ancestors(path);
+    this.nodes.set(path, { kind: "file", bytes: contents });
+  }
+
+  fsReadDir(path: string): string[] {
+    const prefix = `${path}/`;
+    const names = new Set<string>();
+    for (const known of [...this.nodes.keys(), ...this.folders]) {
+      if (known.startsWith(prefix)) {
+        const head = known.slice(prefix.length).split("/")[0];
+        if (head !== undefined && head !== "") {
+          names.add(head);
+        }
+      }
+    }
+    return [...names].sort();
+  }
+
+  fsKind(path: string): string | undefined {
+    const node = this.nodes.get(path);
+    if (node) {
+      return node.kind === "file" ? "file" : "symlink";
+    }
+    return this.folders.has(path) ? "directory" : undefined;
+  }
+
+  fsSize(path: string): number {
+    const node = this.nodes.get(path);
+    return node?.kind === "file" ? node.bytes.byteLength : 0;
+  }
+
+  fsReadLink(path: string): string {
+    const node = this.nodes.get(path);
+    if (node?.kind !== "symlink") {
+      throw new Error(`${path} is not a symbolic link`);
+    }
+    return node.target;
+  }
+
+  fsSymlink(target: string, link: string): void {
+    this.ancestors(link);
+    this.nodes.set(link, { kind: "symlink", target });
+  }
+
+  fsMkdirp(path: string): void {
+    this.folders.add(path);
+    this.ancestors(`${path}/x`);
+  }
 
   envReplace(entries: string[]): void {
     this.environments.push(entries);
@@ -98,13 +168,51 @@ class FakeEngine implements EngineHandle {
   }
 }
 
+class FakeColdStore implements ColdStore {
+  readonly blobs = new Map<string, Uint8Array>();
+  readonly calls: string[] = [];
+  manifest: string | undefined;
+  failWrites = false;
+  failReads = false;
+
+  async readManifest(): Promise<string | undefined> {
+    this.calls.push("readManifest");
+    if (this.failReads) {
+      throw new Error("the cold store is unreadable");
+    }
+    return this.manifest;
+  }
+
+  async writeManifest(raw: string): Promise<void> {
+    this.calls.push("writeManifest");
+    this.manifest = raw;
+  }
+
+  async read(path: string): Promise<Uint8Array | undefined> {
+    return this.blobs.get(path);
+  }
+
+  async write(path: string, bytes: Uint8Array): Promise<void> {
+    this.calls.push(`write:${path}`);
+    if (this.failWrites) {
+      throw new Error("the cold store is full");
+    }
+    this.blobs.set(path, bytes);
+  }
+
+  async remove(path: string): Promise<void> {
+    this.blobs.delete(path);
+  }
+}
+
 interface Harness {
   worker: EngineWorker;
   emitted: WorkerMessage[];
   engines: FakeEngine[];
+  store: FakeColdStore;
 }
 
-function harness(options: FakeOptions = {}): Harness {
+function harness(options: FakeOptions = {}, store = new FakeColdStore()): Harness {
   const emitted: WorkerMessage[] = [];
   const engines: FakeEngine[] = [];
   const exports = {
@@ -123,8 +231,10 @@ function harness(options: FakeOptions = {}): Harness {
     load: async () => exports,
     emit: (message) => emitted.push(message),
     now: () => 0,
+    coldStore: async () => store,
+    lock: (_name, run) => run(),
   });
-  return { worker, emitted, engines };
+  return { worker, emitted, engines, store };
 }
 
 async function init(test: Harness, config: Record<string, unknown> = {}): Promise<void> {
@@ -526,5 +636,106 @@ describe("the engine worker hands the environment to the engine", () => {
         },
       },
     ]);
+  });
+});
+
+describe("the worker carries uv's cache across a reload when the host asks for opfs", () => {
+  const CACHE_ROOT = "/home/browser/.cache/uv";
+  const opfs = { cache: { kind: "opfs" } };
+
+  const seed = (store: FakeColdStore): void => {
+    store.manifest = JSON.stringify({
+      schemaVersion: 2,
+      abiTag: "unknown",
+      entries: { "simple-v24/idna.rkyv": { kind: "file", size: 5, usedAt: 1 } },
+    });
+    store.blobs.set("simple-v24/idna.rkyv", encoder.encode("index"));
+  };
+
+  const exec = async (test: Harness): Promise<void> => {
+    test.worker.receive({ type: "exec", invocationId: "e1", argv: ["uv", "--version"] });
+    await test.worker.settled;
+  };
+
+  it("hydrates the stored cache before it reports ready", async () => {
+    const store = new FakeColdStore();
+    seed(store);
+    const test = harness({}, store);
+    await init(test, opfs);
+
+    expect(test.emitted.at(-1)).toMatchObject({ outcome: { ok: true } });
+    const engine = test.engines[0];
+    expect(engine?.fsRead(`${CACHE_ROOT}/simple-v24/idna.rkyv`)).toEqual(encoder.encode("index"));
+  });
+
+  it("leaves the cold store untouched when the cache is in memory", async () => {
+    const test = harness();
+    await init(test, { cache: { kind: "memory" } });
+    await exec(test);
+    expect(test.store.calls).toEqual([]);
+  });
+
+  it("flushes what a successful command cached", async () => {
+    const test = harness();
+    await init(test, opfs);
+    test.engines[0]?.fsWrite(`${CACHE_ROOT}/wheels-v6/idna.whl`, encoder.encode("wheel"));
+    await exec(test);
+
+    expect(test.store.blobs.get("wheels-v6/idna.whl")).toEqual(encoder.encode("wheel"));
+    expect(test.store.calls.at(-1)).toBe("writeManifest");
+  });
+
+  it("does not flush after a command that failed", async () => {
+    const test = harness({ exitCode: 2 });
+    await init(test, opfs);
+    test.engines[0]?.fsWrite(`${CACHE_ROOT}/wheels-v6/idna.whl`, encoder.encode("wheel"));
+    test.store.calls.length = 0;
+    await exec(test);
+
+    expect(test.store.calls).toEqual([]);
+  });
+
+  it("warns rather than failing init when the store cannot be read", async () => {
+    const store = new FakeColdStore();
+    store.failReads = true;
+    const test = harness({}, store);
+    await init(test, opfs);
+
+    expect(test.emitted.at(-1)).toMatchObject({ outcome: { ok: true } });
+    expect(test.emitted).toContainEqual(
+      expect.objectContaining({
+        type: "event",
+        event: expect.objectContaining({ type: "log", level: "warn" }),
+      }),
+    );
+  });
+
+  it("warns rather than changing the exit code when the flush fails", async () => {
+    const test = harness();
+    await init(test, opfs);
+    test.engines[0]?.fsWrite(`${CACHE_ROOT}/a`, encoder.encode("x"));
+    test.store.failWrites = true;
+    await exec(test);
+
+    const exit = test.emitted.findLast((message) => message.type === "exit");
+    expect(exit).toMatchObject({ code: 0, cancelled: false });
+    expect(test.emitted).toContainEqual(
+      expect.objectContaining({
+        type: "event",
+        event: expect.objectContaining({ type: "log", level: "warn" }),
+      }),
+    );
+  });
+
+  it("reports the exit before it spends time flushing", async () => {
+    const test = harness();
+    await init(test, opfs);
+    test.engines[0]?.fsWrite(`${CACHE_ROOT}/a`, encoder.encode("x"));
+    test.store.calls.length = 0;
+    await exec(test);
+
+    const order = test.emitted.map((message) => message.type);
+    expect(order.lastIndexOf("exit")).toBeLessThan(order.length);
+    expect(test.store.calls).toContain("write:a");
   });
 });

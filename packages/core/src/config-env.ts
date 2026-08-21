@@ -3,6 +3,17 @@ import { indexEnv } from "./index-env.js";
 
 export const UV_NO_CACHE = "UV_NO_CACHE";
 export const RUST_LOG = "RUST_LOG";
+export const DEFAULT_HOME = "/home/browser";
+
+export function cacheRoot(env: Record<string, string>): string {
+  const explicit = env.UV_CACHE_DIR;
+  if (explicit !== undefined && explicit !== "") {
+    return explicit;
+  }
+  const xdg = env.XDG_CACHE_HOME;
+  const base = xdg?.startsWith("/") ? xdg : `${env.HOME ?? DEFAULT_HOME}/.cache`;
+  return `${base}/uv`;
+}
 
 function unsupported(what: string, why: string): Error {
   return new Error(`config.${what} is not supported yet: ${why}`);
@@ -17,14 +28,10 @@ function storageEnv(config: EngineConfig): Record<string, string> {
   }
   switch (config.cache.kind) {
     case "memory":
+    case "opfs":
       return {};
     case "none":
       return { [UV_NO_CACHE]: "1" };
-    default:
-      throw unsupported(
-        `cache.kind "${config.cache.kind}"`,
-        'the OPFS cold store is phase 4; use "memory" or "none"',
-      );
   }
 }
 
