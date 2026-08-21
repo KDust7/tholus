@@ -104,6 +104,21 @@ impl Engine {
         fs::kind(path)
     }
 
+    #[wasm_bindgen(js_name = fsSize)]
+    pub fn fs_size(&self, path: &str) -> Result<f64, JsError> {
+        fs::size(path)
+    }
+
+    #[wasm_bindgen(js_name = fsSymlink)]
+    pub fn fs_symlink(&self, target: &str, link: &str) -> Result<(), JsError> {
+        fs::symlink(target, link)
+    }
+
+    #[wasm_bindgen(js_name = fsReadLink)]
+    pub fn fs_read_link(&self, path: &str) -> Result<String, JsError> {
+        fs::read_link(path)
+    }
+
     #[wasm_bindgen(js_name = fsRemove)]
     pub fn fs_remove(&self, path: &str) -> Result<(), JsError> {
         fs::remove_file(path)
