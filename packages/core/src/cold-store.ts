@@ -43,6 +43,30 @@ export function loadManifest(raw: string | undefined, abiTag: string): Manifest 
   return parsed;
 }
 
+const ARCHIVE = /^(archive-v\d+\/[^/]+)(?:\/|$)/;
+const SOURCE_TREE = /^(sdists-v\d+\/.+?\/src)(?:\/|$)/;
+
+export function cacheUnit(path: string): string {
+  return ARCHIVE.exec(path)?.[1] ?? SOURCE_TREE.exec(path)?.[1] ?? path;
+}
+
+export function groupByUnit<T>(
+  entries: readonly T[],
+  pathOf: (entry: T) => string,
+): Map<string, T[]> {
+  const units = new Map<string, T[]>();
+  for (const entry of entries) {
+    const key = cacheUnit(pathOf(entry));
+    const members = units.get(key);
+    if (members === undefined) {
+      units.set(key, [entry]);
+    } else {
+      members.push(entry);
+    }
+  }
+  return units;
+}
+
 function isStale(entry: ManifestEntry | undefined, live: CacheEntry): boolean {
   if (entry === undefined || entry.kind !== live.kind) {
     return true;
@@ -69,6 +93,21 @@ export function planFlush(live: readonly CacheEntry[], manifest: Manifest): Flus
   return { writes, deletes };
 }
 
+function whole(
+  entries: Record<string, ManifestEntry>,
+  live: readonly CacheEntry[],
+): Record<string, ManifestEntry> {
+  const broken = new Set<string>();
+  for (const entry of live) {
+    if (entries[entry.path] === undefined) {
+      broken.add(cacheUnit(entry.path));
+    }
+  }
+  return broken.size === 0
+    ? entries
+    : Object.fromEntries(Object.entries(entries).filter(([path]) => !broken.has(cacheUnit(path))));
+}
+
 export function commitFlush(
   manifest: Manifest,
   live: readonly CacheEntry[],
@@ -91,14 +130,14 @@ export function commitFlush(
         ? { kind: "file", size: entry.size, usedAt: now }
         : { kind: "symlink", target: entry.target, usedAt: now };
   }
-  return { ...manifest, entries };
+  return { ...manifest, entries: whole(entries, live) };
 }
 
-const ARCHIVE = /(^|\/)archive-v\d+\//;
+const ARCHIVE_BUCKET = /(^|\/)archive-v\d+\//;
 const BUILT_WHEEL = /(^|\/)(built-wheels|sdists)-v\d+\//;
 
 function evictionRank(path: string): number {
-  if (ARCHIVE.test(path)) {
+  if (ARCHIVE_BUCKET.test(path)) {
     return 0;
   }
   if (BUILT_WHEEL.test(path)) {
@@ -116,24 +155,31 @@ export function planEviction(manifest: Manifest, budgetBytes: number): string[] 
     return [];
   }
 
-  const ordered = [...files].sort(([leftPath, left], [rightPath, right]) => {
-    const rank = evictionRank(leftPath) - evictionRank(rightPath);
+  const units = [...groupByUnit(files, ([path]) => path)].map(([unit, members]) => ({
+    unit,
+    paths: members.map(([path]) => path),
+    size: members.reduce((sum, [, entry]) => sum + entry.size, 0),
+    usedAt: members.reduce((newest, [, entry]) => Math.max(newest, entry.usedAt), 0),
+  }));
+
+  const ordered = [...units].sort((left, right) => {
+    const rank = evictionRank(left.unit) - evictionRank(right.unit);
     if (rank !== 0) {
       return rank;
     }
     if (left.usedAt !== right.usedAt) {
       return left.usedAt - right.usedAt;
     }
-    return leftPath < rightPath ? -1 : 1;
+    return left.unit < right.unit ? -1 : 1;
   });
 
   const evicted: string[] = [];
-  for (const [path, entry] of ordered) {
+  for (const unit of ordered) {
     if (total <= budgetBytes) {
       break;
     }
-    evicted.push(path);
-    total -= entry.size;
+    evicted.push(...unit.paths);
+    total -= unit.size;
   }
   return evicted;
 }

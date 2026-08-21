@@ -1,4 +1,4 @@
-import type { CacheEntry } from "./cold-store.js";
+import { type CacheEntry, groupByUnit } from "./cold-store.js";
 
 export interface CacheVfs {
   fsReadDir(path: string): string[];
@@ -41,6 +41,24 @@ export function readCacheTree(vfs: CacheVfs, root: string): CacheEntry[] {
   return entries;
 }
 
+async function loadUnit(
+  members: readonly CacheEntry[],
+  load: LoadBlob,
+): Promise<[string, Uint8Array][] | undefined> {
+  const loaded: [string, Uint8Array][] = [];
+  for (const entry of members) {
+    if (entry.kind === "symlink") {
+      continue;
+    }
+    const bytes = await load(entry.path);
+    if (bytes === undefined) {
+      return undefined;
+    }
+    loaded.push([entry.path, bytes]);
+  }
+  return loaded;
+}
+
 export async function hydrateCacheTree(
   vfs: HydrateVfs,
   root: string,
@@ -48,19 +66,20 @@ export async function hydrateCacheTree(
   load: LoadBlob,
 ): Promise<string[]> {
   const missing: string[] = [];
+  const links: CacheEntry[] = [];
   vfs.fsMkdirp(root);
-  for (const entry of entries) {
-    if (entry.kind === "symlink") {
+  for (const [, members] of groupByUnit(entries, (entry) => entry.path)) {
+    const loaded = await loadUnit(members, load);
+    if (loaded === undefined) {
+      missing.push(...members.map((entry) => entry.path));
       continue;
     }
-    const bytes = await load(entry.path);
-    if (bytes === undefined) {
-      missing.push(entry.path);
-      continue;
+    for (const [path, bytes] of loaded) {
+      vfs.fsWrite(`${root}/${path}`, bytes);
     }
-    vfs.fsWrite(`${root}/${entry.path}`, bytes);
+    links.push(...members.filter((entry) => entry.kind === "symlink"));
   }
-  for (const entry of entries) {
+  for (const entry of links) {
     if (entry.kind === "symlink") {
       vfs.fsSymlink(entry.target, `${root}/${entry.path}`);
     }

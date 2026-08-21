@@ -127,6 +127,18 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
         `the cold store had lost ${report.missing.length} cached file(s); uv will fetch them again`,
       );
     }
+    if (report.evicted.length > 0) {
+      warn(
+        `the stored cache was over its budget, so ${report.evicted.length} cached file(s) were ` +
+          "given up; uv will fetch them again if it needs them",
+      );
+    }
+    if (report.orphaned.length > 0) {
+      warn(
+        `the cold store would not delete ${report.orphaned.length} evicted file(s); they are no ` +
+          "longer used but still take up room",
+      );
+    }
   };
 
   const flushCache = async (): Promise<void> => {
@@ -148,7 +160,8 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       }
       if (report.failed.length > 0) {
         warn(
-          `the cold store rejected ${report.failed.length} cached file(s); the cache is partial`,
+          `the cold store rejected ${report.failed.length} cached file(s); the packages they ` +
+            "belong to were not saved",
         );
       }
     } catch (error) {

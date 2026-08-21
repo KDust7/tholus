@@ -38,7 +38,6 @@ export interface FlushReport {
   written: string[];
   removed: string[];
   failed: string[];
-  evicted: string[];
   quotaExceeded: boolean;
   nearQuota: boolean;
 }
@@ -57,6 +56,8 @@ function isOutOfRoom(error: unknown): boolean {
 export interface HydrateReport {
   hydrated: string[];
   missing: string[];
+  evicted: string[];
+  orphaned: string[];
 }
 
 export interface Persistence {
@@ -88,15 +89,39 @@ export function createPersistence(options: PersistenceOptions): Persistence {
 
   const read = async (): Promise<Manifest> => loadManifest(await store.readManifest(), abiTag);
 
+  const room = async (): Promise<StorageRoom | undefined> => options.quota?.();
+
+  const budgetFrom = (available: StorageRoom | undefined): number | undefined =>
+    options.budgetBytes ?? (available && Math.floor(available.quota * QUOTA_SHARE));
+
   return {
     hydrate: () =>
       lock(CACHE_LOCK, async () => {
-        const entries = manifestEntries(await read());
+        const stored = await read();
+        const budget = budgetFrom(options.budgetBytes === undefined ? await room() : undefined);
+        const evicted = budget === undefined ? [] : planEviction(stored, budget);
+        const manifest = without(stored, evicted);
+
+        const orphaned: string[] = [];
+        if (evicted.length > 0) {
+          await store.writeManifest(JSON.stringify(manifest));
+          for (const path of evicted) {
+            try {
+              await store.remove(path);
+            } catch {
+              orphaned.push(path);
+            }
+          }
+        }
+
+        const entries = manifestEntries(manifest);
         const missing = await hydrateCacheTree(vfs, root, entries, (path) => store.read(path));
         const lost = new Set(missing);
         return {
           hydrated: entries.map((entry) => entry.path).filter((path) => !lost.has(path)),
           missing,
+          evicted,
+          orphaned,
         };
       }),
 
@@ -130,25 +155,16 @@ export function createPersistence(options: PersistenceOptions): Persistence {
         }
 
         const committed = commitFlush(manifest, live, written, now());
-        const room = options.budgetBytes === undefined ? await options.quota?.() : undefined;
-        const budget = options.budgetBytes ?? (room && Math.floor(room.quota * QUOTA_SHARE));
-        const evicted = budget === undefined ? [] : planEviction(committed, budget);
-        for (const path of evicted) {
-          try {
-            await store.remove(path);
-          } catch {
-            failed.push(path);
-          }
-        }
+        await store.writeManifest(JSON.stringify(committed));
 
-        await store.writeManifest(JSON.stringify(without(committed, evicted)));
+        const available = await room();
         return {
           written,
           removed,
           failed,
-          evicted,
           quotaExceeded,
-          nearQuota: room !== undefined && room.usage >= room.quota * QUOTA_HIGH_WATER,
+          nearQuota:
+            available !== undefined && available.usage >= available.quota * QUOTA_HIGH_WATER,
         };
       }),
   };

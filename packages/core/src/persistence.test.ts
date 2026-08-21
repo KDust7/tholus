@@ -240,16 +240,19 @@ describe("a flush writes the cache to the cold store", () => {
     expect(held()).toBe(1);
   });
 
-  it("evicts past the budget, oldest archives first, and forgets what it evicted", async () => {
+  it("keeps a refused blob's siblings out of the manifest, rather than recording half an archive", async () => {
     const vfs = new FakeVfs()
-      .file(`${ROOT}/archive-v0/old/x`, "aaaaa")
-      .file(`${ROOT}/simple-v24/idx`, "bbbbb");
-    const { persistence, store } = setup({ vfs, budgetBytes: 5 });
+      .file(`${ROOT}/archive-v0/idna/__init__.py`, "a")
+      .file(`${ROOT}/archive-v0/idna/core.py`, "b");
+    const store = new FakeStore();
+    store.refuse.add("archive-v0/idna/core.py");
+    const { persistence } = setup({ vfs, store });
 
-    const report = await persistence.flush();
-    expect(report.evicted).toEqual(["archive-v0/old/x"]);
-    expect(store.blobs.has("archive-v0/old/x")).toBe(false);
-    expect(Object.keys(stored(store).entries)).toEqual(["simple-v24/idx"]);
+    await persistence.flush();
+    expect(
+      Object.keys(stored(store).entries),
+      "one refused blob must not leave a package uv would install from",
+    ).toEqual([]);
   });
 });
 
@@ -298,6 +301,22 @@ describe("hydration puts the stored cache back before uv runs", () => {
     expect(vfs.fsKind(`${ROOT}/b`)).toBe("file");
   });
 
+  it("leaves out the siblings of a blob the store lost, rather than restoring half an archive", async () => {
+    const source = new FakeVfs()
+      .file(`${ROOT}/archive-v0/idna/__init__.py`, "a")
+      .file(`${ROOT}/archive-v0/idna/core.py`, "b");
+    const store = new FakeStore();
+    await setup({ vfs: source, store }).persistence.flush();
+    store.blobs.delete("archive-v0/idna/core.py");
+
+    const { persistence, vfs } = setup({ store });
+    await persistence.hydrate();
+    expect(
+      vfs.fsKind(`${ROOT}/archive-v0/idna`),
+      "a directory with one of two files is a package uv would install",
+    ).toBeUndefined();
+  });
+
   it("takes the lock, so a flush in another tab cannot tear what it reads", async () => {
     const { persistence, taken } = setup();
     await persistence.hydrate();
@@ -305,15 +324,65 @@ describe("hydration puts the stored cache back before uv runs", () => {
   });
 });
 
-describe("the cold store gives ground before the origin runs out of room", () => {
-  it("sizes its budget from a share of the origin's quota when the host names none", async () => {
-    const vfs = new FakeVfs()
-      .file(`${ROOT}/archive-v0/a`, "aaaaaaaaaa")
-      .file(`${ROOT}/simple-v24/b`, "bbbbbbbbbb");
-    const quota = { quota: Math.ceil(10 / QUOTA_SHARE), usage: 0 };
-    const { persistence, store } = setup({ vfs, quota });
+describe("the cold store prunes itself to its budget before it loads anything", () => {
+  const filled = async (build: (vfs: FakeVfs) => FakeVfs): Promise<FakeStore> => {
+    const store = new FakeStore();
+    await setup({ vfs: build(new FakeVfs()), store }).persistence.flush();
+    return store;
+  };
 
-    const report = await persistence.flush();
+  it("gives up the oldest archive first, and forgets it", async () => {
+    const store = await filled((vfs) =>
+      vfs.file(`${ROOT}/archive-v0/old/x`, "aaaaa").file(`${ROOT}/simple-v24/idx`, "bbbbb"),
+    );
+    const { persistence } = setup({ store, budgetBytes: 5 });
+
+    const report = await persistence.hydrate();
+    expect(report.evicted).toEqual(["archive-v0/old/x"]);
+    expect(store.blobs.has("archive-v0/old/x")).toBe(false);
+    expect(Object.keys(stored(store).entries)).toEqual(["simple-v24/idx"]);
+  });
+
+  it("gives up a whole archive, because uv reads the directory as proof of the package", async () => {
+    const store = await filled((vfs) =>
+      vfs
+        .file(`${ROOT}/archive-v0/idna/__init__.py`, "aaaaa")
+        .file(`${ROOT}/archive-v0/idna/core.py`, "bbbbb")
+        .file(`${ROOT}/simple-v24/idx`, "ccccc"),
+    );
+    const { persistence } = setup({ store, budgetBytes: 10 });
+
+    const report = await persistence.hydrate();
+    expect(
+      [...report.evicted].sort(),
+      "half an archive still has a directory, and uv would install from it",
+    ).toEqual(["archive-v0/idna/__init__.py", "archive-v0/idna/core.py"]);
+    expect(store.blobs.has("archive-v0/idna/core.py")).toBe(false);
+  });
+
+  it("never loads what it evicted, so the next flush cannot put it back", async () => {
+    const store = await filled((vfs) =>
+      vfs.file(`${ROOT}/archive-v0/old/x`, "aaaaa").file(`${ROOT}/simple-v24/idx`, "bbbbb"),
+    );
+    const { persistence, vfs } = setup({ store, budgetBytes: 5 });
+    await persistence.hydrate();
+
+    store.writes.length = 0;
+    expect(
+      (await persistence.flush()).written,
+      "a re-written blob means the budget is never really enforced",
+    ).toEqual([]);
+    expect(vfs.fsKind(`${ROOT}/archive-v0/old/x`)).toBeUndefined();
+  });
+
+  it("sizes its budget from a share of the origin's quota when the host names none", async () => {
+    const store = await filled((vfs) =>
+      vfs.file(`${ROOT}/archive-v0/a`, "aaaaaaaaaa").file(`${ROOT}/simple-v24/b`, "bbbbbbbbbb"),
+    );
+    const quota = { quota: Math.ceil(10 / QUOTA_SHARE), usage: 0 };
+    const { persistence } = setup({ store, quota });
+
+    const report = await persistence.hydrate();
     expect(report.evicted, "a 20-byte cache should not fit a 10-byte share").toEqual([
       "archive-v0/a",
     ]);
@@ -321,21 +390,40 @@ describe("the cold store gives ground before the origin runs out of room", () =>
   });
 
   it("prefers a budget the host named over the one it would derive", async () => {
-    const vfs = new FakeVfs().file(`${ROOT}/archive-v0/a`, "aaaaaaaaaa");
-    const { persistence } = setup({ vfs, budgetBytes: 1000, quota: { quota: 1, usage: 0 } });
-    expect((await persistence.flush()).evicted).toEqual([]);
+    const store = await filled((vfs) => vfs.file(`${ROOT}/archive-v0/a`, "aaaaaaaaaa"));
+    const { persistence } = setup({ store, budgetBytes: 1000, quota: { quota: 1, usage: 0 } });
+    expect((await persistence.hydrate()).evicted).toEqual([]);
   });
 
+  it("forgets a blob it could not delete, and says it is still taking up room", async () => {
+    const store = await filled((vfs) =>
+      vfs.file(`${ROOT}/archive-v0/old/x`, "aaaaa").file(`${ROOT}/simple-v24/idx`, "bbbbb"),
+    );
+    store.remove = async (path: string): Promise<void> => {
+      throw new Error(`the store would not delete ${path}`);
+    };
+    const { persistence, vfs } = setup({ store, budgetBytes: 5 });
+
+    const report = await persistence.hydrate();
+    expect(report.orphaned).toEqual(["archive-v0/old/x"]);
+    expect(
+      vfs.fsKind(`${ROOT}/archive-v0/old/x`),
+      "a blob the manifest has forgotten must not be loaded anyway",
+    ).toBeUndefined();
+  });
+});
+
+describe("the cold store warns before the origin runs out of room", () => {
   it("says the origin is nearly full without evicting a share that is not the problem", async () => {
     const vfs = new FakeVfs().file(`${ROOT}/archive-v0/a`, "aaaaaaaaaa");
-    const { persistence } = setup({ vfs, quota: { quota: 100, usage: 95 } });
+    const { persistence, store } = setup({ vfs, quota: { quota: 100, usage: 95 } });
 
     const report = await persistence.flush();
     expect(report.nearQuota, "95 of 100 bytes used should be reported as pressure").toBe(true);
     expect(
-      report.evicted,
+      store.blobs.has("archive-v0/a"),
       "giving up 10 bytes of our own would not fix an origin filled by something else",
-    ).toEqual([]);
+    ).toBe(true);
   });
 
   it("does not cry pressure while the origin has room", async () => {
@@ -346,8 +434,10 @@ describe("the cold store gives ground before the origin runs out of room", () =>
 
   it("persists as before when the browser will not say what the quota is", async () => {
     const vfs = new FakeVfs().file(`${ROOT}/archive-v0/a`, "aaaaaaaaaa");
-    const { persistence, store } = setup({ vfs });
-    expect((await persistence.flush()).evicted).toEqual([]);
+    const store = new FakeStore();
+    await setup({ vfs, store }).persistence.flush();
+
+    expect((await setup({ store }).persistence.hydrate()).evicted).toEqual([]);
     expect(store.blobs.has("archive-v0/a")).toBe(true);
   });
 

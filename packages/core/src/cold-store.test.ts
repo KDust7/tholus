@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   type CacheEntry,
+  cacheUnit,
   commitFlush,
   emptyManifest,
   isReusable,
@@ -23,6 +24,28 @@ const file = (path: string, size: number): CacheEntry => ({ kind: "file", path, 
 
 const flush = (live: readonly CacheEntry[], manifest: Manifest, now: number): Manifest =>
   commitFlush(manifest, live, planFlush(live, manifest).writes, now);
+
+describe("the unit of the cache is the tree uv stores as one thing", () => {
+  it("groups every file of an unzipped wheel under its archive", () => {
+    expect(cacheUnit("archive-v0/nB9onYywpvaVqSg1/idna/core.py")).toBe(
+      "archive-v0/nB9onYywpvaVqSg1",
+    );
+    expect(cacheUnit("archive-v0/nB9onYywpvaVqSg1")).toBe("archive-v0/nB9onYywpvaVqSg1");
+  });
+
+  it("groups an unpacked source distribution under its src tree", () => {
+    expect(cacheUnit("sdists-v9/pypi/idna/3.11/rev/src/setup.py")).toBe(
+      "sdists-v9/pypi/idna/3.11/rev/src",
+    );
+  });
+
+  it("leaves a file uv reads by name standing alone", () => {
+    expect(cacheUnit("simple-v24/pypi/idna.rkyv")).toBe("simple-v24/pypi/idna.rkyv");
+    expect(cacheUnit("wheels-v6/index/abc/3.11-py3-none-any.rev")).toBe(
+      "wheels-v6/index/abc/3.11-py3-none-any.rev",
+    );
+  });
+});
 
 describe("the cold store only reuses a manifest it can trust", () => {
   it("starts empty when there is nothing stored", () => {
