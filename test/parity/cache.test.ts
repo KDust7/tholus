@@ -24,6 +24,8 @@ interface EngineInstance {
   fsMkdirp(path: string): void;
   fsReadDir(path: string): string[];
   fsExists(path: string): boolean;
+  fsKind(path: string): string | undefined;
+  fsReadLink(path: string): string;
   clearStdin(): void;
 }
 
@@ -88,6 +90,31 @@ describe.skipIf(!canRun)("the cache spares the network on a second install", () 
     expect(buckets).toContain("simple-v24");
     expect(buckets).toContain("wheels-v6");
     expect(buckets).toContain("archive-v0");
+  });
+
+  it("links the wheel bucket to the unpacked archive with a target that resolves", () => {
+    const links: string[] = [];
+    const walk = (path: string): void => {
+      for (const name of engine.fsReadDir(path)) {
+        const child = `${path}/${name}`;
+        const kind = engine.fsKind(child);
+        if (kind === "directory") {
+          walk(child);
+        } else if (kind === "symlink") {
+          links.push(child);
+        }
+      }
+    };
+    walk(CACHE_ROOT);
+
+    expect(links.length, "uv cached no archive link, so this proves nothing").toBeGreaterThan(0);
+    for (const link of links) {
+      expect(engine.fsReadLink(link).startsWith("."), `${link} is not a relative link`).toBe(true);
+      expect(
+        engine.fsExists(link),
+        `${link} dangles; a relative target resolved against the root rather than its own directory`,
+      ).toBe(true);
+    }
   });
 
   it("downloads the index and the distribution the first time", () => {
