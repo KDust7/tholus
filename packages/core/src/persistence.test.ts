@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { type CacheVfs, type HydrateVfs, readCacheTree } from "./cache-tree.js";
 import { emptyManifest, type Manifest } from "./cold-store.js";
 import type { ColdStore } from "./opfs-store.js";
-import { CACHE_LOCK, createPersistence, type LockRunner } from "./persistence.js";
+import { CACHE_LOCK, createPersistence, type LockRunner, QUOTA_SHARE } from "./persistence.js";
 
 const ROOT = "/home/browser/.cache/uv";
 const ABI = "pyemscripten_2026_0_wasm32";
@@ -91,6 +91,7 @@ class FakeStore implements ColdStore {
   readonly order: string[] = [];
   manifest: string | undefined;
   refuse = new Set<string>();
+  outOfRoom = false;
 
   async readManifest(): Promise<string | undefined> {
     return this.manifest;
@@ -106,6 +107,9 @@ class FakeStore implements ColdStore {
   }
 
   async write(path: string, bytes: Uint8Array): Promise<void> {
+    if (this.outOfRoom) {
+      throw Object.assign(new Error("out of room"), { name: "QuotaExceededError" });
+    }
     if (this.refuse.has(path)) {
       throw new Error(`the store refused ${path}`);
     }
@@ -137,7 +141,14 @@ const serial = (): { lock: LockRunner; taken: string[]; held: () => number } => 
   return { lock, taken, held: () => peak };
 };
 
-const setup = (options: { vfs?: FakeVfs; store?: FakeStore; budgetBytes?: number } = {}) => {
+const setup = (
+  options: {
+    vfs?: FakeVfs;
+    store?: FakeStore;
+    budgetBytes?: number;
+    quota?: { quota: number; usage: number };
+  } = {},
+) => {
   const vfs = options.vfs ?? new FakeVfs();
   const store = options.store ?? new FakeStore();
   const clock = { now: 100 };
@@ -150,6 +161,7 @@ const setup = (options: { vfs?: FakeVfs; store?: FakeStore; budgetBytes?: number
     lock,
     now: () => clock.now,
     ...(options.budgetBytes === undefined ? {} : { budgetBytes: options.budgetBytes }),
+    ...(options.quota === undefined ? {} : { quota: async () => options.quota }),
   });
   return { persistence, vfs, store, clock, taken, held };
 };
@@ -290,5 +302,71 @@ describe("hydration puts the stored cache back before uv runs", () => {
     const { persistence, taken } = setup();
     await persistence.hydrate();
     expect(taken).toEqual([CACHE_LOCK]);
+  });
+});
+
+describe("the cold store gives ground before the origin runs out of room", () => {
+  it("sizes its budget from a share of the origin's quota when the host names none", async () => {
+    const vfs = new FakeVfs()
+      .file(`${ROOT}/archive-v0/a`, "aaaaaaaaaa")
+      .file(`${ROOT}/simple-v24/b`, "bbbbbbbbbb");
+    const quota = { quota: Math.ceil(10 / QUOTA_SHARE), usage: 0 };
+    const { persistence, store } = setup({ vfs, quota });
+
+    const report = await persistence.flush();
+    expect(report.evicted, "a 20-byte cache should not fit a 10-byte share").toEqual([
+      "archive-v0/a",
+    ]);
+    expect(store.blobs.has("archive-v0/a")).toBe(false);
+  });
+
+  it("prefers a budget the host named over the one it would derive", async () => {
+    const vfs = new FakeVfs().file(`${ROOT}/archive-v0/a`, "aaaaaaaaaa");
+    const { persistence } = setup({ vfs, budgetBytes: 1000, quota: { quota: 1, usage: 0 } });
+    expect((await persistence.flush()).evicted).toEqual([]);
+  });
+
+  it("says the origin is nearly full without evicting a share that is not the problem", async () => {
+    const vfs = new FakeVfs().file(`${ROOT}/archive-v0/a`, "aaaaaaaaaa");
+    const { persistence } = setup({ vfs, quota: { quota: 100, usage: 95 } });
+
+    const report = await persistence.flush();
+    expect(report.nearQuota, "95 of 100 bytes used should be reported as pressure").toBe(true);
+    expect(
+      report.evicted,
+      "giving up 10 bytes of our own would not fix an origin filled by something else",
+    ).toEqual([]);
+  });
+
+  it("does not cry pressure while the origin has room", async () => {
+    const vfs = new FakeVfs().file(`${ROOT}/a`, "1");
+    const { persistence } = setup({ vfs, quota: { quota: 100, usage: 5 } });
+    expect((await persistence.flush()).nearQuota).toBe(false);
+  });
+
+  it("persists as before when the browser will not say what the quota is", async () => {
+    const vfs = new FakeVfs().file(`${ROOT}/archive-v0/a`, "aaaaaaaaaa");
+    const { persistence, store } = setup({ vfs });
+    expect((await persistence.flush()).evicted).toEqual([]);
+    expect(store.blobs.has("archive-v0/a")).toBe(true);
+  });
+
+  it("reports running out of room as its own thing, not as a refused blob", async () => {
+    const vfs = new FakeVfs().file(`${ROOT}/a`, "1");
+    const store = new FakeStore();
+    store.outOfRoom = true;
+    const { persistence } = setup({ vfs, store });
+
+    const report = await persistence.flush();
+    expect(report.quotaExceeded).toBe(true);
+    expect(report.failed).toEqual(["a"]);
+  });
+
+  it("does not claim a quota failure on an ordinary refusal", async () => {
+    const vfs = new FakeVfs().file(`${ROOT}/a`, "1");
+    const store = new FakeStore();
+    store.refuse.add("a");
+    const { persistence } = setup({ vfs, store });
+    expect((await persistence.flush()).quotaExceeded).toBe(false);
   });
 });

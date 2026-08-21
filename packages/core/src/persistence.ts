@@ -15,6 +15,14 @@ export type LockRunner = <T>(name: string, run: () => Promise<T>) => Promise<T>;
 
 export type PersistenceVfs = CacheVfs & HydrateVfs & { fsRead(path: string): Uint8Array };
 
+export const QUOTA_SHARE = 0.5;
+export const QUOTA_HIGH_WATER = 0.9;
+
+export interface StorageRoom {
+  quota: number;
+  usage: number;
+}
+
 export interface PersistenceOptions {
   store: ColdStore;
   vfs: PersistenceVfs;
@@ -23,6 +31,7 @@ export interface PersistenceOptions {
   lock: LockRunner;
   now?: () => number;
   budgetBytes?: number;
+  quota?: () => Promise<StorageRoom | undefined>;
 }
 
 export interface FlushReport {
@@ -30,6 +39,19 @@ export interface FlushReport {
   removed: string[];
   failed: string[];
   evicted: string[];
+  quotaExceeded: boolean;
+  nearQuota: boolean;
+}
+
+export const originQuota = async (): Promise<StorageRoom | undefined> => {
+  const estimate = await navigator.storage.estimate();
+  return estimate.quota === undefined || estimate.usage === undefined
+    ? undefined
+    : { quota: estimate.quota, usage: estimate.usage };
+};
+
+function isOutOfRoom(error: unknown): boolean {
+  return error instanceof Error && error.name === "QuotaExceededError";
 }
 
 export interface HydrateReport {
@@ -86,11 +108,13 @@ export function createPersistence(options: PersistenceOptions): Persistence {
 
         const written: string[] = [];
         const failed: string[] = [];
+        let quotaExceeded = false;
         for (const path of plan.writes) {
           try {
             await store.write(path, vfs.fsRead(`${root}/${path}`));
             written.push(path);
-          } catch {
+          } catch (error) {
+            quotaExceeded ||= isOutOfRoom(error);
             failed.push(path);
           }
         }
@@ -106,8 +130,9 @@ export function createPersistence(options: PersistenceOptions): Persistence {
         }
 
         const committed = commitFlush(manifest, live, written, now());
-        const evicted =
-          options.budgetBytes === undefined ? [] : planEviction(committed, options.budgetBytes);
+        const room = options.budgetBytes === undefined ? await options.quota?.() : undefined;
+        const budget = options.budgetBytes ?? (room && Math.floor(room.quota * QUOTA_SHARE));
+        const evicted = budget === undefined ? [] : planEviction(committed, budget);
         for (const path of evicted) {
           try {
             await store.remove(path);
@@ -117,7 +142,14 @@ export function createPersistence(options: PersistenceOptions): Persistence {
         }
 
         await store.writeManifest(JSON.stringify(without(committed, evicted)));
-        return { written, removed, failed, evicted };
+        return {
+          written,
+          removed,
+          failed,
+          evicted,
+          quotaExceeded,
+          nearQuota: room !== undefined && room.usage >= room.quota * QUOTA_HIGH_WATER,
+        };
       }),
   };
 }

@@ -10,7 +10,14 @@ import {
 import { cacheRoot, resolveEnvironment } from "./config-env.js";
 import { interpreterAbiTag } from "./interpreter.js";
 import { type ColdStore, openColdStore } from "./opfs-store.js";
-import { createPersistence, type LockRunner, type Persistence, webLocks } from "./persistence.js";
+import {
+  createPersistence,
+  type LockRunner,
+  originQuota,
+  type Persistence,
+  type StorageRoom,
+  webLocks,
+} from "./persistence.js";
 
 export interface EngineHandle {
   invoke(argv: string[], onOutput: (stream: string, data: Uint8Array) => void): Promise<number>;
@@ -48,6 +55,7 @@ export interface EngineWorkerOptions {
   wasm?: () => Promise<BufferSource | URL> | BufferSource | URL;
   coldStore?: (spec: OpfsCacheSpec) => Promise<ColdStore>;
   lock?: LockRunner;
+  quota?: () => Promise<StorageRoom | undefined>;
 }
 
 const openOriginStore = async (spec: OpfsCacheSpec): Promise<ColdStore> =>
@@ -109,6 +117,7 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       root: cacheRoot(env),
       abiTag: spec.abiTag ?? interpreterAbiTag(handle),
       lock: options.lock ?? webLocks,
+      quota: options.quota ?? originQuota,
       now,
       ...(spec.budgetBytes === undefined ? {} : { budgetBytes: spec.budgetBytes }),
     });
@@ -126,6 +135,17 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
     }
     try {
       const report = await persistence.flush();
+      if (report.quotaExceeded) {
+        persistence = undefined;
+        warn(
+          "the browser is out of storage, so uv's cache will not be saved for the rest of this " +
+            "session; it still works in memory",
+        );
+        return;
+      }
+      if (report.nearQuota) {
+        warn("the origin is nearly out of storage; uv's cache may stop being saved");
+      }
       if (report.failed.length > 0) {
         warn(
           `the cold store rejected ${report.failed.length} cached file(s); the cache is partial`,

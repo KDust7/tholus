@@ -179,6 +179,7 @@ class FakeColdStore implements ColdStore {
   manifest: string | undefined;
   failWrites = false;
   failReads = false;
+  outOfRoom = false;
 
   async readManifest(): Promise<string | undefined> {
     this.calls.push("readManifest");
@@ -199,6 +200,9 @@ class FakeColdStore implements ColdStore {
 
   async write(path: string, bytes: Uint8Array): Promise<void> {
     this.calls.push(`write:${path}`);
+    if (this.outOfRoom) {
+      throw Object.assign(new Error("out of room"), { name: "QuotaExceededError" });
+    }
     if (this.failWrites) {
       throw new Error("the cold store is full");
     }
@@ -217,7 +221,11 @@ interface Harness {
   store: FakeColdStore;
 }
 
-function harness(options: FakeOptions = {}, store = new FakeColdStore()): Harness {
+function harness(
+  options: FakeOptions = {},
+  store = new FakeColdStore(),
+  quota?: { quota: number; usage: number },
+): Harness {
   const emitted: WorkerMessage[] = [];
   const engines: FakeEngine[] = [];
   const exports = {
@@ -238,6 +246,7 @@ function harness(options: FakeOptions = {}, store = new FakeColdStore()): Harnes
     now: () => 0,
     coldStore: async () => store,
     lock: (_name, run) => run(),
+    quota: async () => quota,
   });
   return { worker, emitted, engines, store };
 }
@@ -760,6 +769,42 @@ describe("the worker carries uv's cache across a reload when the host asks for o
     const second = harness({ profile: profileFor(2025) }, store);
     await init(second, opfs);
     expect(second.engines[0]?.fsKind(`${CACHE_ROOT}/a`)).toBeUndefined();
+  });
+
+  const warnings = (test: Harness): string[] =>
+    test.emitted
+      .filter(
+        (message): message is Extract<WorkerMessage, { type: "event" }> =>
+          message.type === "event" && message.event.type === "log",
+      )
+      .map((message) => (message.event as { message: string }).message);
+
+  it("stops saving the cache for the rest of the session when storage runs out", async () => {
+    const store = new FakeColdStore();
+    const test = harness({}, store);
+    await init(test, opfs);
+    test.engines[0]?.fsWrite(`${CACHE_ROOT}/a`, encoder.encode("x"));
+    store.outOfRoom = true;
+    await exec(test);
+
+    expect(warnings(test).some((line) => line.includes("out of storage"))).toBe(true);
+
+    store.outOfRoom = false;
+    store.calls.length = 0;
+    test.engines[0]?.fsWrite(`${CACHE_ROOT}/b`, encoder.encode("y"));
+    await exec(test);
+    expect(store.calls, "it kept flushing after saying it had given up").toEqual([]);
+  });
+
+  it("warns while the origin is nearly full, but keeps saving", async () => {
+    const store = new FakeColdStore();
+    const test = harness({}, store, { quota: 100, usage: 95 });
+    await init(test, opfs);
+    test.engines[0]?.fsWrite(`${CACHE_ROOT}/a`, encoder.encode("x"));
+    await exec(test);
+
+    expect(warnings(test).some((line) => line.includes("nearly out of storage"))).toBe(true);
+    expect(store.blobs.has("a"), "it stopped saving over a warning").toBe(true);
   });
 
   it("reports the exit before it spends time flushing", async () => {
