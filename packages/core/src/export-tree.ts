@@ -8,6 +8,13 @@ export interface ExportVfs {
   fsReadLink(path: string): string;
 }
 
+export interface ImportVfs {
+  fsWrite(path: string, contents: Uint8Array): void;
+  fsSymlink(target: string, link: string): void;
+  fsMkdirp(path: string): void;
+  fsKind(path: string): string | undefined;
+}
+
 export interface ExportedTree {
   entries: TreeEntry[];
   bytes: Uint8Array;
@@ -78,4 +85,49 @@ export function exportTree(vfs: ExportVfs, root: string): ExportedTree {
     offset += contents.byteLength;
   }
   return { entries, bytes };
+}
+
+export interface ImportedTree {
+  files: number;
+  links: number;
+  bytes: number;
+}
+
+function guard(path: string): void {
+  const parts = path.split("/");
+  if (path.startsWith("/") || parts.some((part) => part === ".." || part === "" || part === ".")) {
+    throw new Error(`${path} does not name a place inside the imported tree`);
+  }
+}
+
+export function importTree(
+  vfs: ImportVfs,
+  root: string,
+  entries: readonly TreeEntry[],
+  bytes: Uint8Array,
+): ImportedTree {
+  for (const entry of entries) {
+    guard(entry.path);
+    if (entry.kind === "file" && entry.offset + entry.length > bytes.byteLength) {
+      throw new RangeError(`${entry.path} reaches past the ${bytes.byteLength} bytes it was sent`);
+    }
+  }
+
+  vfs.fsMkdirp(root);
+  const imported: ImportedTree = { files: 0, links: 0, bytes: 0 };
+  for (const entry of entries) {
+    if (entry.kind === "symlink") {
+      continue;
+    }
+    vfs.fsWrite(`${root}/${entry.path}`, bytes.subarray(entry.offset, entry.offset + entry.length));
+    imported.files += 1;
+    imported.bytes += entry.length;
+  }
+  for (const entry of entries) {
+    if (entry.kind === "symlink") {
+      vfs.fsSymlink(entry.target, `${root}/${entry.path}`);
+      imported.links += 1;
+    }
+  }
+  return imported;
 }

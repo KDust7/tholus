@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type ExportVfs, exportTree, MAX_EXPORT_BYTES } from "./export-tree.js";
+import { type ExportVfs, exportTree, importTree, MAX_EXPORT_BYTES } from "./export-tree.js";
 
 const encoder = new TextEncoder();
 
@@ -134,5 +134,86 @@ describe("a tree leaves the engine as one buffer and a table of where things are
     const vfs = new FakeVfs().file(`${ROOT}/a.py`, "hello");
     vfs.sizes.set(`${ROOT}/a.py`, 2);
     expect(() => exportTree(vfs, ROOT)).toThrow(/measured 2 bytes and read 5/);
+  });
+});
+
+class FakeTarget {
+  readonly written = new Map<string, Uint8Array>();
+  readonly links = new Map<string, string>();
+  readonly made: string[] = [];
+
+  fsWrite(path: string, contents: Uint8Array): void {
+    this.written.set(path, contents);
+  }
+
+  fsSymlink(target: string, link: string): void {
+    this.links.set(link, target);
+  }
+
+  fsMkdirp(path: string): void {
+    this.made.push(path);
+  }
+
+  fsKind(): string | undefined {
+    return undefined;
+  }
+}
+
+describe("a tree comes back into the engine the same way it left", () => {
+  const bytes = encoder.encode("onetwo");
+
+  it("round-trips what exportTree produced", () => {
+    const source = new FakeVfs().file(`${ROOT}/pkg/a.py`, "one").file(`${ROOT}/b.py`, "two");
+    const exported = exportTree(source, ROOT);
+
+    const target = new FakeTarget();
+    const report = importTree(target, "/out", exported.entries, exported.bytes);
+
+    expect(report).toEqual({ files: 2, links: 0, bytes: 6 });
+    expect(new TextDecoder().decode(target.written.get("/out/pkg/a.py"))).toBe("one");
+    expect(new TextDecoder().decode(target.written.get("/out/b.py"))).toBe("two");
+  });
+
+  it("restores a symlink after the files, so its target is already there", () => {
+    const target = new FakeTarget();
+    const report = importTree(
+      target,
+      "/out",
+      [
+        { kind: "symlink", path: "alias", target: "real.py" },
+        { kind: "file", path: "real.py", offset: 0, length: 3 },
+      ],
+      bytes,
+    );
+    expect(report.links).toBe(1);
+    expect(target.links.get("/out/alias")).toBe("real.py");
+  });
+
+  it("refuses a path that would climb out of the tree it is given", () => {
+    const target = new FakeTarget();
+    expect(() =>
+      importTree(
+        target,
+        "/out",
+        [{ kind: "file", path: "../escape", offset: 0, length: 1 }],
+        bytes,
+      ),
+    ).toThrow(/does not name a place inside/);
+    expect(target.written.size, "nothing may be written before every path is checked").toBe(0);
+  });
+
+  it("refuses an absolute path, which would ignore the root entirely", () => {
+    const target = new FakeTarget();
+    expect(() =>
+      importTree(target, "/out", [{ kind: "file", path: "/etc/x", offset: 0, length: 1 }], bytes),
+    ).toThrow(/does not name a place inside/);
+  });
+
+  it("refuses an entry reaching past the bytes it was sent", () => {
+    const target = new FakeTarget();
+    expect(() =>
+      importTree(target, "/out", [{ kind: "file", path: "a", offset: 4, length: 99 }], bytes),
+    ).toThrow(RangeError);
+    expect(target.written.size).toBe(0);
   });
 });
