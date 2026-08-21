@@ -4941,6 +4941,7 @@ dependencies = [
  "uv-vfs",
  "uv-virtualenv",
  "uv-warnings",
+ "uv-wasm-compat",
  "uv-workspace",
 ]
 

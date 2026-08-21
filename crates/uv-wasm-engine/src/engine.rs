@@ -33,6 +33,21 @@ impl Engine {
         })
     }
 
+    #[wasm_bindgen(js_name = attachRuntime)]
+    pub fn attach_runtime(&self, run_hook: js_sys::Function) {
+        uv_wasm_compat::pep517::set_runner(Box::new(crate::pep517::JsRunner::new(run_hook)));
+    }
+
+    #[wasm_bindgen(js_name = detachRuntime)]
+    pub fn detach_runtime(&self) {
+        uv_wasm_compat::pep517::clear_runner();
+    }
+
+    #[wasm_bindgen(js_name = hasRuntime)]
+    pub fn has_runtime(&self) -> bool {
+        uv_wasm_compat::pep517::is_attached()
+    }
+
     #[wasm_bindgen(js_name = setTermSize)]
     pub fn set_term_size(&self, columns: u16, rows: u16) {
         term::set(TermConfig::tty(columns, rows));
