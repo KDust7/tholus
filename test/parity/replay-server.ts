@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
@@ -70,23 +70,32 @@ export function parseByteRange(header: string | undefined, size: number): ByteRa
   return { start, end };
 }
 
-export async function startReplayServer(
-  snapshotDir: string,
-  options: ReplayOptions = {},
-): Promise<ReplayServer> {
-  const snapshot = JSON.parse(
-    await readFile(resolve(snapshotDir, "snapshot.json"), "utf8"),
-  ) as Snapshot;
+export interface ReplayLog {
+  requested: string[];
+  misses: string[];
+  rejected: string[];
+  revalidated: string[];
+  origin: string;
+}
 
-  const requested: string[] = [];
-  const misses: string[] = [];
-  const rejected: string[] = [];
-  const revalidated: string[] = [];
+export function emptyReplayLog(): ReplayLog {
+  return { requested: [], misses: [], rejected: [], revalidated: [], origin: FIXTURE_ORIGIN };
+}
+
+export async function readSnapshot(snapshotDir: string): Promise<Snapshot> {
+  return JSON.parse(await readFile(resolve(snapshotDir, "snapshot.json"), "utf8")) as Snapshot;
+}
+
+export function createReplayHandler(
+  snapshot: Snapshot,
+  log: ReplayLog,
+  options: ReplayOptions = {},
+): (request: IncomingMessage, response: ServerResponse) => void {
+  const { requested, misses, rejected, revalidated } = log;
   const failures = new Map<string, number>();
   const failFirst = options.failFirst ?? 0;
-  let origin = FIXTURE_ORIGIN;
 
-  const server: Server = createServer((request, response) => {
+  return (request, response) => {
     const key = request.url ?? "/";
     requested.push(key);
     const recorded = snapshot.responses[key];
@@ -116,7 +125,7 @@ export async function startReplayServer(
     const encoded = Buffer.from(recorded.body, "base64");
     const raw = recorded.gzip ? gunzipSync(encoded) : encoded;
     const body = recorded.rewrite
-      ? Buffer.from(raw.toString("utf8").split(FIXTURE_ORIGIN).join(origin), "utf8")
+      ? Buffer.from(raw.toString("utf8").split(FIXTURE_ORIGIN).join(log.origin), "utf8")
       : raw;
     const rangeHeader = request.headers.range;
     if (rangeHeader !== undefined && recorded.status === 200) {
@@ -145,20 +154,29 @@ export async function startReplayServer(
       "content-length": String(body.byteLength),
     });
     response.end(body);
-  });
+  };
+}
+
+export async function startReplayServer(
+  snapshotDir: string,
+  options: ReplayOptions = {},
+): Promise<ReplayServer> {
+  const log = emptyReplayLog();
+  const handler = createReplayHandler(await readSnapshot(snapshotDir), log, options);
+  const server: Server = createServer(handler);
 
   await new Promise<void>((ready) => {
     server.listen(0, "127.0.0.1", ready);
   });
   const { port } = server.address() as AddressInfo;
-  origin = `http://127.0.0.1:${port}`;
+  log.origin = `http://127.0.0.1:${port}`;
 
   return {
-    origin,
-    requested,
-    misses,
-    rejected,
-    revalidated,
+    origin: log.origin,
+    requested: log.requested,
+    misses: log.misses,
+    rejected: log.rejected,
+    revalidated: log.revalidated,
     close: () =>
       new Promise<void>((done, fail) => {
         server.close((error) => (error ? fail(error) : done()));
