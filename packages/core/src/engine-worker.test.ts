@@ -758,6 +758,34 @@ describe("the worker carries uv's cache across a reload when the host asks for o
     );
   });
 
+  it("refuses to start on an interpreter that disagrees with itself", async () => {
+    const test = harness({
+      profile: JSON.stringify({
+        platform: { os: { name: "pyemscripten", major: 2026, minor: 0 }, arch: "wasm32" },
+        markers: { implementation_name: "cpython", python_full_version: "3.14.0" },
+        extension_suffixes: [".cpython-311-wasm32-emscripten.so"],
+      }),
+    });
+    await init(test);
+
+    expect(test.emitted.at(-1)).toMatchObject({
+      type: "initResult",
+      outcome: {
+        ok: false,
+        error: {
+          code: "invalid-config",
+          message: expect.stringContaining("built for python 3.11"),
+        },
+      },
+    });
+  });
+
+  it("starts as usual when there is no interpreter to disagree with", async () => {
+    const test = harness();
+    await init(test);
+    expect(test.emitted.at(-1)).toMatchObject({ type: "initResult", outcome: { ok: true } });
+  });
+
   it("refuses a cache built for another interpreter rather than mixing the two", async () => {
     const store = new FakeColdStore();
     const first = harness({ profile: profileFor(2026) }, store);

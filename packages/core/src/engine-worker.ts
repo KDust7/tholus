@@ -8,7 +8,7 @@ import {
   type WorkerMessage,
 } from "@uv-wasm/engine-protocol";
 import { cacheRoot, resolveEnvironment } from "./config-env.js";
-import { interpreterAbiTag } from "./interpreter.js";
+import { assertInterpreter, interpreterAbiTag } from "./interpreter.js";
 import { type ColdStore, openColdStore } from "./opfs-store.js";
 import {
   createPersistence,
@@ -218,6 +218,16 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       baseEnv = resolvedEnv;
       baseCwd = message.config.cwd;
       handle.envReplace(flatten(baseEnv));
+      try {
+        assertInterpreter(handle);
+      } catch (error) {
+        emit({
+          type: "initResult",
+          id: message.id,
+          outcome: { ok: false, error: { code: "invalid-config", message: describe(error) } },
+        });
+        return;
+      }
       if (message.config.cache.kind === "opfs") {
         try {
           await attachPersistence(handle, message.config.cache, resolvedEnv);
