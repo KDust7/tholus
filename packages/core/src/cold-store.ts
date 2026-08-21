@@ -1,9 +1,8 @@
-export const MANIFEST_SCHEMA_VERSION = 1;
+export const MANIFEST_SCHEMA_VERSION = 2;
 
-export interface ManifestEntry {
-  size: number;
-  usedAt: number;
-}
+export type ManifestEntry =
+  | { kind: "file"; size: number; usedAt: number }
+  | { kind: "symlink"; target: string; usedAt: number };
 
 export interface Manifest {
   schemaVersion: number;
@@ -11,10 +10,9 @@ export interface Manifest {
   entries: Record<string, ManifestEntry>;
 }
 
-export interface CacheFile {
-  path: string;
-  size: number;
-}
+export type CacheEntry =
+  | { kind: "file"; path: string; size: number }
+  | { kind: "symlink"; path: string; target: string };
 
 export interface FlushPlan {
   writes: string[];
@@ -45,35 +43,53 @@ export function loadManifest(raw: string | undefined, abiTag: string): Manifest 
   return parsed;
 }
 
-export function planFlush(live: readonly CacheFile[], manifest: Manifest): FlushPlan {
-  const seen = new Set<string>();
+function isStale(entry: ManifestEntry | undefined, live: CacheEntry): boolean {
+  if (entry === undefined || entry.kind !== live.kind) {
+    return true;
+  }
+  return entry.kind === "file" && live.kind === "file"
+    ? entry.size !== live.size
+    : entry.kind === "symlink" && live.kind === "symlink" && entry.target !== live.target;
+}
+
+export function planFlush(live: readonly CacheEntry[], manifest: Manifest): FlushPlan {
+  const files = new Set<string>();
   const writes: string[] = [];
-  for (const file of live) {
-    seen.add(file.path);
-    const stored = manifest.entries[file.path];
-    if (stored === undefined || stored.size !== file.size) {
-      writes.push(file.path);
+  for (const entry of live) {
+    if (entry.kind === "file") {
+      files.add(entry.path);
+    }
+    if (entry.kind === "file" && isStale(manifest.entries[entry.path], entry)) {
+      writes.push(entry.path);
     }
   }
-  const deletes = Object.keys(manifest.entries).filter((path) => !seen.has(path));
+  const deletes = Object.entries(manifest.entries)
+    .filter(([path, entry]) => entry.kind === "file" && !files.has(path))
+    .map(([path]) => path);
   return { writes, deletes };
 }
 
 export function commitFlush(
   manifest: Manifest,
-  live: readonly CacheFile[],
-  plan: FlushPlan,
+  live: readonly CacheEntry[],
+  written: readonly string[],
   now: number,
 ): Manifest {
-  const sizes = new Map(live.map((file) => [file.path, file.size]));
+  const landed = new Set(written);
   const entries: Record<string, ManifestEntry> = {};
-  for (const [path, entry] of Object.entries(manifest.entries)) {
-    if (!plan.deletes.includes(path)) {
-      entries[path] = entry;
+  for (const entry of live) {
+    const stored = manifest.entries[entry.path];
+    if (!isStale(stored, entry)) {
+      entries[entry.path] = stored as ManifestEntry;
+      continue;
     }
-  }
-  for (const path of plan.writes) {
-    entries[path] = { size: sizes.get(path) ?? 0, usedAt: now };
+    if (entry.kind === "file" && !landed.has(entry.path)) {
+      continue;
+    }
+    entries[entry.path] =
+      entry.kind === "file"
+        ? { kind: "file", size: entry.size, usedAt: now }
+        : { kind: "symlink", target: entry.target, usedAt: now };
   }
   return { ...manifest, entries };
 }
@@ -92,13 +108,15 @@ function evictionRank(path: string): number {
 }
 
 export function planEviction(manifest: Manifest, budgetBytes: number): string[] {
-  const entries = Object.entries(manifest.entries);
-  let total = entries.reduce((sum, [, entry]) => sum + entry.size, 0);
+  const files = Object.entries(manifest.entries).filter(
+    (pair): pair is [string, Extract<ManifestEntry, { kind: "file" }>] => pair[1].kind === "file",
+  );
+  let total = files.reduce((sum, [, entry]) => sum + entry.size, 0);
   if (total <= budgetBytes) {
     return [];
   }
 
-  const ordered = [...entries].sort(([leftPath, left], [rightPath, right]) => {
+  const ordered = [...files].sort(([leftPath, left], [rightPath, right]) => {
     const rank = evictionRank(leftPath) - evictionRank(rightPath);
     if (rank !== 0) {
       return rank;
