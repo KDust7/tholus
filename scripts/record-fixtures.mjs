@@ -51,6 +51,13 @@ const scenarios = {
     ],
   },
   sync: { requirements: ["idna==3.11"], extraArgs: [], command: "sync" },
+  sdist: {
+    requirements: ["idna==3.11"],
+    extraArgs: ["--no-binary", "idna"],
+    command: "install",
+    target: true,
+    runtime: true,
+  },
   "install-pyodide": {
     requirements: ["msgpack==1.1.2"],
     extraArgs: ["--python-platform", "wasm32-pyodide2026", "--python-version", "3.14"],
@@ -117,10 +124,52 @@ async function loadEngine() {
   return mod;
 }
 
-async function browserEngine() {
+let runtimePromise;
+
+async function pyodideRuntime() {
+  runtimePromise ??= (async () => {
+    const core = await import(
+      pathToFileURL(resolve(root, "packages/core/dist/index.js")).href
+    );
+    const adapter = await import(
+      pathToFileURL(resolve(root, "packages/pyodide/dist/index.js")).href
+    );
+    const { loadPyodide } = await import(
+      pathToFileURL(resolve(root, "test/parity/node_modules/pyodide/pyodide.mjs")).href
+    );
+    const pyodide = await loadPyodide();
+    return { core, adapter, pyodide };
+  })();
+  return runtimePromise;
+}
+
+async function attachRuntime(engine) {
+  const { core, adapter, pyodide } = await pyodideRuntime();
+  const runtime = adapter.attachPyodide(
+    { exportTree: async (path) => core.exportTree(engine, path) },
+    pyodide,
+  );
+  engine.attachRuntime(async (request) => {
+    const outcome = await runtime.hook({
+      script: request.script,
+      cwd: request.sourceTree,
+      env: request.env,
+      sitePackages: core.sitePackagesOf(engine, request.venv),
+      trees: core.hookTrees(engine, request),
+    });
+    core.applyHookWrites(engine, outcome.writes);
+    return { stdout: outcome.stdout, stderr: outcome.stderr, code: outcome.code };
+  });
+}
+
+async function browserEngine(withRuntime = false) {
   enginePromise ??= loadEngine();
   const mod = await enginePromise;
-  return new mod.Engine();
+  const engine = new mod.Engine();
+  if (withRuntime) {
+    await attachRuntime(engine);
+  }
+  return engine;
 }
 
 function invokeBrowser(engine, args) {
@@ -151,8 +200,8 @@ async function runBrowser(name, requirements, args, stdin) {
   return invokeBrowser(engine, [...args, "--directory", directory]);
 }
 
-async function runBrowserInstall(name, args, intoTarget, requirements) {
-  const engine = await browserEngine();
+async function runBrowserInstall(name, args, intoTarget, requirements, withRuntime = false) {
+  const engine = await browserEngine(withRuntime);
   const directory = `/record-${name}`;
   engine.clearStdin();
   engine.fsMkdirp(directory);
@@ -341,7 +390,13 @@ async function record(name, scenario) {
   const afterNative = Object.keys(responses).length;
 
   const browser = installing
-    ? await runBrowserInstall(name, indexed, scenario.target === true, requirements)
+    ? await runBrowserInstall(
+        name,
+        indexed,
+        scenario.target === true,
+        requirements,
+        scenario.runtime === true,
+      )
     : await runBrowser(name, requirements, indexed, stdin);
   await new Promise((done) => server.close(done));
   if (browser.status !== 0) {
