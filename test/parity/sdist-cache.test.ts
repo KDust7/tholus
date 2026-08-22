@@ -135,7 +135,7 @@ describe.skipIf(!canRun || !hasPyodide)(
       expect(first.builds, "the build hook has to run once").toBe(1);
     });
 
-    it.skip("BLOCKED: does not build the second time, because the wheel is already in the cache, uv hands `link_dir` the cache's symlink pointer, which walks as a symlink rather than a directory and is then copied as a file", () => {
+    it("does not build the second time, because the wheel is already in the cache", () => {
       expect(second.code, `the second install failed:\n${second.stderr}`).toBe(0);
       expect(
         second.builds,
@@ -144,7 +144,7 @@ describe.skipIf(!canRun || !hasPyodide)(
       expect(second.stderr).not.toContain("Building idna==3.11");
     });
 
-    it.skip("BLOCKED: installs the same package either way, so the cache is not a shortcut past the work, blocked on the same symlink-rooted walk", () => {
+    it("installs the same package either way, so the cache is not a shortcut past the work", () => {
       const read = (target: string): string =>
         decoder.decode(engine.fsRead(`${target}/idna-3.11.dist-info/RECORD`));
       expect(read("/cache-second/target")).toBe(read("/cache-first/target"));
