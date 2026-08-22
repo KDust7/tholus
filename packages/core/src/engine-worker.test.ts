@@ -163,10 +163,13 @@ class FakeEngine implements EngineHandle {
     this.directories.push(path);
   }
 
+  readonly invocations: string[][] = [];
+
   async invoke(
-    _argv: string[],
+    argv: string[],
     onOutput: (stream: string, data: Uint8Array) => void,
   ): Promise<number> {
+    this.invocations.push(argv);
     if (this.options.throws) {
       throw new Error(this.options.throws);
     }
@@ -333,6 +336,19 @@ describe("the engine worker speaks the host protocol", () => {
         },
       },
     ]);
+  });
+
+  it("gives uv a program name, because the protocol's argv starts at the subcommand", async () => {
+    const test = harness();
+    await init(test);
+    test.worker.receive({ type: "exec", invocationId: "x1", argv: ["pip", "list"] });
+    await test.worker.settled;
+
+    expect(
+      test.engines[0]?.invocations,
+      "uv reads argv[0] as the program name, so forwarding the protocol's argv verbatim makes " +
+        "clap read the first subcommand as the program and the second as an unknown command",
+    ).toEqual([["uv", "pip", "list"]]);
   });
 
   it("turns engine output into sequenced output messages and an exit", async () => {

@@ -14,6 +14,18 @@
         "vitest": "^4.1.10",
       },
     },
+    "apps/testbed": {
+      "name": "@uv-wasm/testbed",
+      "version": "0.0.0",
+      "dependencies": {
+        "@uv-wasm/core": "workspace:*",
+        "@uv-wasm/engine-protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "^24.13.3",
+        "esbuild": "^0.27.2",
+      },
+    },
     "packages/core": {
       "name": "@uv-wasm/core",
       "version": "0.0.0",
@@ -286,6 +298,8 @@
     "@uv-wasm/pyodide": ["@uv-wasm/pyodide@workspace:packages/pyodide"],
 
     "@uv-wasm/size-report": ["@uv-wasm/size-report@workspace:tools/size-report"],
+
+    "@uv-wasm/testbed": ["@uv-wasm/testbed@workspace:apps/testbed"],
 
     "@uv-wasm/transport-fetch": ["@uv-wasm/transport-fetch@workspace:packages/transport-fetch"],
 

@@ -1,12 +1,13 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { basename, dirname, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { EngineEndpoint } from "../../packages/core/src/endpoint.js";
 import { createEngine, type Engine } from "../../packages/core/src/engine.js";
 import { createEngineWorker, type EngineExports } from "../../packages/core/src/engine-worker.js";
+import { normalize } from "./cli-goldens.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const assets = resolve(root, "packages/core/assets");
@@ -18,7 +19,6 @@ const nativePath = resolve(
   "vendor/uv/target/debug",
   process.platform === "win32" ? "uv.exe" : "uv",
 );
-const PROGRAM = basename(nativePath);
 
 function inProcessEndpoint(): EngineEndpoint {
   const listeners = new Set<(event: { data: unknown }) => void>();
@@ -70,7 +70,7 @@ describe.skipIf(!isBuilt)("the SDK drives the real engine", () => {
   async function run(args: string[]): Promise<Captured> {
     const stdout: Uint8Array[] = [];
     const stderr: Uint8Array[] = [];
-    const handle = engine.exec([PROGRAM, ...args], {
+    const handle = engine.exec([...args], {
       stdout: (chunk) => stdout.push(chunk),
       stderr: (chunk) => stderr.push(chunk),
     });
@@ -98,7 +98,10 @@ describe.skipIf(!isBuilt)("the SDK drives the real engine", () => {
   it.skipIf(!existsSync(nativePath))("delivers native uv's exact bytes", async () => {
     const result = await run(["--help"]);
     const native = spawnSync(nativePath, ["--help"], { encoding: "buffer" });
-    expect(result.stdout).toBe(native.stdout.toString("utf8"));
+    expect(
+      normalize(result.stdout),
+      "the worker names the program `uv`, where a native binary names the file it was run from",
+    ).toBe(normalize(native.stdout.toString("utf8")));
   });
 
   it("reports a usage failure without throwing", async () => {

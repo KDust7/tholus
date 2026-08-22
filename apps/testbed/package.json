@@ -1,0 +1,20 @@
+{
+  "name": "@uv-wasm/testbed",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0 OR MIT",
+  "description": "The page Playwright drives uv-wasm through, so browser gates share one harness",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && esbuild dist/main.js --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/main.js --allow-overwrite",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@uv-wasm/core": "workspace:*",
+    "@uv-wasm/engine-protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "esbuild": "^0.27.2"
+  }
+}

@@ -143,7 +143,7 @@ describe("a session reads lines, runs them, and prompts again", () => {
     terminal.type("uv pip list\r");
     await settle();
 
-    expect(engine.calls[0]?.argv).toEqual(["uv", "pip", "list"]);
+    expect(engine.calls[0]?.argv).toEqual(["pip", "list"]);
   });
 
   it("runs a bare command as uv's, so `pip list` and `uv pip list` agree", async () => {
@@ -154,7 +154,7 @@ describe("a session reads lines, runs them, and prompts again", () => {
     terminal.type("pip list\r");
     await settle();
 
-    expect(engine.calls[0]?.argv).toEqual(["uv", "pip", "list"]);
+    expect(engine.calls[0]?.argv).toEqual(["pip", "list"]);
   });
 
   it("shows help when the program name is typed with nothing after it", async () => {
@@ -165,7 +165,7 @@ describe("a session reads lines, runs them, and prompts again", () => {
     terminal.type("uv\r");
     await settle();
 
-    expect(engine.calls[0]?.argv).toEqual(["uv", "--help"]);
+    expect(engine.calls[0]?.argv).toEqual(["--help"]);
   });
 
   it("gives a host builtin the line instead of the engine", async () => {
@@ -234,7 +234,7 @@ describe("a session reads lines, runs them, and prompts again", () => {
     const session = attachTerminal(terminal, engine);
 
     await expect(session.executeLine("uv pip check")).resolves.toBe(3);
-    expect(engine.calls[0]?.argv).toEqual(["uv", "pip", "check"]);
+    expect(engine.calls[0]?.argv).toEqual(["pip", "check"]);
   });
 
   it("stops listening once disposed, so a second session cannot double-run a line", async () => {

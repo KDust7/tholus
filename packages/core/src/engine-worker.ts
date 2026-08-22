@@ -10,6 +10,7 @@ import {
 } from "@uv-wasm/engine-protocol";
 import { createFetchTransport } from "@uv-wasm/transport-fetch";
 import { createLibcurlTransport, type LibcurlModule } from "@uv-wasm/transport-libcurl";
+import { PROGRAM_NAME } from "./brand.js";
 import { cacheRoot, resolveEnvironment } from "./config-env.js";
 import { exportTree } from "./export-tree.js";
 import {
@@ -472,7 +473,7 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
     }
 
     try {
-      const code = await engine.invoke(message.argv, (stream, data) => {
+      const code = await engine.invoke([PROGRAM_NAME, ...message.argv], (stream, data) => {
         if (stream !== "stdout" && stream !== "stderr") {
           return;
         }

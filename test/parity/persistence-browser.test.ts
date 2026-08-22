@@ -188,9 +188,8 @@ describe.skipIf(!canRun)("uv's cache survives a reload through real opfs", () =>
     };
 
     const install = async (id: string, home: string): Promise<void> => {
-      await run(id, ["uv", "venv", `${home}/.venv`, "--python", "/bin/python3"]);
+      await run(id, ["venv", `${home}/.venv`, "--python", "/bin/python3"]);
       await run(id, [
-        "uv",
         "pip",
         "install",
         "idna==3.11",
@@ -199,7 +198,7 @@ describe.skipIf(!canRun)("uv's cache survives a reload through real opfs", () =>
         "--python",
         `${home}/.venv`,
       ]);
-      await run(id, ["uv", "--version"]);
+      await run(id, ["--version"]);
     };
 
     await boot("a");

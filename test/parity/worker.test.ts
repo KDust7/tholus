@@ -1,11 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { basename, dirname, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { PROTOCOL_VERSION, type WorkerMessage } from "@uv-wasm/engine-protocol";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createEngineWorker, type EngineExports } from "../../packages/core/src/engine-worker.js";
+import { normalize } from "./cli-goldens.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const assets = resolve(root, "packages/core/assets");
@@ -16,7 +17,6 @@ const nativePath = resolve(
   "vendor/uv/target/debug",
   process.platform === "win32" ? "uv.exe" : "uv",
 );
-const PROGRAM = basename(nativePath);
 
 interface Transcript {
   messages: WorkerMessage[];
@@ -51,7 +51,7 @@ describe.skipIf(!isBuilt)("the worker drives the real engine over the protocol",
     worker.receive({
       type: "exec",
       invocationId,
-      argv: [PROGRAM, ...args],
+      argv: [...args],
     });
     await worker.settled;
     const messages = emitted.slice(before);
@@ -100,7 +100,10 @@ describe.skipIf(!isBuilt)("the worker drives the real engine over the protocol",
   it.skipIf(!existsSync(nativePath))("matches native uv through the protocol", async () => {
     const result = await exec("help-2", ["--help"]);
     const native = spawnSync(nativePath, ["--help"], { encoding: "buffer" });
-    expect(result.stdout).toBe(native.stdout.toString("utf8"));
+    expect(
+      normalize(result.stdout),
+      "the worker names the program `uv`, where a native binary names the file it was run from",
+    ).toBe(normalize(native.stdout.toString("utf8")));
     expect(result.exit?.code).toBe(native.status ?? -1);
   });
 

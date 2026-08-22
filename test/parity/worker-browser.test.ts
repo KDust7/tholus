@@ -135,7 +135,7 @@ describe.skipIf(!isBuilt)("a real browser Worker drives the engine", () => {
       (globalThis as unknown as WorkerWindow).__send({
         type: "exec",
         invocationId: "inv-1",
-        argv: ["uv", "--version"],
+        argv: ["--version"],
       }),
     );
 

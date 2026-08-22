@@ -129,7 +129,7 @@ export function attachTerminal(
 
     running = true;
     try {
-      const result: ExecResultLike = await runInTerminal(terminal, engine, [program, ...argv], {
+      const result: ExecResultLike = await runInTerminal(terminal, engine, argv, {
         ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
         writer,
       });
