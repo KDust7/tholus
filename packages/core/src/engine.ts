@@ -27,6 +27,7 @@ export interface EngineConfigInput {
     | { kind: "opfs"; scope?: string; abiTag?: string; budgetBytes?: number }
     | { kind: "memory" }
     | { kind: "none" };
+  transport?: { kind: "platform" } | { kind: "fetch"; rewriteHead?: boolean };
   index?: {
     indexUrl?: string;
     extraIndexUrls?: string[];

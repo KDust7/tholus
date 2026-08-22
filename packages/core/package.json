@@ -22,7 +22,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@uv-wasm/engine-protocol": "workspace:*"
+    "@uv-wasm/engine-protocol": "workspace:*",
+    "@uv-wasm/transport-fetch": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

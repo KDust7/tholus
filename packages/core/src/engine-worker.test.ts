@@ -260,6 +260,7 @@ function harness(
   options: FakeOptions = {},
   store = new FakeColdStore(),
   quota?: { quota: number; usage: number },
+  installFetch?: (fetch: typeof globalThis.fetch) => void,
 ): Harness {
   const emitted: WorkerMessage[] = [];
   const engines: FakeEngine[] = [];
@@ -282,6 +283,7 @@ function harness(
     coldStore: async () => store,
     lock: (_name, run) => run(),
     quota: async () => quota,
+    ...(installFetch === undefined ? {} : { installFetch }),
   });
   return { worker, emitted, engines, store };
 }
@@ -1045,5 +1047,73 @@ describe("a build hook crosses to the host while the command that asked for it w
     const pending = call(engine);
     test.worker.receive({ type: "dispose" });
     await expect(pending).rejects.toThrow(/disposed while a build hook was running/);
+  });
+});
+
+describe("the host chooses the transport, and the platform's own fetch is the default", () => {
+  const installs = (): {
+    installed: (typeof globalThis.fetch)[];
+    install: (fetch: typeof globalThis.fetch) => void;
+  } => {
+    const installed: (typeof globalThis.fetch)[] = [];
+    return { installed, install: (fetch) => installed.push(fetch) };
+  };
+
+  it("leaves fetch alone unless the host asks for a transport", async () => {
+    const { installed, install } = installs();
+    const test = harness({}, new FakeColdStore(), undefined, install);
+    await init(test);
+    expect(installed, "wrapping fetch nobody asked for would change recorded traffic").toEqual([]);
+  });
+
+  it("installs a transport that turns HEAD into a one-byte GET", async () => {
+    const { installed, install } = installs();
+    const seen: string[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (_input: string, request: RequestInit = {}) => {
+      seen.push(
+        `${(request.method ?? "GET").toUpperCase()} ${new Headers(request.headers).get("range")}`,
+      );
+      return new Response("x", {
+        status: 206,
+        headers: { "content-range": "bytes 0-0/4321" },
+      });
+    }) as unknown as typeof globalThis.fetch;
+
+    try {
+      const test = harness({}, new FakeColdStore(), undefined, install);
+      await init(test, { transport: { kind: "fetch" } });
+      expect(installed.length).toBe(1);
+
+      const response = await (installed[0] as typeof globalThis.fetch)(
+        "https://files.example/a.whl",
+        { method: "HEAD" },
+      );
+      expect(seen).toEqual(["GET bytes=0-0"]);
+      expect(response.headers.get("content-length")).toBe("4321");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it("passes the host's rewriteHead choice through to the transport", async () => {
+    const { installed, install } = installs();
+    const seen: string[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (_input: string, request: RequestInit = {}) => {
+      seen.push((request.method ?? "GET").toUpperCase());
+      return new Response(null, { status: 200 });
+    }) as unknown as typeof globalThis.fetch;
+
+    try {
+      const test = harness({}, new FakeColdStore(), undefined, install);
+      await init(test, { transport: { kind: "fetch", rewriteHead: false } });
+      await (installed[0] as typeof globalThis.fetch)("https://files.example/a.whl", {
+        method: "HEAD",
+      });
+      expect(seen).toEqual(["HEAD"]);
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 });

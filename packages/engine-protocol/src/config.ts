@@ -33,9 +33,16 @@ export const indexOptionsSchema = z.object({
 });
 export type IndexOptions = z.infer<typeof indexOptionsSchema>;
 
+export const transportSpecSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("platform") }),
+  z.object({ kind: z.literal("fetch"), rewriteHead: z.boolean().optional() }),
+]);
+export type TransportSpec = z.infer<typeof transportSpecSchema>;
+
 export const engineConfigSchema = z.object({
   fs: fsBackendSpecSchema.default({ kind: "memory" }),
   cache: cacheSpecSchema.default({ kind: "memory" }),
+  transport: transportSpecSchema.default({ kind: "platform" }),
   index: indexOptionsSchema.default({}),
   env: z.record(z.string(), z.string()).default({}),
   cwd: z.string().default("/work"),

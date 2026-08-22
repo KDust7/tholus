@@ -7,6 +7,7 @@ import {
   type StructuredErrorInfo,
   type WorkerMessage,
 } from "@uv-wasm/engine-protocol";
+import { createFetchTransport } from "@uv-wasm/transport-fetch";
 import { cacheRoot, resolveEnvironment } from "./config-env.js";
 import { exportTree } from "./export-tree.js";
 import {
@@ -74,6 +75,7 @@ export interface EngineWorkerOptions {
   coldStore?: (spec: OpfsCacheSpec) => Promise<ColdStore>;
   lock?: LockRunner;
   quota?: () => Promise<StorageRoom | undefined>;
+  installFetch?: (fetch: typeof globalThis.fetch) => void;
 }
 
 const openOriginStore = async (spec: OpfsCacheSpec): Promise<ColdStore> =>
@@ -305,6 +307,21 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
         },
       });
       return;
+    }
+
+    if (message.config.transport.kind === "fetch") {
+      const spec = message.config.transport;
+      const transport = createFetchTransport({
+        fetch: globalThis.fetch.bind(globalThis),
+        ...(spec.rewriteHead === undefined ? {} : { rewriteHead: spec.rewriteHead }),
+      });
+      const install =
+        options.installFetch ??
+        ((replacement: typeof globalThis.fetch) => {
+          globalThis.fetch = replacement;
+        });
+      install(((input: string, init?: RequestInit) =>
+        transport.fetch(input, init)) as unknown as typeof globalThis.fetch);
     }
 
     try {
