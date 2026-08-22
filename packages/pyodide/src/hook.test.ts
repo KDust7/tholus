@@ -4,11 +4,9 @@ import type { PyodideLike } from "./facts.js";
 import { callOf, type HookRequest, parseResult, RUNNER, runHook } from "./hook.js";
 
 const request = (overrides: Partial<HookRequest> = {}): HookRequest => ({
-  venv: "/build/.venv",
   script: "print('hello')",
-  sourceTree: "/src",
+  cwd: "/src",
   env: { PEP517: "1" },
-  path: "/build/.venv/bin",
   ...overrides,
 });
 
@@ -45,7 +43,7 @@ describe("the hook call carries its arguments as one json payload", () => {
 
   it("cannot be closed early by a quote in a path uv chose", () => {
     const hostile = `/src"); import os; os.system("echo pwned`;
-    expect(payloadOf(callOf(request({ sourceTree: hostile }), []))["cwd"]).toBe(hostile);
+    expect(payloadOf(callOf(request({ cwd: hostile }), []))["cwd"]).toBe(hostile);
   });
 });
 

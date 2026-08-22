@@ -9,6 +9,12 @@ import {
 } from "@uv-wasm/engine-protocol";
 import { cacheRoot, resolveEnvironment } from "./config-env.js";
 import { exportTree } from "./export-tree.js";
+import {
+  applyHookWrites,
+  hookTrees,
+  type RuntimeHookRequest,
+  sitePackagesOf,
+} from "./hook-bridge.js";
 import { assertInterpreter, interpreterAbiTag } from "./interpreter.js";
 import { type ColdStore, openColdStore } from "./opfs-store.js";
 import {
@@ -38,6 +44,17 @@ export interface EngineHandle {
   fsReadLink(path: string): string;
   fsSymlink(target: string, link: string): void;
   fsMkdirp(path: string): void;
+  fsRemove(path: string): void;
+  fsRemoveDir(path: string): void;
+  attachRuntime(runHook: (request: RuntimeHookRequest) => Promise<RuntimeHookOutput>): void;
+  detachRuntime(): void;
+  hasRuntime(): boolean;
+}
+
+export interface RuntimeHookOutput {
+  stdout: string[];
+  stderr: string[];
+  code: number;
 }
 
 export type OpfsCacheSpec = Extract<CacheSpec, { kind: "opfs" }>;
@@ -72,6 +89,11 @@ interface Running {
   seq: number;
 }
 
+interface PendingHook {
+  resolve(output: RuntimeHookOutput): void;
+  reject(error: unknown): void;
+}
+
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -95,6 +117,9 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
   let queue: Promise<void> = Promise.resolve();
   let disposed = false;
   let persistence: Persistence | undefined;
+  let runtimeWanted = false;
+  let hookCounter = 0;
+  const hooks = new Map<string, PendingHook>();
 
   const emit = (message: WorkerMessage): void => {
     if (!disposed) {
@@ -170,6 +195,75 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
     }
   };
 
+  const runHook = (request: RuntimeHookRequest): Promise<RuntimeHookOutput> => {
+    const handle = engine;
+    if (!handle) {
+      return Promise.reject(new Error("the engine is not initialized"));
+    }
+    hookCounter += 1;
+    const id = `h${hookCounter}`;
+    let trees: ReturnType<typeof hookTrees>;
+    let sitePackages: string[];
+    try {
+      trees = hookTrees(handle, request);
+      sitePackages = sitePackagesOf(handle, request.venv);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    return new Promise<RuntimeHookOutput>((resolve, reject) => {
+      hooks.set(id, { resolve, reject });
+      emit({
+        type: "hookRequest",
+        id,
+        script: request.script,
+        cwd: request.sourceTree,
+        env: request.env,
+        sitePackages,
+        trees,
+      });
+    });
+  };
+
+  const settleHook = (message: Extract<HostMessage, { type: "hookResult" }>): void => {
+    const waiter = hooks.get(message.id);
+    if (!waiter) {
+      return;
+    }
+    hooks.delete(message.id);
+    if (!message.outcome.ok) {
+      waiter.reject(new Error(message.outcome.error.message));
+      return;
+    }
+    const handle = engine;
+    if (!handle) {
+      waiter.reject(new Error("the engine went away while the hook was running"));
+      return;
+    }
+    try {
+      applyHookWrites(handle, message.outcome.writes);
+    } catch (error) {
+      waiter.reject(error);
+      return;
+    }
+    waiter.resolve({
+      stdout: message.outcome.stdout,
+      stderr: message.outcome.stderr,
+      code: message.outcome.code,
+    });
+  };
+
+  const setRuntime = (attached: boolean): void => {
+    runtimeWanted = attached;
+    if (!engine) {
+      return;
+    }
+    if (attached) {
+      engine.attachRuntime(runHook);
+    } else {
+      engine.detachRuntime();
+    }
+  };
+
   const boot = async (): Promise<EngineHandle> => {
     emit({ type: "bootProgress", phase: "compile-start" });
     const started = now();
@@ -219,6 +313,9 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       baseEnv = resolvedEnv;
       baseCwd = message.config.cwd;
       handle.envReplace(flatten(baseEnv));
+      if (runtimeWanted) {
+        handle.attachRuntime(runHook);
+      }
       try {
         assertInterpreter(handle);
       } catch (error) {
@@ -375,8 +472,21 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       }
       case "ack":
         return;
+      case "attachRuntime":
+        setRuntime(true);
+        return;
+      case "detachRuntime":
+        setRuntime(false);
+        return;
+      case "hookResult":
+        settleHook(message);
+        return;
       case "dispose":
         disposed = true;
+        for (const [id, waiter] of [...hooks]) {
+          hooks.delete(id);
+          waiter.reject(new Error("the engine was disposed while a build hook was running"));
+        }
         return;
       case "exportTree":
         enqueue(async () => {

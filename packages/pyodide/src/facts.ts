@@ -3,6 +3,15 @@ export interface PyodideFileSystem {
   mkdirTree(path: string): void;
   symlink(target: string, link: string): void;
   analyzePath(path: string): { exists: boolean };
+  readFile(path: string, options: { encoding: "binary" }): Uint8Array;
+  readdir(path: string): string[];
+  lstat(path: string): { mode: number };
+  readlink(path: string): string;
+  unlink(path: string): void;
+  rmdir(path: string): void;
+  isDir(mode: number): boolean;
+  isFile(mode: number): boolean;
+  isLink(mode: number): boolean;
 }
 
 export interface PyodideLike {

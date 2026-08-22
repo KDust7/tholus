@@ -3,6 +3,9 @@ import {
   type EngineEvent,
   EXIT_CODE_CANCELLED,
   type ExportTreeResultMessage,
+  type HookRequestMessage,
+  type HookTree,
+  type HookWrite,
   MAX_STDIN_BYTES,
   PROTOCOL_VERSION,
   type PromptPolicy,
@@ -69,12 +72,30 @@ export interface EngineOptions {
   workerUrl?: URL | string;
 }
 
+export interface HookInvocation {
+  script: string;
+  cwd: string;
+  env: Record<string, string>;
+  sitePackages: string[];
+  trees: HookTree[];
+}
+
+export interface HookOutcome {
+  stdout: string[];
+  stderr: string[];
+  code: number;
+  writes: HookWrite[];
+}
+
+export type RuntimeHandler = (invocation: HookInvocation) => Promise<HookOutcome>;
+
 export interface Engine {
   readonly build: BuildIdentity;
   readonly pip: ReturnType<typeof createPipApi>;
   readonly venv: ReturnType<typeof createVenvApi>;
   exec(argv: string[], options?: ExecOptions): ExecHandle;
   exportTree(path: string): Promise<ExportedTree>;
+  attachRuntime(handler: RuntimeHandler): () => void;
   onEvent(listener: (event: EngineEvent) => void): () => void;
   dispose(): Promise<void>;
   terminate(): void;
@@ -112,6 +133,48 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
   let invocationCounter = 0;
   let exportCounter = 0;
   let disposed = false;
+  let runtimeHandler: RuntimeHandler | undefined;
+
+  const describe = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);
+
+  const answerHook = async (message: HookRequestMessage): Promise<void> => {
+    const handler = runtimeHandler;
+    if (!handler) {
+      endpoint.postMessage({
+        type: "hookResult",
+        id: message.id,
+        outcome: {
+          ok: false,
+          error: {
+            code: "no-runtime-attached",
+            message: "no Python runtime is attached to this engine",
+          },
+        },
+      });
+      return;
+    }
+    try {
+      const outcome = await handler({
+        script: message.script,
+        cwd: message.cwd,
+        env: message.env,
+        sitePackages: message.sitePackages,
+        trees: message.trees,
+      });
+      endpoint.postMessage({
+        type: "hookResult",
+        id: message.id,
+        outcome: { ok: true, ...outcome },
+      });
+    } catch (error) {
+      endpoint.postMessage({
+        type: "hookResult",
+        id: message.id,
+        outcome: { ok: false, error: { code: "build-failed", message: describe(error) } },
+      });
+    }
+  };
 
   const dispatchEvent = (event: EngineEvent, scoped?: (event: EngineEvent) => void): void => {
     scoped?.(event);
@@ -204,6 +267,11 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
     if (message.type === "exportTreeResult") {
       exports.get(message.id)?.(message.outcome);
       exports.delete(message.id);
+      return;
+    }
+
+    if (message.type === "hookRequest") {
+      void answerHook(message);
       return;
     }
 
@@ -326,6 +394,17 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
         });
         endpoint.postMessage({ type: "exportTree", id, path });
       });
+    },
+    attachRuntime(handler) {
+      runtimeHandler = handler;
+      endpoint.postMessage({ type: "attachRuntime" });
+      return () => {
+        if (runtimeHandler !== handler) {
+          return;
+        }
+        runtimeHandler = undefined;
+        endpoint.postMessage({ type: "detachRuntime" });
+      };
     },
     onEvent(listener) {
       listeners.add(listener);

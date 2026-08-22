@@ -1,7 +1,9 @@
 import type { ExportedTree } from "@uv-wasm/core";
+import { type HookInvocation, type HookOutcome, runBuildHook } from "./build.js";
 import { type PyodideFacts, type PyodideLike, probePyodide } from "./facts.js";
 import { checkAbi, MOUNT_ROOT, type WrittenTree, writeTree } from "./mount.js";
 
+export * from "./build.js";
 export * from "./facts.js";
 export * from "./hook.js";
 export * from "./mount.js";
@@ -23,6 +25,7 @@ export interface MountedEnv extends WrittenTree {
 export interface PyodideRuntime {
   facts: PyodideFacts;
   mount(sitePackages: string, options?: MountOptions): Promise<MountedEnv>;
+  hook(invocation: HookInvocation): Promise<HookOutcome>;
 }
 
 export class DynlibApiUnavailable extends Error {
@@ -49,6 +52,9 @@ export function attachPyodide(engine: TreeSource, pyodide: PyodideLike): Pyodide
 
   return {
     facts,
+    hook(invocation): Promise<HookOutcome> {
+      return Promise.resolve(runBuildHook(pyodide, invocation));
+    },
     async mount(sitePackages, options = {}): Promise<MountedEnv> {
       const { entries, bytes } = await engine.exportTree(sitePackages);
       checkAbi(entries, facts);

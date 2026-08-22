@@ -1,11 +1,9 @@
 import type { PyodideLike } from "./facts.js";
 
 export interface HookRequest {
-  venv: string;
   script: string;
-  sourceTree: string;
+  cwd: string;
   env: Record<string, string>;
-  path: string;
 }
 
 export interface HookResult {
@@ -59,7 +57,7 @@ def _uvwasm_run_hook(payload):
 export function callOf(request: HookRequest, sitePackages: readonly string[]): string {
   const payload = JSON.stringify({
     script: request.script,
-    cwd: request.sourceTree,
+    cwd: request.cwd,
     env: request.env,
     sitePackages,
   });

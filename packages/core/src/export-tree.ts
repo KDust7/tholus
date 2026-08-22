@@ -93,7 +93,7 @@ export interface ImportedTree {
   bytes: number;
 }
 
-function guard(path: string): void {
+export function guard(path: string): void {
   const parts = path.split("/");
   if (path.startsWith("/") || parts.some((part) => part === ".." || part === "" || part === ".")) {
     throw new Error(`${path} does not name a place inside the imported tree`);

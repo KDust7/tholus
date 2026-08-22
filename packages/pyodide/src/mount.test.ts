@@ -1,8 +1,9 @@
 import type { TreeEntry } from "@uv-wasm/engine-protocol";
 import { describe, expect, it } from "vitest";
 
-import type { PyodideFacts, PyodideFileSystem } from "./facts.js";
+import type { PyodideFacts } from "./facts.js";
 import { AbiMismatch, checkAbi, parentOf, writeTree } from "./mount.js";
+import { MemFs } from "./testing/memfs.js";
 
 const facts: PyodideFacts = {
   pyodideVersion: "314.0.5",
@@ -12,25 +13,32 @@ const facts: PyodideFacts = {
   sitePackages: "/lib/python3.14/site-packages",
 };
 
-class FakeFs implements PyodideFileSystem {
-  readonly files = new Map<string, Uint8Array>();
-  readonly links = new Map<string, string>();
+class FakeFs extends MemFs {
   readonly trees: string[] = [];
 
-  writeFile(path: string, data: Uint8Array): void {
-    this.files.set(path, data);
+  get files(): Map<string, Uint8Array> {
+    const found = new Map<string, Uint8Array>();
+    for (const [path, node] of this.nodes) {
+      if (node.kind === "file") {
+        found.set(path, node.bytes);
+      }
+    }
+    return found;
   }
 
-  mkdirTree(path: string): void {
+  get links(): Map<string, string> {
+    const found = new Map<string, string>();
+    for (const [path, node] of this.nodes) {
+      if (node.kind === "symlink") {
+        found.set(path, node.target);
+      }
+    }
+    return found;
+  }
+
+  override mkdirTree(path: string): void {
     this.trees.push(path);
-  }
-
-  symlink(target: string, link: string): void {
-    this.links.set(link, target);
-  }
-
-  analyzePath(path: string): { exists: boolean } {
-    return { exists: this.files.has(path) || this.links.has(path) };
+    super.mkdirTree(path);
   }
 }
 

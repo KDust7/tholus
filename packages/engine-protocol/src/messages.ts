@@ -82,6 +82,56 @@ export const exportTreeMessageSchema = z.object({
   path: z.string(),
 });
 
+export const attachRuntimeMessageSchema = z.object({
+  type: z.literal("attachRuntime"),
+});
+
+export const detachRuntimeMessageSchema = z.object({
+  type: z.literal("detachRuntime"),
+});
+
+export const treeEntrySchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("file"),
+    path: z.string(),
+    offset: z.number().int().nonnegative(),
+    length: z.number().int().nonnegative(),
+  }),
+  z.object({ kind: z.literal("symlink"), path: z.string(), target: z.string() }),
+]);
+export type TreeEntry = z.infer<typeof treeEntrySchema>;
+
+export const hookTreeSchema = z.object({
+  root: z.string(),
+  collect: z.enum(["new", "changes"]),
+  entries: z.array(treeEntrySchema),
+  bytes: binarySchema,
+});
+export type HookTree = z.infer<typeof hookTreeSchema>;
+
+export const hookWriteSchema = z.object({
+  root: z.string(),
+  entries: z.array(treeEntrySchema),
+  bytes: binarySchema,
+  removed: z.array(z.string()),
+});
+export type HookWrite = z.infer<typeof hookWriteSchema>;
+
+export const hookResultMessageSchema = z.object({
+  type: z.literal("hookResult"),
+  id: z.string(),
+  outcome: z.discriminatedUnion("ok", [
+    z.object({
+      ok: z.literal(true),
+      stdout: z.array(z.string()),
+      stderr: z.array(z.string()),
+      code: z.number().int(),
+      writes: z.array(hookWriteSchema),
+    }),
+    z.object({ ok: z.literal(false), error: structuredErrorSchema }),
+  ]),
+});
+
 export const hostMessageSchema = z.discriminatedUnion("type", [
   initMessageSchema,
   execMessageSchema,
@@ -90,8 +140,21 @@ export const hostMessageSchema = z.discriminatedUnion("type", [
   ackMessageSchema,
   disposeMessageSchema,
   exportTreeMessageSchema,
+  attachRuntimeMessageSchema,
+  detachRuntimeMessageSchema,
+  hookResultMessageSchema,
 ]);
 export type HostMessage = z.infer<typeof hostMessageSchema>;
+
+export const hookRequestMessageSchema = z.object({
+  type: z.literal("hookRequest"),
+  id: z.string(),
+  script: z.string(),
+  cwd: z.string(),
+  env: z.record(z.string(), z.string()),
+  sitePackages: z.array(z.string()),
+  trees: z.array(hookTreeSchema),
+});
 
 export const initResultMessageSchema = z.object({
   type: z.literal("initResult"),
@@ -136,17 +199,6 @@ export const fatalMessageSchema = z.object({
   stack: z.string().optional(),
 });
 
-export const treeEntrySchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("file"),
-    path: z.string(),
-    offset: z.number().int().nonnegative(),
-    length: z.number().int().nonnegative(),
-  }),
-  z.object({ kind: z.literal("symlink"), path: z.string(), target: z.string() }),
-]);
-export type TreeEntry = z.infer<typeof treeEntrySchema>;
-
 export const exportTreeResultMessageSchema = z.object({
   type: z.literal("exportTreeResult"),
   id: z.string(),
@@ -168,6 +220,7 @@ export const workerMessageSchema = z.discriminatedUnion("type", [
   exitMessageSchema,
   fatalMessageSchema,
   exportTreeResultMessageSchema,
+  hookRequestMessageSchema,
 ]);
 export type WorkerMessage = z.infer<typeof workerMessageSchema>;
 
@@ -185,6 +238,10 @@ export type ExitMessage = z.infer<typeof exitMessageSchema>;
 export type FatalMessage = z.infer<typeof fatalMessageSchema>;
 export type ExportTreeMessage = z.infer<typeof exportTreeMessageSchema>;
 export type ExportTreeResultMessage = z.infer<typeof exportTreeResultMessageSchema>;
+export type AttachRuntimeMessage = z.infer<typeof attachRuntimeMessageSchema>;
+export type DetachRuntimeMessage = z.infer<typeof detachRuntimeMessageSchema>;
+export type HookRequestMessage = z.infer<typeof hookRequestMessageSchema>;
+export type HookResultMessage = z.infer<typeof hookResultMessageSchema>;
 
 export const HOST_MESSAGE_TYPES = [
   "init",
@@ -194,6 +251,9 @@ export const HOST_MESSAGE_TYPES = [
   "ack",
   "dispose",
   "exportTree",
+  "attachRuntime",
+  "detachRuntime",
+  "hookResult",
 ] as const;
 
 export const WORKER_MESSAGE_TYPES = [
@@ -204,6 +264,7 @@ export const WORKER_MESSAGE_TYPES = [
   "exit",
   "fatal",
   "exportTreeResult",
+  "hookRequest",
 ] as const;
 
 export const EXIT_CODE_CANCELLED = 130;

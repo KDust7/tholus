@@ -9,7 +9,9 @@ import {
   type EngineExports,
   type EngineHandle,
   type EngineWorker,
+  type RuntimeHookOutput,
 } from "./engine-worker.js";
+import type { RuntimeHookRequest } from "./hook-bridge.js";
 import type { ColdStore } from "./opfs-store.js";
 
 const encoder = new TextEncoder();
@@ -36,6 +38,7 @@ class FakeEngine implements EngineHandle {
   readonly stdins: (Uint8Array | undefined)[] = [];
   readonly nodes = new Map<string, FsNode>();
   readonly folders = new Set<string>();
+  runtime: ((request: RuntimeHookRequest) => Promise<RuntimeHookOutput>) | undefined;
   private release: ((code: number) => void) | undefined;
 
   constructor(private readonly options: FakeOptions) {
@@ -107,6 +110,38 @@ class FakeEngine implements EngineHandle {
   fsMkdirp(path: string): void {
     this.folders.add(path);
     this.ancestors(`${path}/x`);
+  }
+
+  fsRemove(path: string): void {
+    if (!this.nodes.delete(path)) {
+      throw new Error(`${path} was not found`);
+    }
+  }
+
+  fsRemoveDir(path: string): void {
+    const prefix = `${path}/`;
+    for (const known of [...this.nodes.keys()]) {
+      if (known.startsWith(prefix)) {
+        this.nodes.delete(known);
+      }
+    }
+    for (const known of [...this.folders]) {
+      if (known === path || known.startsWith(prefix)) {
+        this.folders.delete(known);
+      }
+    }
+  }
+
+  attachRuntime(runHook: (request: RuntimeHookRequest) => Promise<RuntimeHookOutput>): void {
+    this.runtime = runHook;
+  }
+
+  detachRuntime(): void {
+    this.runtime = undefined;
+  }
+
+  hasRuntime(): boolean {
+    return this.runtime !== undefined;
   }
 
   envReplace(entries: string[]): void {
@@ -845,5 +880,170 @@ describe("the worker carries uv's cache across a reload when the host asks for o
     const order = test.emitted.map((message) => message.type);
     expect(order.lastIndexOf("exit")).toBeLessThan(order.length);
     expect(test.store.calls).toContain("write:a");
+  });
+});
+
+describe("a build hook crosses to the host while the command that asked for it waits", () => {
+  const decoder = new TextDecoder();
+
+  const seed = (engine: FakeEngine): void => {
+    engine.fsWrite("/venv/pyvenv.cfg", encoder.encode("home"));
+    engine.fsWrite("/venv/lib/python3.14/site-packages/setuptools/__init__.py", encoder.encode(""));
+    engine.fsWrite("/src/pyproject.toml", encoder.encode("[project]"));
+    engine.fsMkdirp("/wheels");
+  };
+
+  const call = (engine: FakeEngine) =>
+    engine.runtime?.({
+      venv: "/venv",
+      script: "print('build')",
+      sourceTree: "/src",
+      env: { PEP517: "1" },
+      path: "/venv/bin",
+      outputDir: "/wheels",
+    });
+
+  const requestFrom = (test: Harness) =>
+    test.emitted.find((message) => message.type === "hookRequest");
+
+  async function running(): Promise<{ test: Harness; engine: FakeEngine }> {
+    const test = harness({ blocks: true });
+    await init(test);
+    test.worker.receive({ type: "attachRuntime" });
+    const engine = test.engines[0] as FakeEngine;
+    seed(engine);
+    test.worker.receive({ type: "exec", invocationId: "e1", argv: ["pip", "install", "."] });
+    await Promise.resolve();
+    return { test, engine };
+  }
+
+  it("attaches a runtime only when the host says it has one", async () => {
+    const test = harness();
+    await init(test);
+    expect(test.engines[0]?.hasRuntime()).toBe(false);
+
+    test.worker.receive({ type: "attachRuntime" });
+    expect(test.engines[0]?.hasRuntime()).toBe(true);
+
+    test.worker.receive({ type: "detachRuntime" });
+    expect(test.engines[0]?.hasRuntime()).toBe(false);
+  });
+
+  it("attaches a runtime the host asked for before the engine had booted", async () => {
+    const test = harness();
+    test.worker.receive({ type: "attachRuntime" });
+    await init(test);
+    expect(test.engines[0]?.hasRuntime()).toBe(true);
+  });
+
+  it("sends the venv, the source tree and the output directory, each with its direction", async () => {
+    const { test, engine } = await running();
+    void call(engine);
+
+    const request = requestFrom(test);
+    expect(request?.type).toBe("hookRequest");
+    if (request?.type !== "hookRequest") {
+      return;
+    }
+    expect(request.cwd).toBe("/src");
+    expect(request.env).toEqual({ PEP517: "1" });
+    expect(request.sitePackages).toEqual(["/venv/lib/python3.14/site-packages"]);
+    expect(request.trees.map((tree) => [tree.root, tree.collect])).toEqual([
+      ["/venv", "new"],
+      ["/src", "changes"],
+      ["/wheels", "changes"],
+    ]);
+  });
+
+  it("lands what the runtime wrote before uv is let go, since uv reads it immediately", async () => {
+    const { test, engine } = await running();
+    const pending = call(engine);
+    const atResolve = pending?.then(() => engine.fsKind("/venv/build_wheel.txt"));
+
+    const request = requestFrom(test);
+    if (request?.type !== "hookRequest") {
+      throw new Error("the worker never asked the host to run the hook");
+    }
+    test.worker.receive({
+      type: "hookResult",
+      id: request.id,
+      outcome: {
+        ok: true,
+        stdout: ["built"],
+        stderr: [],
+        code: 0,
+        writes: [
+          {
+            root: "/venv",
+            entries: [{ kind: "file", path: "build_wheel.txt", offset: 0, length: 8 }],
+            bytes: encoder.encode("demo.whl"),
+            removed: [],
+          },
+        ],
+      },
+    });
+
+    await expect(pending).resolves.toEqual({ stdout: ["built"], stderr: [], code: 0 });
+    expect(await atResolve, "the tree must be in the vfs before the hook's promise settles").toBe(
+      "file",
+    );
+    expect(decoder.decode(engine.fsRead("/venv/build_wheel.txt"))).toBe("demo.whl");
+  });
+
+  it("fails the hook when the host reports the runtime could not run it", async () => {
+    const { test, engine } = await running();
+    const pending = call(engine);
+
+    const request = requestFrom(test);
+    if (request?.type !== "hookRequest") {
+      throw new Error("the worker never asked the host to run the hook");
+    }
+    test.worker.receive({
+      type: "hookResult",
+      id: request.id,
+      outcome: {
+        ok: false,
+        error: { code: "no-runtime-attached", message: "nothing is attached" },
+      },
+    });
+
+    await expect(pending).rejects.toThrow(/nothing is attached/);
+  });
+
+  it("refuses a write that climbs out of its tree, rather than letting it land", async () => {
+    const { test, engine } = await running();
+    const pending = call(engine);
+
+    const request = requestFrom(test);
+    if (request?.type !== "hookRequest") {
+      throw new Error("the worker never asked the host to run the hook");
+    }
+    test.worker.receive({
+      type: "hookResult",
+      id: request.id,
+      outcome: {
+        ok: true,
+        stdout: [],
+        stderr: [],
+        code: 0,
+        writes: [
+          {
+            root: "/venv",
+            entries: [{ kind: "file", path: "../../etc/passwd", offset: 0, length: 1 }],
+            bytes: encoder.encode("x"),
+            removed: [],
+          },
+        ],
+      },
+    });
+
+    await expect(pending).rejects.toThrow(/does not name a place inside/);
+  });
+
+  it("lets go of a hook still in flight when the engine is disposed", async () => {
+    const { test, engine } = await running();
+    const pending = call(engine);
+    test.worker.receive({ type: "dispose" });
+    await expect(pending).rejects.toThrow(/disposed while a build hook was running/);
   });
 });

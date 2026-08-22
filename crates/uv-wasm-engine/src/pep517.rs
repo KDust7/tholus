@@ -31,6 +31,9 @@ fn to_request(request: &HookRequest) -> Result<JsValue, JsValue> {
     set("script", JsValue::from_str(&request.script))?;
     set("sourceTree", JsValue::from_str(&request.source_tree))?;
     set("path", JsValue::from_str(&request.path))?;
+    if let Some(output_dir) = &request.output_dir {
+        set("outputDir", JsValue::from_str(output_dir))?;
+    }
 
     let env = js_sys::Object::new();
     for (key, value) in &request.env {

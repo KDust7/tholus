@@ -6,6 +6,7 @@ import {
   PyodideProbeFailed,
   type TreeSource,
 } from "./index.js";
+import { MemFs } from "./testing/memfs.js";
 
 const FACTS = {
   pythonVersion: "3.14.2",
@@ -19,12 +20,7 @@ function fakePyodide(overrides: Partial<PyodideLike> = {}): PyodideLike & { ran:
   return {
     ran,
     version: "314.0.5",
-    FS: {
-      writeFile: () => undefined,
-      mkdirTree: () => undefined,
-      symlink: () => undefined,
-      analyzePath: () => ({ exists: false }),
-    },
+    FS: new MemFs(),
     runPython(code: string) {
       ran.push(code);
       return code.includes("sysconfig") ? JSON.stringify(FACTS) : "";
