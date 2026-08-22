@@ -58,6 +58,20 @@ const scenarios = {
     target: true,
     runtime: true,
   },
+  "sdist-setuptools": {
+    requirements: ["zipp==3.23.0"],
+    extraArgs: ["--no-binary", "zipp"],
+    command: "install",
+    target: true,
+    runtime: true,
+  },
+  "sdist-hatchling": {
+    requirements: ["attrs==25.4.0"],
+    extraArgs: ["--no-binary", "attrs"],
+    command: "install",
+    target: true,
+    runtime: true,
+  },
   "install-pyodide": {
     requirements: ["msgpack==1.1.2"],
     extraArgs: ["--python-platform", "wasm32-pyodide2026", "--python-version", "3.14"],
