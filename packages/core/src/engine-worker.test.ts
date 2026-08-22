@@ -1116,4 +1116,40 @@ describe("the host chooses the transport, and the platform's own fetch is the de
       globalThis.fetch = original;
     }
   });
+
+  it("installs the libcurl transport without loading the module until a request is made", async () => {
+    const { installed, install } = installs();
+    const test = harness({}, new FakeColdStore(), undefined, install);
+    await init(test, {
+      transport: {
+        kind: "libcurl",
+        moduleUrl: "https://cdn.example/libcurl.mjs",
+        relayUrl: "wss://relay.example/ws/",
+        userAgent: "uv/0.12.3",
+      },
+    });
+
+    expect(test.emitted.at(-1)).toMatchObject({ type: "initResult", outcome: { ok: true } });
+    expect(installed.length, "the module URL is fetched on the first request, never at init").toBe(
+      1,
+    );
+  });
+
+  it("refuses a relay URL that is not a WebSocket, rather than failing mid-download", async () => {
+    const { installed, install } = installs();
+    const test = harness({}, new FakeColdStore(), undefined, install);
+    await init(test, {
+      transport: {
+        kind: "libcurl",
+        moduleUrl: "https://cdn.example/libcurl.mjs",
+        relayUrl: "https://relay.example/ws/",
+      },
+    });
+
+    expect(test.emitted.at(-1)).toMatchObject({
+      type: "initResult",
+      outcome: { ok: false, error: { code: "invalid-config" } },
+    });
+    expect(installed).toEqual([]);
+  });
 });

@@ -36,6 +36,16 @@ export type IndexOptions = z.infer<typeof indexOptionsSchema>;
 export const transportSpecSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("platform") }),
   z.object({ kind: z.literal("fetch"), rewriteHead: z.boolean().optional() }),
+  z.object({
+    kind: z.literal("libcurl"),
+    moduleUrl: z.string(),
+    wasmUrl: z.string().optional(),
+    relayUrl: z.string(),
+    userAgent: z.string().optional(),
+    maxConnections: z.number().int().positive().optional(),
+    connectionCache: z.number().int().positive().optional(),
+    connectionsPerHost: z.number().int().positive().optional(),
+  }),
 ]);
 export type TransportSpec = z.infer<typeof transportSpecSchema>;
 

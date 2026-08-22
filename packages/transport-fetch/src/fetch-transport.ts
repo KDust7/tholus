@@ -1,6 +1,6 @@
-export interface ProxyTransport {
-  fetch(input: string, init?: RequestInit): Promise<Response>;
-}
+import type { ProxyTransport } from "@uv-wasm/engine-protocol";
+
+export type { ProxyTransport };
 
 export interface FetchTransportOptions {
   fetch?: typeof globalThis.fetch;

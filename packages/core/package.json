@@ -23,7 +23,8 @@
   },
   "dependencies": {
     "@uv-wasm/engine-protocol": "workspace:*",
-    "@uv-wasm/transport-fetch": "workspace:*"
+    "@uv-wasm/transport-fetch": "workspace:*",
+    "@uv-wasm/transport-libcurl": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

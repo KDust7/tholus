@@ -3,11 +3,13 @@ import {
   EXIT_CODE_CANCELLED,
   type HostMessage,
   PROTOCOL_VERSION,
+  type ProxyTransport,
   parseHostMessage,
   type StructuredErrorInfo,
   type WorkerMessage,
 } from "@uv-wasm/engine-protocol";
 import { createFetchTransport } from "@uv-wasm/transport-fetch";
+import { createLibcurlTransport, type LibcurlModule } from "@uv-wasm/transport-libcurl";
 import { cacheRoot, resolveEnvironment } from "./config-env.js";
 import { exportTree } from "./export-tree.js";
 import {
@@ -102,6 +104,15 @@ function describe(error: unknown): string {
 
 function unsupported(message: string): StructuredErrorInfo {
   return { code: "unsupported", message };
+}
+
+async function loadLibcurl(moduleUrl: string): Promise<LibcurlModule> {
+  const specifier = moduleUrl;
+  const namespace = (await import(specifier)) as {
+    libcurl?: LibcurlModule;
+    default?: LibcurlModule;
+  };
+  return namespace.libcurl ?? namespace.default ?? (namespace as unknown as LibcurlModule);
 }
 
 function flatten(env: Record<string, string>): string[] {
@@ -309,12 +320,42 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       return;
     }
 
-    if (message.config.transport.kind === "fetch") {
+    if (message.config.transport.kind !== "platform") {
       const spec = message.config.transport;
-      const transport = createFetchTransport({
-        fetch: globalThis.fetch.bind(globalThis),
-        ...(spec.rewriteHead === undefined ? {} : { rewriteHead: spec.rewriteHead }),
-      });
+      let transport: ProxyTransport;
+      try {
+        transport =
+          spec.kind === "fetch"
+            ? createFetchTransport({
+                fetch: globalThis.fetch.bind(globalThis),
+                ...(spec.rewriteHead === undefined ? {} : { rewriteHead: spec.rewriteHead }),
+              })
+            : createLibcurlTransport({
+                load: () => loadLibcurl(spec.moduleUrl),
+                relayUrl: spec.relayUrl,
+                ...(spec.wasmUrl === undefined ? {} : { wasmUrl: spec.wasmUrl }),
+                ...(spec.userAgent === undefined ? {} : { userAgent: spec.userAgent }),
+                ...(spec.maxConnections === undefined
+                  ? {}
+                  : { maxConnections: spec.maxConnections }),
+                ...(spec.connectionCache === undefined
+                  ? {}
+                  : { connectionCache: spec.connectionCache }),
+                ...(spec.connectionsPerHost === undefined
+                  ? {}
+                  : { connectionsPerHost: spec.connectionsPerHost }),
+              });
+      } catch (error) {
+        emit({
+          type: "initResult",
+          id: message.id,
+          outcome: {
+            ok: false,
+            error: { code: "invalid-config", message: describe(error) },
+          },
+        });
+        return;
+      }
       const install =
         options.installFetch ??
         ((replacement: typeof globalThis.fetch) => {

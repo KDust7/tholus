@@ -27,7 +27,19 @@ export interface EngineConfigInput {
     | { kind: "opfs"; scope?: string; abiTag?: string; budgetBytes?: number }
     | { kind: "memory" }
     | { kind: "none" };
-  transport?: { kind: "platform" } | { kind: "fetch"; rewriteHead?: boolean };
+  transport?:
+    | { kind: "platform" }
+    | { kind: "fetch"; rewriteHead?: boolean }
+    | {
+        kind: "libcurl";
+        moduleUrl: string;
+        wasmUrl?: string;
+        relayUrl: string;
+        userAgent?: string;
+        maxConnections?: number;
+        connectionCache?: number;
+        connectionsPerHost?: number;
+      };
   index?: {
     indexUrl?: string;
     extraIndexUrls?: string[];

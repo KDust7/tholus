@@ -1,10 +1,10 @@
 {
-  "name": "@uv-wasm/transport-fetch",
+  "name": "@uv-wasm/transport-libcurl",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0 OR MIT",
-  "description": "The default uv-wasm transport: the platform's own fetch, with the rewrites a browser forces",
+  "description": "A uv-wasm transport over a host-supplied libcurl.js, for Wisp relays and a real User-Agent",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
+    "libcurl.js": "0.7.4",
     "vitest": "^4.1.10"
   }
 }

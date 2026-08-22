@@ -192,7 +192,10 @@ describe.skipIf(!canRun || !hasPyodide)(
     it("asked the backend what it needed before building it, and built the extra requirement too", () => {
       const requires = seen.filter((request) => request.outputDir === undefined);
       const builds = seen.filter((request) => request.outputDir !== undefined);
-      expect(requires.length, "every build asks its backend for requirements first").toBeGreaterThanOrEqual(1);
+      expect(
+        requires.length,
+        "every build asks its backend for requirements first",
+      ).toBeGreaterThanOrEqual(1);
       expect(
         builds.length,
         "the marker is a source tree of its own, so two wheels have to be built",

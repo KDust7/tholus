@@ -20,6 +20,7 @@
       "dependencies": {
         "@uv-wasm/engine-protocol": "workspace:*",
         "@uv-wasm/transport-fetch": "workspace:*",
+        "@uv-wasm/transport-libcurl": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "^24.13.3",
@@ -64,8 +65,23 @@
     "packages/transport-fetch": {
       "name": "@uv-wasm/transport-fetch",
       "version": "0.0.0",
+      "dependencies": {
+        "@uv-wasm/engine-protocol": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "^24.13.3",
+        "vitest": "^4.1.10",
+      },
+    },
+    "packages/transport-libcurl": {
+      "name": "@uv-wasm/transport-libcurl",
+      "version": "0.0.0",
+      "dependencies": {
+        "@uv-wasm/engine-protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "^24.13.3",
+        "libcurl.js": "0.7.4",
         "vitest": "^4.1.10",
       },
     },
@@ -98,12 +114,14 @@
       "version": "0.0.0",
       "devDependencies": {
         "@types/node": "^24.13.3",
+        "@types/ws": "^8.18.1",
         "@uv-wasm/contract-transcripts": "workspace:*",
         "@uv-wasm/core": "workspace:*",
         "@uv-wasm/engine-protocol": "workspace:*",
         "@uv-wasm/pyodide": "workspace:*",
         "pyodide": "314.0.5",
         "vitest": "^4.1.10",
+        "ws": "^8.21.3",
       },
     },
     "tools/size-report": {
@@ -253,6 +271,8 @@
 
     "@types/node": ["@types/node@24.13.3", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q=="],
 
+    "@types/ws": ["@types/ws@8.18.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg=="],
+
     "@uv-wasm/contract-transcripts": ["@uv-wasm/contract-transcripts@workspace:test/contract"],
 
     "@uv-wasm/core": ["@uv-wasm/core@workspace:packages/core"],
@@ -268,6 +288,8 @@
     "@uv-wasm/size-report": ["@uv-wasm/size-report@workspace:tools/size-report"],
 
     "@uv-wasm/transport-fetch": ["@uv-wasm/transport-fetch@workspace:packages/transport-fetch"],
+
+    "@uv-wasm/transport-libcurl": ["@uv-wasm/transport-libcurl@workspace:packages/transport-libcurl"],
 
     "@uv-wasm/xterm": ["@uv-wasm/xterm@workspace:packages/xterm"],
 
@@ -322,6 +344,8 @@
     "istanbul-reports": ["istanbul-reports@3.2.0", "", { "dependencies": { "html-escaper": "^2.0.0", "istanbul-lib-report": "^3.0.0" } }, "sha512-HGYWWS/ehqTV3xN10i23tkPkpH46MLCIMFNCaaKNavAXTF1RkqxawEPtnjnGZ6XKSInBKkiOA5BKS+aZiY3AvA=="],
 
     "js-tokens": ["js-tokens@10.0.0", "", {}, "sha512-lM/UBzQmfJRo9ABXbPWemivdCW8V2G8FHaHdypQaIy523snUjog0W71ayWXTjiR+ixeMyVHN2XcpnTd/liPg/Q=="],
+
+    "libcurl.js": ["libcurl.js@0.7.4", "", {}, "sha512-UpvVirvATP7fD0t4rnsxVRuUpPVIo2QvWj4+5JrMsd1KSEvYkON36+COOPAl88hPlGJddk+DfZRvyF7KG7YcSA=="],
 
     "lightningcss": ["lightningcss@1.33.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.33.0", "lightningcss-darwin-arm64": "1.33.0", "lightningcss-darwin-x64": "1.33.0", "lightningcss-freebsd-x64": "1.33.0", "lightningcss-linux-arm-gnueabihf": "1.33.0", "lightningcss-linux-arm64-gnu": "1.33.0", "lightningcss-linux-arm64-musl": "1.33.0", "lightningcss-linux-x64-gnu": "1.33.0", "lightningcss-linux-x64-musl": "1.33.0", "lightningcss-win32-arm64-msvc": "1.33.0", "lightningcss-win32-x64-msvc": "1.33.0" } }, "sha512-WkUDrojuJs0xkgGf2udWxa3yGBRxPtxUkB79i6aCZLRgc7PM8fZe9TosfPDcvEpQZbuFASnHYmRLBLUbmLOIIA=="],
 
