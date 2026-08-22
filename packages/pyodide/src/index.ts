@@ -3,6 +3,7 @@ import { type PyodideFacts, type PyodideLike, probePyodide } from "./facts.js";
 import { checkAbi, MOUNT_ROOT, type WrittenTree, writeTree } from "./mount.js";
 
 export * from "./facts.js";
+export * from "./hook.js";
 export * from "./mount.js";
 
 export interface TreeSource {
