@@ -1,0 +1,29 @@
+{
+  "name": "@uv-wasm/xterm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0 OR MIT",
+  "description": "Drives a uv-wasm engine from an xterm.js terminal, bytes verbatim",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@uv-wasm/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "vitest": "^4.1.10"
+  }
+}
