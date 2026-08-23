@@ -132,6 +132,15 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: The engine crate covers itself
+        run: |
+          cargo llvm-cov --json --output-path "$RUNNER_TEMP/engine-cov.json" -p uv-wasm-engine
+          node scripts/check-rust-coverage.mjs "$RUNNER_TEMP/engine-cov.json" uv-wasm-engine
+
       - name: Build wasm artifact
         run: cargo xtask build
 
