@@ -80,16 +80,16 @@ interface Case {
   scenario: string;
   label: string;
   extra: string[];
-  expected?: string;
-  report?: string;
+  expected: string | undefined;
+  report: string | undefined;
 }
 
 const read = (name: string): Snapshot =>
   JSON.parse(readFileSync(resolve(fixtures, name, "snapshot.json"), "utf8")) as Snapshot;
 
-const snapshots = new Map(available.map((name) => [name, read(name)] as const));
+const snapshots = new Map<string, Snapshot>(available.map((name) => [name, read(name)]));
 
-const cases: Case[] = available.flatMap((name) => {
+const cases: Case[] = available.flatMap((name): Case[] => {
   const snapshot = snapshots.get(name) as Snapshot;
   return [
     {

@@ -1,6 +1,6 @@
 {
-  "recordedAt": "2026-08-20T08:41:34.272Z",
-  "recordedFrom": "8172d418b",
+  "recordedAt": "2026-08-23T16:38:57.087Z",
+  "recordedFrom": "7454ab4b3",
   "requirements": [
     "idna==3.11"
   ],
@@ -26,6 +26,28 @@
     {
       "args": [
         "pip",
+        "list",
+        "--format",
+        "freeze"
+      ],
+      "status": 0,
+      "stdout": "idna==3.11\n",
+      "stderr": "Using Python <ENVIRONMENT>\n"
+    },
+    {
+      "args": [
+        "pip",
+        "list",
+        "--format",
+        "json"
+      ],
+      "status": 0,
+      "stdout": "[{\"name\":\"idna\",\"version\":\"3.11\"}]\n",
+      "stderr": "Using Python <ENVIRONMENT>\n"
+    },
+    {
+      "args": [
+        "pip",
         "freeze"
       ],
       "status": 0,
@@ -45,11 +67,30 @@
     {
       "args": [
         "pip",
+        "show",
+        "nonesuch"
+      ],
+      "status": 1,
+      "stdout": "",
+      "stderr": "Using Python <ENVIRONMENT>\nwarning: Package(s) not found for: nonesuch\n"
+    },
+    {
+      "args": [
+        "pip",
         "check"
       ],
       "status": 0,
       "stdout": "",
-      "stderr": "Using Python <ENVIRONMENT>\nChecked 1 package in 4ms\nAll installed packages are compatible\n"
+      "stderr": "Using Python <ENVIRONMENT>\nChecked 1 package in 6ms\nAll installed packages are compatible\n"
+    },
+    {
+      "args": [
+        "pip",
+        "tree"
+      ],
+      "status": 0,
+      "stdout": "idna v3.11\n",
+      "stderr": "Using Python <ENVIRONMENT>\n"
     },
     {
       "args": [
@@ -59,7 +100,7 @@
       ],
       "status": 0,
       "stdout": "",
-      "stderr": "Using Python <ENVIRONMENT>\nUninstalled 1 package in 31ms\n - idna==3.11\n"
+      "stderr": "Using Python <ENVIRONMENT>\nUninstalled 1 package in 19ms\n - idna==3.11\n"
     },
     {
       "args": [
@@ -69,9 +110,29 @@
       "status": 0,
       "stdout": "",
       "stderr": "Using Python <ENVIRONMENT>\n"
+    },
+    {
+      "args": [
+        "pip",
+        "show",
+        "idna"
+      ],
+      "status": 1,
+      "stdout": "",
+      "stderr": "Using Python <ENVIRONMENT>\nwarning: Package(s) not found for: idna\n"
+    },
+    {
+      "args": [
+        "pip",
+        "uninstall",
+        "idna"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": "Using Python <ENVIRONMENT>\nwarning: Skipping idna as it is not installed\nwarning: No packages to uninstall\n"
     }
   ],
-  "expectedReport": "Using Python <ENVIRONMENT>\nResolved 1 package in 194ms\nPrepared 1 package in 173ms\nInstalled 1 package in 60ms\n + idna==3.11\n",
+  "expectedReport": "Using Python <ENVIRONMENT>\nResolved 1 package in 260ms\nPrepared 1 package in 268ms\nInstalled 1 package in 91ms\n + idna==3.11\n",
   "responses": {
     "/simple/idna/": {
       "status": 200,
