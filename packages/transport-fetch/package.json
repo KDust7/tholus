@@ -5,6 +5,29 @@
   "type": "module",
   "license": "Apache-2.0 OR MIT",
   "description": "The default uv-wasm transport: the platform's own fetch, with the rewrites a browser forces",
+  "keywords": [
+    "uv",
+    "pip",
+    "python",
+    "package-manager",
+    "resolver",
+    "wasm",
+    "webassembly",
+    "browser",
+    "fetch",
+    "transport",
+    "http"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KDust7/uv-wasm.git",
+    "directory": "packages/transport-fetch"
+  },
+  "homepage": "https://github.com/KDust7/uv-wasm#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

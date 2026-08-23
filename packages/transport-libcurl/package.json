@@ -5,6 +5,30 @@
   "type": "module",
   "license": "Apache-2.0 OR MIT",
   "description": "A uv-wasm transport over a host-supplied libcurl.js, for Wisp relays and a real User-Agent",
+  "keywords": [
+    "uv",
+    "pip",
+    "python",
+    "package-manager",
+    "resolver",
+    "wasm",
+    "webassembly",
+    "browser",
+    "libcurl",
+    "transport",
+    "wisp",
+    "proxy"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KDust7/uv-wasm.git",
+    "directory": "packages/transport-libcurl"
+  },
+  "homepage": "https://github.com/KDust7/uv-wasm#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

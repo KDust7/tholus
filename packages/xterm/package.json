@@ -5,6 +5,30 @@
   "type": "module",
   "license": "Apache-2.0 OR MIT",
   "description": "Drives a uv-wasm engine from an xterm.js terminal, bytes verbatim",
+  "keywords": [
+    "uv",
+    "pip",
+    "python",
+    "package-manager",
+    "resolver",
+    "wasm",
+    "webassembly",
+    "browser",
+    "xterm",
+    "terminal",
+    "tty",
+    "repl"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KDust7/uv-wasm.git",
+    "directory": "packages/xterm"
+  },
+  "homepage": "https://github.com/KDust7/uv-wasm#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

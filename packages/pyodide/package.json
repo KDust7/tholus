@@ -5,6 +5,29 @@
   "type": "module",
   "license": "Apache-2.0 OR MIT",
   "description": "Mounts a uv-built environment into a host-supplied Pyodide runtime",
+  "keywords": [
+    "uv",
+    "pip",
+    "python",
+    "package-manager",
+    "resolver",
+    "wasm",
+    "webassembly",
+    "browser",
+    "pyodide",
+    "pep517",
+    "wheels"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KDust7/uv-wasm.git",
+    "directory": "packages/pyodide"
+  },
+  "homepage": "https://github.com/KDust7/uv-wasm#readme",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

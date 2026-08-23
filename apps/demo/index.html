@@ -61,6 +61,16 @@
   button:disabled { opacity: 0.4; cursor: default; }
 
   #status { margin-left: auto; color: var(--dim); font-size: 0.8rem; }
+
+  #disclaimer {
+    flex-basis: 100%;
+    margin: 0.4rem 0 0;
+    color: var(--dim);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  #disclaimer a { color: inherit; }
 </style>
 <header>
   <h1>uv, running in this tab</h1>
@@ -70,5 +80,10 @@
 <footer>
   <button id="mount" disabled>hand the environment to Python</button>
   <span id="status"></span>
+  <p id="disclaimer">
+    An unofficial port of <a href="https://github.com/astral-sh/uv">Astral's uv</a> to WebAssembly.
+    Not affiliated with or endorsed by Astral. Nothing you type leaves this tab except the package
+    requests themselves, which go straight to the index, there is no server in between.
+  </p>
 </footer>
 <script type="module" src="/demo/main.js"></script>

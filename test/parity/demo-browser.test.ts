@@ -106,6 +106,12 @@ describe.skipIf(!canRun)("the demo runs uv in a terminal, in a real browser", ()
     expect(await page.locator("#build").innerText()).toMatch(/^uv 0\.12\.3 · engine /);
   });
 
+  it("says on the page itself that it is unofficial", async () => {
+    const disclaimer = await page.locator("#disclaimer").innerText();
+    expect(disclaimer).toMatch(/unofficial port/i);
+    expect(disclaimer).toMatch(/[Nn]ot affiliated with or endorsed by Astral/);
+  });
+
   it("greets with a terminal that has already rendered text", async () => {
     expect(await screenOf(page)).toContain("uv is compiled to WebAssembly");
   });
