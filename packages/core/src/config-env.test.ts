@@ -53,8 +53,12 @@ describe("the engine config becomes the environment uv reads", () => {
 });
 
 describe("a config the engine cannot honor fails rather than being ignored", () => {
-  it.each(["opfs", "delegate"])("refuses the %s filesystem, which is phase 4", (kind) => {
+  it.each(["opfs", "delegate"])("refuses the %s filesystem, and says what does work", (kind) => {
     expect(() => derivedEnv(parse({ fs: { kind } }))).toThrow(/only has the in-memory filesystem/);
+    expect(
+      () => derivedEnv(parse({ fs: { kind } })),
+      "a host reading this must not go looking for a phase that has already shipped",
+    ).toThrow(/cache: \{ kind: "opfs" \}/);
   });
 
   it("accepts the opfs cache, and derives no environment because uv already caches under HOME", () => {

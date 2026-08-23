@@ -41,7 +41,8 @@ promoting it to the default would be a behavior change rather than a naming one.
   it. That is a performance cliff with no error attached.
 
 Both are reasons to keep the rewrite opt-in for the hosts that need it, which is exactly what an
-index refusing `HEAD` looks like. `test/parity/transport-engine.test.ts` gates it either way: it
+index refusing `HEAD` looks like,
+[ADR 0005](decisions/0005-the-browsers-own-fetch-is-the-default.md) records the whole call. `test/parity/transport-engine.test.ts` gates it either way: it
 drives a real install through this transport and asserts no `HEAD` survived.
 
 ## `fetch`

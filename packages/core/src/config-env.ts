@@ -23,7 +23,9 @@ function storageEnv(config: EngineConfig): Record<string, string> {
   if (config.fs.kind !== "memory") {
     throw unsupported(
       `fs.kind "${config.fs.kind}"`,
-      "the engine only has the in-memory filesystem; OPFS and a delegated backend are phase 4",
+      "the engine only has the in-memory filesystem. Persisting the uv cache is a different " +
+        'setting, `cache: { kind: "opfs" }`, and it works; whole-filesystem persistence is not ' +
+        "built, because venvs and projects are session-scoped by design",
     );
   }
   switch (config.cache.kind) {
