@@ -78,3 +78,57 @@ jobs:
         run: |
           echo "::warning::The browser gates failed on ${{ matrix.browser }}."
           echo "Chromium is the per-PR gate; this run reports engine drift rather than blocking."
+
+  drift:
+    name: the goldens against the live indexes
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the fork
+        env:
+          FORK_TOKEN: ${{ secrets.FORK_TOKEN }}
+        run: |
+          if [ -z "$FORK_TOKEN" ]; then
+            echo "FORK_TOKEN is unset, so vendor/uv cannot be checked out. See docs/status.md."
+            exit 1
+          fi
+          git config --global             url."https://x-access-token:${FORK_TOKEN}@github.com/KDust7/uv-wasm-fork".insteadOf             "https://github.com/KDust7/uv-wasm-fork"
+          git submodule update --init --recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@${{ env.WASM_BINDGEN_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --linker=isolated --frozen-lockfile
+
+      - name: Build packages
+        run: bun run build
+
+      - name: Build wasm artifact
+        run: cargo xtask build --skip-opt
+
+      - name: The Pyodide surface the adapter reaches for
+        run: bun run vitest run --project unit test/parity/pyodide-surface.test.ts
+
+      - name: The goldens against PyPI and the Pyodide index
+        env:
+          UV_WASM_LIVE: "1"
+        run: bun run vitest run --project unit test/parity/live-index.test.ts
+
+      - name: Say what drift means
+        if: failure()
+        run: |
+          echo "::warning::A recorded golden no longer matches the live index, or Pyodide moved."
+          echo "Re-record with scripts/record-fixtures.mjs, or read the adapter tripwire's message."
