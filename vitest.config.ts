@@ -68,7 +68,7 @@ export default defineConfig({
             "test/parity/**/*.test.ts",
             "tools/*/src/**/*.test.ts",
           ],
-          exclude: ["**/node_modules/**", "**/dist/**", "test/e2e/**", ...BROWSER_DRIVEN],
+          exclude: ["**/node_modules/**", "**/dist/**", ...BROWSER_DRIVEN],
         },
       },
       {

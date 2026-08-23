@@ -265,6 +265,15 @@ ${transcript}`,
       `uv pip install uv-wasm-left==1.0.0 uv-wasm-right==1.0.0 --python ${VENV} --no-cache ` +
         `--index-url ${site.origin}/simple --python-version 3.14`,
     );
+    await page
+      .waitForFunction(
+        () =>
+          document.querySelector(".xterm-screen")?.textContent?.includes("No solution found") ===
+          true,
+        undefined,
+        { timeout: 60_000 },
+      )
+      .catch(() => undefined);
     const screen = await screenOf(page);
 
     expect(code, `the conflict resolved, which it must not:\n${screen}`).not.toBe(0);
