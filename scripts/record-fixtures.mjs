@@ -29,6 +29,8 @@ const scenarios = {
     extraArgs: [],
   },
   transitive: { requirements: ["requests==2.32.5"], extraArgs: [] },
+  extras: { requirements: ["requests[socks]==2.32.5"], extraArgs: [] },
+  hashes: { requirements: ["idna==3.11"], extraArgs: ["--generate-hashes"] },
   universal: { requirements: ["requests==2.32.5"], extraArgs: ["--universal"] },
   stdin: { requirements: ["idna==3.11"], extraArgs: [], stdin: true },
   "pyodide-wheel": {

@@ -26,6 +26,8 @@ const SCENARIOS = [
   "universal",
   "pyodide-wheel",
   "stdin",
+  "extras",
+  "hashes",
 ] as const;
 
 const available = SCENARIOS.filter((name) => existsSync(resolve(fixtures, name, "snapshot.json")));
