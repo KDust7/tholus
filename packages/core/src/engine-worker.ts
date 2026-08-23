@@ -135,6 +135,7 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
   let persistence: Persistence | undefined;
   let runtimeWanted = false;
   let hookCounter = 0;
+  let releaseTransport: (() => Promise<void>) | undefined;
   const hooks = new Map<string, PendingHook>();
 
   const emit = (message: WorkerMessage): void => {
@@ -359,6 +360,10 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
         });
         return;
       }
+      const disposable = transport as { dispose?: () => Promise<void> };
+      if (typeof disposable.dispose === "function") {
+        releaseTransport = () => disposable.dispose?.() ?? Promise.resolve();
+      }
       const install =
         options.installFetch ??
         ((replacement: typeof globalThis.fetch) => {
@@ -570,13 +575,17 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       case "hookResult":
         settleHook(message);
         return;
-      case "dispose":
+      case "dispose": {
         disposed = true;
         for (const [id, waiter] of [...hooks]) {
           hooks.delete(id);
           waiter.reject(new Error("the engine was disposed while a build hook was running"));
         }
+        const release = releaseTransport;
+        releaseTransport = undefined;
+        void release?.().catch(() => undefined);
         return;
+      }
       case "exportTree":
         enqueue(async () => {
           const handle = engine;

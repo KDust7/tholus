@@ -1195,6 +1195,42 @@ describe("the host chooses the transport, and the platform's own fetch is the de
     );
   });
 
+  it("closes the libcurl session when the engine is disposed, because libcurl leaks it", async () => {
+    const scope = globalThis as unknown as { __libcurlCloses?: number };
+    scope.__libcurlCloses = 0;
+    const source = [
+      "const scope = globalThis;",
+      "export const libcurl = {",
+      "  set_websocket() {},",
+      "  load_wasm() { return Promise.resolve(); },",
+      "  HTTPSession: class {",
+      "    fetch() { return Promise.resolve(new Response('x')); }",
+      "    set_connections() {}",
+      "    close() { scope.__libcurlCloses += 1; }",
+      "  },",
+      "};",
+    ].join("\n");
+    const moduleUrl = `data:text/javascript,${encodeURIComponent(source)}`;
+
+    const { installed, install } = installs();
+    const test = harness({}, new FakeColdStore(), undefined, install);
+    await init(test, {
+      transport: { kind: "libcurl", moduleUrl, relayUrl: "wss://relay.example/ws/" },
+    });
+
+    await (installed[0] as typeof globalThis.fetch)("https://files.example/a.whl");
+    expect(scope.__libcurlCloses, "the session opens on the first request").toBe(0);
+
+    test.worker.receive({ type: "dispose" });
+    await test.worker.settled;
+    await new Promise((done) => setTimeout(done, 0));
+
+    expect(
+      scope.__libcurlCloses,
+      "libcurl leaks a session that is never closed, so disposing the engine has to close it",
+    ).toBe(1);
+  });
+
   it("refuses a relay URL that is not a WebSocket, rather than failing mid-download", async () => {
     const { installed, install } = installs();
     const test = harness({}, new FakeColdStore(), undefined, install);
