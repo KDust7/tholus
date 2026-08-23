@@ -364,8 +364,24 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
         ((replacement: typeof globalThis.fetch) => {
           globalThis.fetch = replacement;
         });
-      install(((input: string, init?: RequestInit) =>
-        transport.fetch(input, init)) as unknown as typeof globalThis.fetch);
+      install((async (input: string, init: RequestInit = {}) => {
+        const response = await transport.fetch(input, init);
+        const length = response.headers.get("content-length");
+        emit({
+          type: "event",
+          event: {
+            type: "request",
+            method: (init.method ?? "GET").toUpperCase(),
+            url: input,
+            status: response.status,
+            fromCache: false,
+            ...(length === null || Number.isNaN(Number(length))
+              ? {}
+              : { bytes: Math.max(0, Number(length)) }),
+          },
+        });
+        return response;
+      }) as unknown as typeof globalThis.fetch);
     }
 
     try {

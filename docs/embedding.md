@@ -83,9 +83,16 @@ engine.onEvent((event) => {
 ```
 
 Events also arrive per invocation through `options.onEvent`. What is emitted today: `log`, `phase`,
-`resolution-complete`, `install-report` and `runtime-finalize`. `progress` and `request` are
-declared in the protocol but not yet emitted, uv suppresses progress bars on a pipe, and request
-events would need the transport seam to observe every call.
+`resolution-complete`, `install-report`, `runtime-finalize` and `request`.
+
+`request` is the exception to per-invocation delivery, it carries no `invocationId`, because the
+transport does not know which command a fetch belongs to, so it reaches the engine-level listener
+only. It is emitted only when you choose a transport: the `platform` default deliberately leaves
+`globalThis.fetch` untouched, so there is nothing to observe.
+
+`progress` is declared in the protocol and not emitted. uv suppresses progress bars on a pipe, so
+there is nothing to read; deriving it from a response body would mean interposing on the download
+path, which is not a trade worth making for a progress bar.
 
 ## Reading what uv built
 

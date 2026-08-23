@@ -1133,6 +1133,50 @@ describe("the host chooses the transport, and the platform's own fetch is the de
     }
   });
 
+  it("reports each request the transport made, so a host can show the network", async () => {
+    const { installed, install } = installs();
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response("x", {
+        status: 200,
+        headers: { "content-length": "4321" },
+      })) as unknown as typeof globalThis.fetch;
+
+    try {
+      const test = harness({}, new FakeColdStore(), undefined, install);
+      await init(test, { transport: { kind: "fetch", rewriteHead: false } });
+      test.emitted.length = 0;
+
+      await (installed[0] as typeof globalThis.fetch)("https://files.example/a.whl");
+
+      expect(test.emitted).toEqual([
+        {
+          type: "event",
+          event: {
+            type: "request",
+            method: "GET",
+            url: "https://files.example/a.whl",
+            status: 200,
+            fromCache: false,
+            bytes: 4321,
+          },
+        },
+      ]);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it("says nothing about the network when the host asked for no transport", async () => {
+    const { install } = installs();
+    const test = harness({}, new FakeColdStore(), undefined, install);
+    await init(test);
+    expect(
+      test.emitted.filter((message) => message.type === "event"),
+      "the platform default leaves fetch alone, so there is nothing to observe",
+    ).toEqual([]);
+  });
+
   it("installs the libcurl transport without loading the module until a request is made", async () => {
     const { installed, install } = installs();
     const test = harness({}, new FakeColdStore(), undefined, install);
