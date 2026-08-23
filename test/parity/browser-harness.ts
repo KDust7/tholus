@@ -36,13 +36,26 @@ export interface StaticSite {
   close(): Promise<void>;
 }
 
+export interface DirectoryMount {
+  prefix: string;
+  directory: string;
+}
+
 export async function serveStatic(
   files: Map<string, string>,
   fallback?: Fallback,
+  mounts: readonly DirectoryMount[] = [],
 ): Promise<StaticSite> {
   const cache = new Map<string, Buffer>();
   const server = createServer((request, response) => {
-    const path = files.get((request.url ?? "").split("?")[0] ?? "");
+    const url = (request.url ?? "").split("?")[0] ?? "";
+    let path = files.get(url);
+    if (path === undefined) {
+      const mount = mounts.find((candidate) => url.startsWith(candidate.prefix));
+      if (mount && !url.slice(mount.prefix.length).includes("..")) {
+        path = resolve(mount.directory, url.slice(mount.prefix.length));
+      }
+    }
     if (path === undefined) {
       if (fallback?.(request, response)) {
         return;

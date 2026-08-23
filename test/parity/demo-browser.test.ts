@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Browser, Page } from "playwright";
@@ -20,6 +21,16 @@ const files = new Map<string, string>([
 ]);
 
 const canRun = [...files.values()].every((path) => existsSync(path));
+
+const pyodideDir = ((): string | undefined => {
+  try {
+    return dirname(
+      createRequire(resolve(root, "test/parity/package.json")).resolve("pyodide/pyodide.mjs"),
+    );
+  } catch {
+    return undefined;
+  }
+})();
 
 if (process.env.CI && !canRun) {
   throw new Error(
@@ -56,14 +67,18 @@ describe.skipIf(!canRun)("the demo runs uv in a terminal, in a real browser", ()
 
   beforeAll(async () => {
     const replay = createReplayHandler(await readSnapshot(fixture), log);
-    site = await serveStatic(files, (request, response) => {
-      const url = request.url ?? "/";
-      if (!url.startsWith("/simple/") && !url.startsWith("/files/")) {
-        return false;
-      }
-      replay(request, response);
-      return true;
-    });
+    site = await serveStatic(
+      files,
+      (request, response) => {
+        const url = request.url ?? "/";
+        if (!url.startsWith("/simple/") && !url.startsWith("/files/")) {
+          return false;
+        }
+        replay(request, response);
+        return true;
+      },
+      pyodideDir === undefined ? [] : [{ prefix: "/pyodide/", directory: pyodideDir }],
+    );
     log.origin = site.origin;
 
     browser = await launchChromium();
@@ -156,6 +171,29 @@ ${transcript}`,
     );
     expect(await screenOf(page)).toContain("uv 0.12.3");
   }, 180_000);
+
+  it.skipIf(pyodideDir === undefined)(
+    "hands the environment it built to Python, which is what the demo is for",
+    async () => {
+      await page.evaluate(() =>
+        (globalThis as unknown as { __demo: DemoHandle }).__demo.mountPython(),
+      );
+      await page.waitForFunction(
+        () => document.querySelector("#status")?.textContent?.includes("mounted") === true,
+        undefined,
+        { timeout: 600_000 },
+      );
+
+      const PROBE = `python -c "import idna; print('mounted-idna=' + idna.__version__)"`;
+      expect(await run(page, PROBE)).toBe(0);
+      expect(
+        await screenOf(page),
+        "the marker has to be distinctive: the install line already printed `+ idna==3.11`, so " +
+          "asserting on the bare version would pass without Python running at all",
+      ).toContain("mounted-idna=3.11");
+    },
+    900_000,
+  );
 
   it("raised no uncaught page errors along the way", () => {
     expect(pageErrors).toEqual([]);
