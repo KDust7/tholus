@@ -43,6 +43,9 @@ jobs:
           bun run --filter @uv-wasm/engine-protocol emit-schema
           git diff --exit-code -- packages/engine-protocol/schema
 
+      - name: Release readiness
+        run: node scripts/check-release-readiness.mjs
+
       - name: Verify the public API report is current
         run: |
           bun run api
