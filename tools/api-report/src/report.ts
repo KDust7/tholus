@@ -64,6 +64,8 @@ export function surfaceOf(entryPoint: string): ApiEntry[] {
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
     skipLibCheck: true,
+    skipDefaultLibCheck: true,
+    noLib: true,
     noEmit: true,
   });
   const checker = program.getTypeChecker();
