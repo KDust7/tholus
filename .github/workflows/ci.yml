@@ -43,6 +43,11 @@ jobs:
           bun run --filter @uv-wasm/engine-protocol emit-schema
           git diff --exit-code -- packages/engine-protocol/schema
 
+      - name: Verify the public API report is current
+        run: |
+          bun run api
+          git diff --exit-code -- api
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

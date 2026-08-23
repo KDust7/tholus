@@ -186,6 +186,13 @@ ${transcript}`,
 
       const PROBE = `python -c "import idna; print('mounted-idna=' + idna.__version__)"`;
       expect(await run(page, PROBE)).toBe(0);
+      await page.waitForFunction(
+        () =>
+          document.querySelector(".xterm-screen")?.textContent?.includes("mounted-idna=3.11") ===
+          true,
+        undefined,
+        { timeout: 120_000 },
+      );
       expect(
         await screenOf(page),
         "the marker has to be distinctive: the install line already printed `+ idna==3.11`, so " +
