@@ -15,7 +15,7 @@ jobs:
     name: the fork still builds and tests as native uv
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check out the fork
         env:
@@ -63,7 +63,15 @@ jobs:
         working-directory: vendor/uv
         run: |
           cargo llvm-cov --json --output-path "$RUNNER_TEMP/rust-cov.json"             -p uv-vfs -p uv-wasm-compat -p uv-wasm-http
-          node "$GITHUB_WORKSPACE/scripts/check-rust-coverage.mjs"             "$RUNNER_TEMP/rust-cov.json" crates uv-vfs uv-wasm-compat uv-wasm-http
+          status=0
+          node "$GITHUB_WORKSPACE/scripts/check-rust-coverage.mjs"             "$RUNNER_TEMP/rust-cov.json" crates uv-vfs uv-wasm-compat uv-wasm-http             > "$RUNNER_TEMP/rust-cov.txt" 2>&1 || status=$?
+          {
+            echo "## Rust coverage"
+            echo
+            sed "s/^/- /" "$RUNNER_TEMP/rust-cov.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/rust-cov.txt"
+          exit "$status"
 
       - name: Native uv still compiles, because it is the parity oracle
         working-directory: vendor/uv

@@ -27,7 +27,7 @@ jobs:
       matrix:
         browser: [chromium, firefox, webkit]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check out the fork
         env:
@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check out the fork
         env:
@@ -127,18 +127,25 @@ jobs:
           UV_WASM_LIVE: "1"
         run: bun run vitest run --project unit test/parity/live-index.test.ts
 
+      - name: The same surface on the stable, previous and next Pyodide
+        run: |
+          node scripts/install-pyodide-matrix.mjs "$RUNNER_TEMP/pyodide-matrix"
+          UV_WASM_PYODIDE_MATRIX="$RUNNER_TEMP/pyodide-matrix/matrix.json"             bun run vitest run --project unit test/parity/pyodide-matrix.test.ts
+
       - name: Say what drift means
         if: failure()
         run: |
           echo "::warning::A recorded golden no longer matches the live index, or Pyodide moved."
           echo "Re-record with scripts/record-fixtures.mjs, or read the adapter tripwire's message."
+          echo "A failure on the *next* channel is early warning, not breakage: it says what an"
+          echo "upgrade would cost before anyone pays it."
 
   crossvenv:
     name: the baseline a real Pyodide cross venv derives
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check out the fork
         env:
@@ -165,7 +172,7 @@ jobs:
         with:
           bun-version: latest
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 

@@ -19,7 +19,7 @@ jobs:
     name: the fork can still be carried forward
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check out the fork
         env:
@@ -95,7 +95,7 @@ jobs:
 
           cat "$report" >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: rebase-canary

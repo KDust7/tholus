@@ -2,6 +2,8 @@ import { createRequire } from "node:module";
 import type { PyodideLike } from "@uv-wasm/pyodide";
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { asPythonVersion } from "./pyodide-versions.js";
+
 const require = createRequire(import.meta.url);
 const hasPyodide = ((): boolean => {
   try {
@@ -49,7 +51,7 @@ describe.skipIf(!hasPyodide)("the Pyodide surface the adapter reaches for", () =
 
   it("is the version this repository pins", () => {
     expect(PINNED, "the pyodide dependency carries no version").not.toBe("");
-    expect(pyodide.version).toBe(PINNED);
+    expect(pyodide.version).toBe(asPythonVersion(PINNED));
   });
 
   it.each(FILESYSTEM)("still exposes FS.%s", (member) => {

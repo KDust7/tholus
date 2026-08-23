@@ -13,12 +13,16 @@ concurrency:
 env:
   WASM_BINDGEN_VERSION: 0.2.126
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   js:
     name: javascript
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -38,6 +42,9 @@ jobs:
       - name: Test with coverage
         run: bun run test:coverage
 
+      - name: Report what each package covers
+        run: node scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+
       - name: Verify emitted protocol schemas are current
         run: |
           bun run --filter @uv-wasm/engine-protocol emit-schema
@@ -51,7 +58,7 @@ jobs:
           bun run api
           git diff --exit-code -- api
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: coverage
@@ -62,9 +69,9 @@ jobs:
     name: fork rewrite
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -75,7 +82,7 @@ jobs:
     name: wasm engine
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -153,7 +160,18 @@ jobs:
       - name: Size report
         run: bun run size
 
-      - uses: actions/upload-artifact@v4
+      - name: Report the grid
+        run: |
+          node scripts/parity-summary.mjs > "$RUNNER_TEMP/parity.md"
+          cat "$RUNNER_TEMP/parity.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Say the same thing on the pull request
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/sticky-comment.mjs "$RUNNER_TEMP/parity.md"
+
+      - uses: actions/upload-artifact@v5
         with:
           name: engine-wasm
           path: |

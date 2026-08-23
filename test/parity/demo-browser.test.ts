@@ -152,6 +152,17 @@ describe.skipIf(!canRun)("the demo runs uv in a terminal, in a real browser", ()
     ).toEqual(["compile-start", "compile-done", "init-start", "ready"]);
   });
 
+  it("ships the libcurl module the relay path names", async () => {
+    const fetched = async (name: string): Promise<number> =>
+      (await page.request.get(`${site.origin}/libcurl/${name}`, { timeout: 120_000 })).status();
+
+    expect(
+      await fetched("libcurl.mjs"),
+      "the demo offers a relay it cannot actually load; the build must copy libcurl beside the page",
+    ).toBe(200);
+    expect(await fetched("libcurl.wasm")).toBe(200);
+  }, 180_000);
+
   it("says on the page itself that it is unofficial", async () => {
     const disclaimer = await page.locator("#disclaimer").innerText();
     expect(disclaimer).toMatch(/unofficial port/i);
@@ -299,15 +310,6 @@ ${transcript}`,
     ).toBe(false);
     expect(await run(page, "uv --version"), "the demo stopped working after a bad relay").toBe(0);
   }, 600_000);
-
-  it("ships the libcurl module the relay path names", async () => {
-    const response = await page.request.get(`${site.origin}/libcurl/libcurl.mjs`);
-    expect(
-      response.status(),
-      "the demo offers a relay it cannot actually load; the build must copy libcurl beside the page",
-    ).toBe(200);
-    expect((await page.request.get(`${site.origin}/libcurl/libcurl.wasm`)).status()).toBe(200);
-  }, 120_000);
 
   it("refuses a relay URL with no trailing slash, which libcurl needs", async () => {
     await page.evaluate(
