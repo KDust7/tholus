@@ -4,7 +4,7 @@ const ESCAPE = String.fromCharCode(27);
 const ANSI = new RegExp(`${ESCAPE}\\[[0-9;]*[A-Za-z]`, "g");
 
 const SUMMARY =
-  /^(Resolved|Prepared|Installed|Uninstalled|Audited) (\d+) packages? in (\d+(?:\.\d+)?)(ms|s|m)$/;
+  /^(Resolved|Prepared|Installed|Uninstalled|Audited)(?: (\d+) packages?(?: [a-z][a-z ]*)?)? in (\d+m \d{2}s|\d+(?:\.\d+)?ms|\d+(?:\.\d+)?s)$/;
 
 const WOULD = /^Would (download|install|uninstall) (\d+) packages?$/;
 
@@ -26,14 +26,24 @@ const WOULD_PHASE_OF: Record<string, EnginePhase> = {
   uninstall: "uninstalling",
 };
 
-const MULTIPLIER: Record<string, number> = { ms: 1, s: 1000, m: 60_000 };
+const MINUTES = /^(\d+)m (\d{2})s$/;
+const SECONDS = /^(\d+(?:\.\d+)?)(ms|s)$/;
+const MULTIPLIER: Record<string, number> = { ms: 1, s: 1000 };
 
 export function stripAnsi(text: string): string {
   return text.replace(ANSI, "");
 }
 
-export function millisecondsOf(value: string, unit: string): number {
-  return Number(value) * (MULTIPLIER[unit] ?? 1);
+export function millisecondsOf(elapsed: string): number {
+  const minutes = MINUTES.exec(elapsed);
+  if (minutes) {
+    return Number(minutes[1]) * 60_000 + Number(minutes[2]) * 1000;
+  }
+  const seconds = SECONDS.exec(elapsed);
+  if (!seconds) {
+    return 0;
+  }
+  return Number(seconds[1]) * (MULTIPLIER[seconds[2] as string] ?? 1);
 }
 
 function refOf(name: string, version: string | undefined, url: string | undefined): PackageRef {
@@ -119,8 +129,8 @@ export function createReportReader(invocationId: string): ReportReader {
       return;
     }
     const phase = PHASE_OF[summary[1] as string] as EnginePhase;
-    const count = Number(summary[2]);
-    const durationMs = millisecondsOf(summary[3] as string, summary[4] as string);
+    const count = summary[2] === undefined ? 0 : Number(summary[2]);
+    const durationMs = millisecondsOf(summary[3] as string);
 
     closePhase(phase, into);
 

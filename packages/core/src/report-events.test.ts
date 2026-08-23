@@ -183,6 +183,36 @@ describe("a dry run says what it would do, and the SDK has to hear it", () => {
   });
 });
 
+describe("the summary lines uv writes when the simple case does not apply", () => {
+  it("reads a resolve that found nothing, which uv prints without a count", () => {
+    const resolved = read(["Resolved in 12ms\n"]).find(
+      (event) => event.type === "resolution-complete",
+    );
+    expect(
+      resolved,
+      "uv drops the count entirely at zero, so a reader that requires one sees no resolution",
+    ).toMatchObject({ packageCount: 0, durationMs: 12 });
+  });
+
+  it("reads a prepare that carries uv's build-isolation suffix", () => {
+    const phases = read([
+      "Prepared 2 packages without build isolation in 88ms\n",
+      "Installed 2 packages in 5ms\n + a==1.0\n + b==2.0\n",
+    ])
+      .filter((event) => event.type === "phase")
+      .map((event) => `${event.phase}:${event.state}`);
+    expect(phases).toContain("downloading:end");
+  });
+
+  it("reads a step that took longer than a minute", () => {
+    const report = reportOf(read(["Installed 1 package in 1m 34s\n + idna==3.11\n"]));
+    expect(
+      report?.installed,
+      "past sixty seconds uv switches to `{m}m {ss}s`, which a seconds-only reader cannot match",
+    ).toEqual([{ name: "idna", version: "3.11" }]);
+  });
+});
+
 describe("a source build is announced as it happens", () => {
   it("brackets each build with a start and an end", () => {
     const events = read([
@@ -214,9 +244,11 @@ describe("the small pieces", () => {
     expect(stripAnsi("\u001B[1mbold\u001B[0m text")).toBe("bold text");
   });
 
-  it("reads uv's duration units", () => {
-    expect(millisecondsOf("126", "ms")).toBe(126);
-    expect(millisecondsOf("1.5", "s")).toBe(1500);
-    expect(millisecondsOf("2", "m")).toBe(120_000);
+  it("reads every duration shape uv can print", () => {
+    expect(millisecondsOf("126ms")).toBe(126);
+    expect(millisecondsOf("0.05ms")).toBe(0.05);
+    expect(millisecondsOf("1.50s")).toBe(1500);
+    expect(millisecondsOf("1m 34s")).toBe(94_000);
+    expect(millisecondsOf("12m 05s")).toBe(725_000);
   });
 });
