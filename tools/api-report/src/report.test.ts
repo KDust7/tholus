@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import ts from "typescript";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { kindOf, renderReport, stripLeadingComment, surfaceOf } from "./report.js";
+import { declarationText, kindOf, renderReport, stripLeadingComment, surfaceOf } from "./report.js";
 
 const sandbox = mkdtempSync(resolve(tmpdir(), "api-report-"));
 
@@ -67,6 +67,12 @@ describe("the report describes what a package actually exports", () => {
   it("refuses a package that was never built, rather than reporting nothing", () => {
     expect(() => surfaceOf(resolve(sandbox, "absent.d.ts"))).toThrow(/build the package first/);
   });
+
+  it("reports nothing for a file that is not a module", () => {
+    const entry = resolve(sandbox, "script.d.ts");
+    writeFileSync(entry, "declare const notExported: number;" + String.fromCharCode(10), "utf8");
+    expect(surfaceOf(entry)).toEqual([]);
+  });
 });
 
 describe("the small pieces", () => {
@@ -87,6 +93,18 @@ describe("the small pieces", () => {
     expect(stripLeadingComment("export declare const a: number;")).toBe(
       "export declare const a: number;",
     );
+  });
+
+  it("gives up on a comment that is never closed rather than looping", () => {
+    expect(stripLeadingComment("/* never closed")).toBe("/* never closed");
+  });
+
+  it("returns nothing for a file that is only a line comment", () => {
+    expect(stripLeadingComment("// nothing follows")).toBe("");
+  });
+
+  it("has no signature to report for a symbol with no declaration", () => {
+    expect(declarationText({ declarations: undefined } as unknown as ts.Symbol)).toBe("");
   });
 
   it("renders a report a diff can be read from", () => {

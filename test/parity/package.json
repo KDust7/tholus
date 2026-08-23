@@ -17,6 +17,7 @@
     "@uv-wasm/core": "workspace:*",
     "@uv-wasm/engine-protocol": "workspace:*",
     "@uv-wasm/pyodide": "workspace:*",
+    "@xterm/headless": "^6.0.0",
     "pyodide": "314.0.5",
     "vitest": "^4.1.10",
     "ws": "^8.21.3"

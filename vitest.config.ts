@@ -20,13 +20,40 @@ export default defineConfig({
     coverage: {
       provider: "v8" as const,
       reporter: ["text", "json-summary", "html"],
-      include: ["packages/*/src/**/*.ts", "test/contract/src/**/*.ts"],
-      exclude: ["**/*.test.ts", "**/dist/**", "**/*.config.ts", "**/cli/**"],
+      include: [
+        "packages/*/src/**/*.ts",
+        "tools/*/src/**/*.ts",
+        "test/contract/src/**/*.ts",
+      ],
+      exclude: [
+        "**/*.test.ts",
+        "**/dist/**",
+        "**/*.config.ts",
+        "**/cli/**",
+        "**/src/cli.ts",
+      ],
       thresholds: {
         lines: 80,
         functions: 80,
         branches: 80,
         statements: 80,
+        ...Object.fromEntries(
+          [
+            "packages/core",
+            "packages/engine-protocol",
+            "packages/mock-engine",
+            "packages/pyodide",
+            "packages/transport-fetch",
+            "packages/transport-libcurl",
+            "packages/xterm",
+            "tools/api-report",
+            "tools/size-report",
+            "test/contract",
+          ].map((where) => [
+            `${where}/src/**`,
+            { lines: 80, functions: 80, branches: 80, statements: 80 },
+          ]),
+        ),
       },
     },
     projects: [
