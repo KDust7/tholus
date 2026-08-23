@@ -1,11 +1,16 @@
 # @uv-wasm/core
 
-123 public exports.
+124 public exports.
 
 ```ts
 export declare function applyHookWrites(vfs: HookVfs, writes: readonly HookWrite[]): void;
 
 export declare function assertInterpreter(vfs: ProfileReader, path?: string): void;
+
+export interface BootProgress {
+    phase: BootProgressMessage["phase"];
+    ms?: number;
+}
 
 BROWSER_PYTHON = "/bin/python3"
 
@@ -238,6 +243,7 @@ export interface EngineOptions {
     endpoint?: EndpointFactory;
     config?: EngineConfigInput;
     onEvent?: (event: EngineEvent) => void;
+    onBootProgress?: (progress: BootProgress) => void;
     handshakeTimeoutMs?: number;
     workerUrl?: URL | string;
 }

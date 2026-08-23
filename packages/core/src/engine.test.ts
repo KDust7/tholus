@@ -55,6 +55,52 @@ describe("handshake", () => {
   });
 });
 
+describe("boot progress", () => {
+  it("reports every phase the engine announces, in order", async () => {
+    const { endpoint } = engineWith();
+    const seen: string[] = [];
+
+    const engine = await createEngine({
+      endpoint,
+      onBootProgress: (progress) => seen.push(progress.phase),
+    });
+
+    expect(
+      seen,
+      "boot progress is emitted before the handshake settles, so a listener registered after it sees nothing",
+    ).toEqual(["compile-start", "compile-done", "init-start", "ready"]);
+    engine.terminate();
+  });
+
+  it("carries the timing the engine measured", async () => {
+    const { endpoint } = engineWith();
+    const timed: (number | undefined)[] = [];
+
+    const engine = await createEngine({
+      endpoint,
+      onBootProgress: (progress) => timed.push(progress.ms),
+    });
+
+    expect(timed.filter((ms) => ms !== undefined).length).toBeGreaterThan(0);
+    engine.terminate();
+  });
+
+  it("boots for a host that does not watch, and for one whose listener throws", async () => {
+    const quiet = await createEngine({ endpoint: engineWith().endpoint });
+    expect(quiet.build.protocol).toBe(PROTOCOL_VERSION);
+    quiet.terminate();
+
+    const noisy = await createEngine({
+      endpoint: engineWith().endpoint,
+      onBootProgress: () => {
+        throw new Error("the host is unhappy");
+      },
+    });
+    expect(noisy.build.protocol).toBe(PROTOCOL_VERSION);
+    noisy.terminate();
+  });
+});
+
 describe("exec", () => {
   it("streams stdout and resolves with the exit code", async () => {
     const { endpoint } = engineWith(listScript);

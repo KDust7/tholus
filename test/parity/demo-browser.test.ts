@@ -66,6 +66,7 @@ describe.skipIf(!canRun)("the demo runs uv in a terminal, in a real browser", ()
   let transcript = "";
   const log = emptyReplayLog();
   const pageErrors: string[] = [];
+  const bootPhases: string[] = [];
 
   beforeAll(async () => {
     const installable = await readSnapshot(fixture);
@@ -94,6 +95,34 @@ describe.skipIf(!canRun)("the demo runs uv in a terminal, in a real browser", ()
     browser = await launchBrowser();
     page = await browser.newPage();
     page.on("pageerror", (error) => pageErrors.push(error.message));
+    await page.exposeFunction("__bootPhase", (phase: string) => {
+      bootPhases.push(phase);
+    });
+    await page.addInitScript(() => {
+      const seen = new Set<string>();
+      const watch = (): void => {
+        const build = document.querySelector("#build");
+        if (!build) {
+          return;
+        }
+        new MutationObserver(() => {
+          const text = build.textContent ?? "";
+          for (const [phase, word] of [
+            ["compile-start", "compiling uv"],
+            ["compile-done", "compiled"],
+            ["init-start", "starting the engine"],
+            ["ready", "ready"],
+          ] as const) {
+            if (text.startsWith(word) && !seen.has(phase)) {
+              seen.add(phase);
+              (globalThis as unknown as { __bootPhase(p: string): void }).__bootPhase(phase);
+            }
+          }
+        }).observe(build, { childList: true, characterData: true, subtree: true });
+      };
+      document.addEventListener("DOMContentLoaded", watch);
+      watch();
+    });
     await page.goto(`${site.origin}/index.html`);
     await page.waitForFunction(() => "__demo" in globalThis, undefined, { timeout: 240_000 });
 
@@ -114,6 +143,13 @@ describe.skipIf(!canRun)("the demo runs uv in a terminal, in a real browser", ()
 
   it("boots uv and shows which build it is running", async () => {
     expect(await page.locator("#build").innerText()).toMatch(/^uv 0\.12\.3 · engine /);
+  });
+
+  it("said something about booting while it booted", () => {
+    expect(
+      bootPhases,
+      "the page showed `booting…` and nothing else until the engine was up",
+    ).toEqual(["compile-start", "compile-done", "init-start", "ready"]);
   });
 
   it("says on the page itself that it is unofficial", async () => {

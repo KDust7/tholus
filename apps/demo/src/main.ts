@@ -15,6 +15,13 @@ const SITE_PACKAGES = `${VENV}/lib/python3.14/site-packages`;
 const USER_AGENT = "uv/0.12.3 (+https://github.com/astral-sh/uv)";
 const PLATFORM = { kind: "platform" } as const;
 
+const BOOT_WORDS: Record<string, string> = {
+  "compile-start": "compiling uv…",
+  "compile-done": "compiled",
+  "init-start": "starting the engine…",
+  ready: "ready",
+};
+
 type Transport = typeof PLATFORM | ReturnType<typeof relayTransport>;
 
 export interface DemoHandle {
@@ -70,19 +77,27 @@ async function main(): Promise<void> {
   });
   terminal.open(el("#terminal"));
 
+  const build = el("#build");
+
   const start = async (transport: Transport): Promise<Engine> =>
-    createEngine({ config: { cwd: "/work", cache: { kind: "opfs" }, transport } });
+    createEngine({
+      config: { cwd: "/work", cache: { kind: "opfs" }, transport },
+      onBootProgress: ({ phase, ms }) => {
+        const said = BOOT_WORDS[phase] ?? phase;
+        build.textContent = ms === undefined ? said : `${said} in ${Math.round(ms)} ms`;
+      },
+    });
 
   let engine: Engine;
   try {
     engine = await start(PLATFORM);
   } catch (error) {
     terminal.write(`\r\nuv could not start: ${describe(error)}\r\n`);
-    el("#build").textContent = "failed to boot";
+    build.textContent = "failed to boot";
     return;
   }
 
-  el("#build").textContent = `uv ${engine.build.uv} · engine ${engine.build.engine}`;
+  build.textContent = `uv ${engine.build.uv} · engine ${engine.build.engine}`;
 
   let runtime: PyodideRuntime | undefined;
 
@@ -175,6 +190,7 @@ async function main(): Promise<void> {
     void engine.dispose();
     engine = replacement;
     session = attach(engine);
+    build.textContent = `uv ${engine.build.uv} · engine ${engine.build.engine}`;
     mount.disabled = false;
     status(wanted === "" ? "using this tab's own fetch" : `routing through ${wanted}`);
     connect.disabled = false;

@@ -1,4 +1,5 @@
 import {
+  type BootProgressMessage,
   type BuildIdentity,
   type EngineEvent,
   EXIT_CODE_CANCELLED,
@@ -77,10 +78,16 @@ export interface ExecHandle {
   cancel(reason?: string): void;
 }
 
+export interface BootProgress {
+  phase: BootProgressMessage["phase"];
+  ms?: number;
+}
+
 export interface EngineOptions {
   endpoint?: EndpointFactory;
   config?: EngineConfigInput;
   onEvent?: (event: EngineEvent) => void;
+  onBootProgress?: (progress: BootProgress) => void;
   handshakeTimeoutMs?: number;
   workerUrl?: URL | string;
 }
@@ -209,6 +216,22 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
     exports.clear();
   };
 
+  const reportBoot = (message: BootProgressMessage): void => {
+    try {
+      options.onBootProgress?.(
+        message.ms === undefined
+          ? { phase: message.phase }
+          : { phase: message.phase, ms: message.ms },
+      );
+    } catch {
+      dispatchEvent({
+        type: "log",
+        level: "warn",
+        message: "a boot-progress listener threw; the engine carried on",
+      });
+    }
+  };
+
   const handshake = new Promise<BuildIdentity>((resolve, reject) => {
     const timer = setTimeout(() => {
       endpoint.removeEventListener("message", onMessage);
@@ -220,6 +243,10 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
       try {
         message = parseWorkerMessage(event.data);
       } catch {
+        return;
+      }
+      if (message.type === "bootProgress") {
+        reportBoot(message);
         return;
       }
       if (message.type !== "initResult") {
@@ -273,7 +300,12 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
       return;
     }
 
-    if (message.type === "bootProgress" || message.type === "initResult") {
+    if (message.type === "bootProgress") {
+      reportBoot(message);
+      return;
+    }
+
+    if (message.type === "initResult") {
       return;
     }
 

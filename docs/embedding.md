@@ -72,6 +72,25 @@ These throw on failure, `ResolutionConflictError` when uv could not solve, `Unsu
 otherwise, where `exec` only reports a non-zero code. Use whichever failure style suits the surface
 you are building.
 
+## Watching it boot
+
+The engine fetches ~18 MiB of WebAssembly, compiles it, and initializes. On a cold cache that is not
+instant, and a page that says nothing during it looks broken:
+
+```ts
+const engine = await createEngine({
+  onBootProgress: ({ phase, ms }) => {
+    setStatus(ms === undefined ? phase : `${phase} in ${Math.round(ms)} ms`);
+  },
+});
+```
+
+Four phases arrive in order, `compile-start`, `compile-done`, `init-start`, `ready`, and the two
+that end a stage carry the milliseconds it took. They all arrive before `createEngine` resolves,
+which is the whole point and also the trap: a listener attached to the returned engine is too late to
+see any of them, so this is a `createEngine` option rather than an `onEvent` type. A listener that
+throws is reported as a `log` event and does not stop the boot.
+
 ## Watching progress
 
 ```ts
