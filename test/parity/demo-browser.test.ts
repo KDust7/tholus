@@ -157,6 +157,11 @@ ${transcript}`,
 
   it("reports an unknown flag the way uv does, rather than throwing", async () => {
     expect(await run(page, "uv --nonesuch")).toBe(2);
+    await page.waitForFunction(
+      () => document.querySelector(".xterm-screen")?.textContent?.includes("--nonesuch") === true,
+      undefined,
+      { timeout: 60_000 },
+    );
     expect(await screenOf(page)).toContain("--nonesuch");
   }, 120_000);
 

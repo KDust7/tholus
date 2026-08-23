@@ -6,7 +6,7 @@ import { extname, resolve } from "node:path";
 import { PROTOCOL_VERSION } from "@uv-wasm/engine-protocol";
 import type { Browser, Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { launchBrowser } from "./browser-harness.js";
+import { chosenBrowser, launchBrowser } from "./browser-harness.js";
 import { root } from "./cli-goldens.js";
 import { createReplayHandler, emptyReplayLog, readSnapshot } from "./replay-server.js";
 
@@ -81,160 +81,163 @@ interface Scope {
   __wipeOpfs(): Promise<boolean>;
 }
 
-describe.skipIf(!canRun)("uv's cache survives a reload through real opfs", () => {
-  let server: Server;
-  let browser: Browser;
-  let page: Page;
-  const log = emptyReplayLog();
-  let firstRound: string[] = [];
-  let secondRound: string[] = [];
+describe.skipIf(!canRun || chosenBrowser() !== "chromium")(
+  "uv's cache survives a reload through real opfs (chromium only: clearing the browser's own HTTP cache needs CDP, and without that this measures their cache rather than ours)",
+  () => {
+    let server: Server;
+    let browser: Browser;
+    let page: Page;
+    const log = emptyReplayLog();
+    let firstRound: string[] = [];
+    let secondRound: string[] = [];
 
-  beforeAll(async () => {
-    const replay = createReplayHandler(await readSnapshot(fixture), log);
-    const statics = new Map<string, string>([
-      ["/dist/worker.js", resolve(dist, "worker.js")],
-      ["/assets/engine.js", resolve(assets, "engine.js")],
-      ["/assets/engine_bg.wasm", resolve(assets, "engine_bg.wasm")],
-    ]);
-
-    server = createServer((request, response) => {
-      const url = request.url ?? "/";
-      if (url.startsWith("/simple/") || url.startsWith("/files/")) {
-        replay(request, response);
-        return;
-      }
-      const file = statics.get(url.split("?")[0] ?? "");
-      if (file !== undefined) {
-        readFile(file)
-          .then((body) => {
-            response
-              .writeHead(200, { "content-type": TYPES[extname(file)] ?? "text/plain" })
-              .end(body);
-          })
-          .catch(() => response.writeHead(500).end());
-        return;
-      }
-      response.writeHead(200, { "content-type": "text/html" }).end(PAGE);
-    });
-    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
-    log.origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-
-    browser = await launchBrowser();
-    page = await browser.newPage();
-    await page.goto(`${log.origin}/index.html`);
-    await page.evaluate(() => (globalThis as unknown as Scope).__wipeOpfs());
-
-    const boot = async (id: string): Promise<void> => {
-      await page.evaluate(
-        ([worker, version]) => {
-          const scope = globalThis as unknown as Scope;
-          scope.__boot(worker);
-          scope.__send(worker, {
-            type: "init",
-            id: "i1",
-            protocolVersion: version,
-            config: { cache: { kind: "opfs" }, cwd: "/" },
-          });
-        },
-        [id, PROTOCOL_VERSION] as const,
-      );
-      const seen = (await page.evaluate(
-        ([worker, budget]) =>
-          (globalThis as unknown as Scope).__await(worker, "initResult", budget as number),
-        [id, 240_000] as const,
-      )) as Emitted[];
-      const result = seen.find((message) => message.type === "initResult");
-      expect(result?.outcome, `worker ${id} failed to boot`).toMatchObject({ ok: true });
-    };
-
-    let invocation = 0;
-    const run = async (id: string, argv: string[]): Promise<Emitted[]> => {
-      invocation += 1;
-      await page.evaluate(
-        ([worker, args, tag]) => {
-          (globalThis as unknown as Scope).__send(worker as string, {
-            type: "exec",
-            invocationId: tag,
-            argv: args,
-          });
-        },
-        [id, argv, `inv-${invocation}`] as [string, string[], string],
-      );
-      const seen = (await page.evaluate(
-        ([worker, budget]) =>
-          (globalThis as unknown as Scope).__await(worker, "exit", budget as number),
-        [id, 300_000] as const,
-      )) as Emitted[];
-      const exit = seen.findLast((message) => message.type === "exit");
-      const stderr = Buffer.from(
-        seen
-          .filter((message) => message.type === "output" && message.stream === "stderr")
-          .flatMap((message) => message.data as number[]),
-      ).toString("utf8");
-      expect(exit, `${argv.join(" ")} never exited`).toBeDefined();
-      expect(exit?.code, `${argv.join(" ")} failed: ${stderr}`).toBe(0);
-      return seen;
-    };
-
-    const install = async (id: string, home: string): Promise<void> => {
-      await run(id, ["venv", `${home}/.venv`, "--python", "/bin/python3"]);
-      await run(id, [
-        "pip",
-        "install",
-        "idna==3.11",
-        "--index-url",
-        `${log.origin}/simple`,
-        "--python",
-        `${home}/.venv`,
+    beforeAll(async () => {
+      const replay = createReplayHandler(await readSnapshot(fixture), log);
+      const statics = new Map<string, string>([
+        ["/dist/worker.js", resolve(dist, "worker.js")],
+        ["/assets/engine.js", resolve(assets, "engine.js")],
+        ["/assets/engine_bg.wasm", resolve(assets, "engine_bg.wasm")],
       ]);
-      await run(id, ["--version"]);
-    };
 
-    await boot("a");
-    const before = log.requested.length;
-    await install("a", "/first");
-    firstRound = log.requested.slice(before);
-    await page.evaluate((worker) => (globalThis as unknown as Scope).__kill(worker), "a");
+      server = createServer((request, response) => {
+        const url = request.url ?? "/";
+        if (url.startsWith("/simple/") || url.startsWith("/files/")) {
+          replay(request, response);
+          return;
+        }
+        const file = statics.get(url.split("?")[0] ?? "");
+        if (file !== undefined) {
+          readFile(file)
+            .then((body) => {
+              response
+                .writeHead(200, { "content-type": TYPES[extname(file)] ?? "text/plain" })
+                .end(body);
+            })
+            .catch(() => response.writeHead(500).end());
+          return;
+        }
+        response.writeHead(200, { "content-type": "text/html" }).end(PAGE);
+      });
+      await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+      log.origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send("Network.clearBrowserCache");
-    await cdp.detach();
+      browser = await launchBrowser();
+      page = await browser.newPage();
+      await page.goto(`${log.origin}/index.html`);
+      await page.evaluate(() => (globalThis as unknown as Scope).__wipeOpfs());
 
-    await boot("b");
-    const between = log.requested.length;
-    await install("b", "/second");
-    secondRound = log.requested.slice(between);
+      const boot = async (id: string): Promise<void> => {
+        await page.evaluate(
+          ([worker, version]) => {
+            const scope = globalThis as unknown as Scope;
+            scope.__boot(worker);
+            scope.__send(worker, {
+              type: "init",
+              id: "i1",
+              protocolVersion: version,
+              config: { cache: { kind: "opfs" }, cwd: "/" },
+            });
+          },
+          [id, PROTOCOL_VERSION] as const,
+        );
+        const seen = (await page.evaluate(
+          ([worker, budget]) =>
+            (globalThis as unknown as Scope).__await(worker, "initResult", budget as number),
+          [id, 240_000] as const,
+        )) as Emitted[];
+        const result = seen.find((message) => message.type === "initResult");
+        expect(result?.outcome, `worker ${id} failed to boot`).toMatchObject({ ok: true });
+      };
 
-    await new Promise<void>((done) => server.close(() => done()));
-  }, 900_000);
+      let invocation = 0;
+      const run = async (id: string, argv: string[]): Promise<Emitted[]> => {
+        invocation += 1;
+        await page.evaluate(
+          ([worker, args, tag]) => {
+            (globalThis as unknown as Scope).__send(worker as string, {
+              type: "exec",
+              invocationId: tag,
+              argv: args,
+            });
+          },
+          [id, argv, `inv-${invocation}`] as [string, string[], string],
+        );
+        const seen = (await page.evaluate(
+          ([worker, budget]) =>
+            (globalThis as unknown as Scope).__await(worker, "exit", budget as number),
+          [id, 300_000] as const,
+        )) as Emitted[];
+        const exit = seen.findLast((message) => message.type === "exit");
+        const stderr = Buffer.from(
+          seen
+            .filter((message) => message.type === "output" && message.stream === "stderr")
+            .flatMap((message) => message.data as number[]),
+        ).toString("utf8");
+        expect(exit, `${argv.join(" ")} never exited`).toBeDefined();
+        expect(exit?.code, `${argv.join(" ")} failed: ${stderr}`).toBe(0);
+        return seen;
+      };
 
-  afterAll(async () => {
-    await browser?.close();
-  }, 180_000);
+      const install = async (id: string, home: string): Promise<void> => {
+        await run(id, ["venv", `${home}/.venv`, "--python", "/bin/python3"]);
+        await run(id, [
+          "pip",
+          "install",
+          "idna==3.11",
+          "--index-url",
+          `${log.origin}/simple`,
+          "--python",
+          `${home}/.venv`,
+        ]);
+        await run(id, ["--version"]);
+      };
 
-  it("downloads the index and the distribution in the first tab", () => {
-    expect(
-      firstRound.filter((url) => url.startsWith("/files/")).length,
-      `the first tab fetched no distribution, so the second proves nothing: ${firstRound.join(", ")}`,
-    ).toBe(2);
-  });
+      await boot("a");
+      const before = log.requested.length;
+      await install("a", "/first");
+      firstRound = log.requested.slice(before);
+      await page.evaluate((worker) => (globalThis as unknown as Scope).__kill(worker), "a");
 
-  it("downloads no distribution in the second tab, having found it in opfs", () => {
-    expect(
-      secondRound.filter((url) => url.startsWith("/files/")),
-      "a fresh tab re-downloaded a distribution the cold store was holding",
-    ).toEqual([]);
-  });
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send("Network.clearBrowserCache");
+      await cdp.detach();
 
-  it("still reaches the network for the index, so the browser cache is not doing the work", () => {
-    expect(
-      secondRound.length,
-      "the second tab made no request at all; the browser's own http cache is answering, " +
-        "so this file cannot tell uv's cache from Chrome's",
-    ).toBeGreaterThan(0);
-  });
+      await boot("b");
+      const between = log.requested.length;
+      await install("b", "/second");
+      secondRound = log.requested.slice(between);
 
-  it("never asked the fixture for anything it had not recorded", () => {
-    expect(log.misses).toEqual([]);
-  });
-});
+      await new Promise<void>((done) => server.close(() => done()));
+    }, 900_000);
+
+    afterAll(async () => {
+      await browser?.close();
+    }, 180_000);
+
+    it("downloads the index and the distribution in the first tab", () => {
+      expect(
+        firstRound.filter((url) => url.startsWith("/files/")).length,
+        `the first tab fetched no distribution, so the second proves nothing: ${firstRound.join(", ")}`,
+      ).toBe(2);
+    });
+
+    it("downloads no distribution in the second tab, having found it in opfs", () => {
+      expect(
+        secondRound.filter((url) => url.startsWith("/files/")),
+        "a fresh tab re-downloaded a distribution the cold store was holding",
+      ).toEqual([]);
+    });
+
+    it("still reaches the network for the index, so the browser cache is not doing the work", () => {
+      expect(
+        secondRound.length,
+        "the second tab made no request at all; the browser's own http cache is answering, " +
+          "so this file cannot tell uv's cache from Chrome's",
+      ).toBeGreaterThan(0);
+    });
+
+    it("never asked the fixture for anything it had not recorded", () => {
+      expect(log.misses).toEqual([]);
+    });
+  },
+);

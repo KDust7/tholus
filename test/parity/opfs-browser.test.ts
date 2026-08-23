@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import { extname, resolve } from "node:path";
 import type { Browser, Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { launchBrowser } from "./browser-harness.js";
+import { chosenBrowser, launchBrowser } from "./browser-harness.js";
 import { root } from "./cli-goldens.js";
 
 const dist = resolve(root, "packages/core/dist");
@@ -31,94 +31,96 @@ interface Probe {
   detail: string;
 }
 
-describe.skipIf(!isBuilt)("the cold store works against a real origin private filesystem", () => {
-  let server: Server;
-  let browser: Browser;
-  let page: Page;
+describe.skipIf(!isBuilt || chosenBrowser() === "webkit")(
+  "the cold store works against a real origin private filesystem (not on webkit: playwright's build exposes no navigator.storage.getDirectory)",
+  () => {
+    let server: Server;
+    let browser: Browser;
+    let page: Page;
 
-  const scripts = new Map<string, string>();
+    const scripts = new Map<string, string>();
 
-  beforeAll(async () => {
-    server = createServer((request, response) => {
-      const url = (request.url ?? "/").split("?")[0] ?? "/";
-      const script = scripts.get(url);
-      if (script !== undefined) {
-        response.writeHead(200, { "content-type": "text/javascript" }).end(script);
-        return;
-      }
-      if (url.startsWith("/dist/")) {
-        const file = resolve(dist, url.slice("/dist/".length));
-        if (file.startsWith(dist) && existsSync(file)) {
-          readFile(file)
-            .then((body) => {
-              response
-                .writeHead(200, {
-                  "content-type": TYPES[extname(file)] ?? "application/octet-stream",
-                })
-                .end(body);
-            })
-            .catch(() => response.writeHead(500).end());
+    beforeAll(async () => {
+      server = createServer((request, response) => {
+        const url = (request.url ?? "/").split("?")[0] ?? "/";
+        const script = scripts.get(url);
+        if (script !== undefined) {
+          response.writeHead(200, { "content-type": "text/javascript" }).end(script);
           return;
         }
-        response.writeHead(404).end();
-        return;
-      }
-      response.writeHead(200, { "content-type": "text/html" }).end(PAGE);
-    });
-    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
-    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-
-    browser = await launchBrowser();
-    page = await browser.newPage();
-    await page.goto(`${origin}/index.html`);
-  }, 180_000);
-
-  afterAll(async () => {
-    await browser?.close();
-    await new Promise<void>((done) => server?.close(() => done()));
-  }, 180_000);
-
-  let scriptCounter = 0;
-
-  const serve = (source: string): string => {
-    scriptCounter += 1;
-    const url = `/probe-${scriptCounter}.js`;
-    scripts.set(url, source);
-    return url;
-  };
-
-  const runInWorker = async (body: string, timeoutMs = 60_000): Promise<Probe[]> => {
-    return page.evaluate(
-      async ([url, budget]) => {
-        const worker = new Worker(url as string, { type: "module" });
-        try {
-          return await new Promise<Probe[]>((done, fail) => {
-            const timer = setTimeout(() => fail(new Error("the worker never answered")), budget);
-            worker.addEventListener("message", (event) => {
-              clearTimeout(timer);
-              done(event.data as Probe[]);
-            });
-            worker.addEventListener("error", (event) => {
-              clearTimeout(timer);
-              fail(new Error(`${event.message} (${event.filename}:${event.lineno})`));
-            });
-          });
-        } finally {
-          worker.terminate();
+        if (url.startsWith("/dist/")) {
+          const file = resolve(dist, url.slice("/dist/".length));
+          if (file.startsWith(dist) && existsSync(file)) {
+            readFile(file)
+              .then((body) => {
+                response
+                  .writeHead(200, {
+                    "content-type": TYPES[extname(file)] ?? "application/octet-stream",
+                  })
+                  .end(body);
+              })
+              .catch(() => response.writeHead(500).end());
+            return;
+          }
+          response.writeHead(404).end();
+          return;
         }
-      },
-      [serve(body), timeoutMs] as const,
-    );
-  };
+        response.writeHead(200, { "content-type": "text/html" }).end(PAGE);
+      });
+      await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+      const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
-  const expectAllPassed = (probes: Probe[]): void => {
-    const failed = probes.filter((probe) => !probe.ok);
-    expect(failed.map((probe) => `${probe.name}: ${probe.detail}`)).toEqual([]);
-    expect(probes.length).toBeGreaterThan(0);
-  };
+      browser = await launchBrowser();
+      page = await browser.newPage();
+      await page.goto(`${origin}/index.html`);
+    }, 180_000);
 
-  it("round trips blobs, nested paths, removal and the manifest", async () => {
-    const probes = await runInWorker(`
+    afterAll(async () => {
+      await browser?.close();
+      await new Promise<void>((done) => server?.close(() => done()));
+    }, 180_000);
+
+    let scriptCounter = 0;
+
+    const serve = (source: string): string => {
+      scriptCounter += 1;
+      const url = `/probe-${scriptCounter}.js`;
+      scripts.set(url, source);
+      return url;
+    };
+
+    const runInWorker = async (body: string, timeoutMs = 60_000): Promise<Probe[]> => {
+      return page.evaluate(
+        async ([url, budget]) => {
+          const worker = new Worker(url as string, { type: "module" });
+          try {
+            return await new Promise<Probe[]>((done, fail) => {
+              const timer = setTimeout(() => fail(new Error("the worker never answered")), budget);
+              worker.addEventListener("message", (event) => {
+                clearTimeout(timer);
+                done(event.data as Probe[]);
+              });
+              worker.addEventListener("error", (event) => {
+                clearTimeout(timer);
+                fail(new Error(`${event.message} (${event.filename}:${event.lineno})`));
+              });
+            });
+          } finally {
+            worker.terminate();
+          }
+        },
+        [serve(body), timeoutMs] as const,
+      );
+    };
+
+    const expectAllPassed = (probes: Probe[]): void => {
+      const failed = probes.filter((probe) => !probe.ok);
+      expect(failed.map((probe) => `${probe.name}: ${probe.detail}`)).toEqual([]);
+      expect(probes.length).toBeGreaterThan(0);
+    };
+
+    it("round trips blobs, nested paths, removal and the manifest", async () => {
+      const probes = await runInWorker(`
       import { openColdStore } from "/dist/opfs-store.js";
       const out = [];
       const say = (name, ok, detail = "") => out.push({ name, ok, detail: String(detail) });
@@ -172,11 +174,11 @@ describe.skipIf(!isBuilt)("the cold store works against a real origin private fi
       }
       postMessage(out);
     `);
-    expectAllPassed(probes);
-  });
+      expectAllPassed(probes);
+    });
 
-  it("survives a payload larger than one sync write, which is what a wheel is", async () => {
-    const probes = await runInWorker(`
+    it("survives a payload larger than one sync write, which is what a wheel is", async () => {
+      const probes = await runInWorker(`
       import { openColdStore } from "/dist/opfs-store.js";
       const out = [];
       try {
@@ -193,11 +195,11 @@ describe.skipIf(!isBuilt)("the cold store works against a real origin private fi
       }
       postMessage(out);
     `);
-    expectAllPassed(probes);
-  });
+      expectAllPassed(probes);
+    });
 
-  it("serializes two tabs holding the cache lock, so neither tears the other's flush", async () => {
-    const source = serve(`
+    it("serializes two tabs holding the cache lock, so neither tears the other's flush", async () => {
+      const source = serve(`
       import { CACHE_LOCK, webLocks } from "/dist/persistence.js";
       addEventListener("message", async (event) => {
         const held = await webLocks(CACHE_LOCK, async () => {
@@ -208,38 +210,39 @@ describe.skipIf(!isBuilt)("the cold store works against a real origin private fi
         postMessage({ id: event.data, held });
       });
     `);
-    const windows = await page.evaluate(async (url) => {
-      const workers = [new Worker(url, { type: "module" }), new Worker(url, { type: "module" })];
-      try {
-        const answers = workers.map(
-          (worker, index) =>
-            new Promise<{ id: number; held: [number, number] }>((done, fail) => {
-              const timer = setTimeout(() => fail(new Error("no answer")), 30_000);
-              worker.addEventListener("message", (event) => {
-                clearTimeout(timer);
-                done(event.data as { id: number; held: [number, number] });
-              });
-              worker.addEventListener("error", (event) => {
-                clearTimeout(timer);
-                fail(new Error(`${event.message} (${event.filename}:${event.lineno})`));
-              });
-              worker.postMessage(index);
-            }),
-        );
-        return await Promise.all(answers);
-      } finally {
-        for (const worker of workers) {
-          worker.terminate();
+      const windows = await page.evaluate(async (url) => {
+        const workers = [new Worker(url, { type: "module" }), new Worker(url, { type: "module" })];
+        try {
+          const answers = workers.map(
+            (worker, index) =>
+              new Promise<{ id: number; held: [number, number] }>((done, fail) => {
+                const timer = setTimeout(() => fail(new Error("no answer")), 30_000);
+                worker.addEventListener("message", (event) => {
+                  clearTimeout(timer);
+                  done(event.data as { id: number; held: [number, number] });
+                });
+                worker.addEventListener("error", (event) => {
+                  clearTimeout(timer);
+                  fail(new Error(`${event.message} (${event.filename}:${event.lineno})`));
+                });
+                worker.postMessage(index);
+              }),
+          );
+          return await Promise.all(answers);
+        } finally {
+          for (const worker of workers) {
+            worker.terminate();
+          }
         }
-      }
-    }, source);
+      }, source);
 
-    const held = windows.map((answer) => answer.held).sort((a, b) => a[0] - b[0]);
-    expect(held).toHaveLength(2);
-    const [first, second] = held as [[number, number], [number, number]];
-    expect(
-      second[0],
-      `the two tabs overlapped: ${JSON.stringify(held)}; the lock did not exclude`,
-    ).toBeGreaterThanOrEqual(first[1] - 1);
-  }, 120_000);
-});
+      const held = windows.map((answer) => answer.held).sort((a, b) => a[0] - b[0]);
+      expect(held).toHaveLength(2);
+      const [first, second] = held as [[number, number], [number, number]];
+      expect(
+        second[0],
+        `the two tabs overlapped: ${JSON.stringify(held)}; the lock did not exclude`,
+      ).toBeGreaterThanOrEqual(first[1] - 1);
+    }, 120_000);
+  },
+);
