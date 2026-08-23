@@ -1,0 +1,56 @@
+name: fork-native
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: fork-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: the fork still builds and tests as native uv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the fork
+        env:
+          FORK_TOKEN: ${{ secrets.FORK_TOKEN }}
+        run: |
+          if [ -z "$FORK_TOKEN" ]; then
+            echo "FORK_TOKEN is unset. GITHUB_TOKEN cannot read a second private repository,"
+            echo "so vendor/uv cannot be checked out. See docs/status.md."
+            exit 1
+          fi
+          git config --global \
+            url."https://x-access-token:${FORK_TOKEN}@github.com/KDust7/uv-wasm-fork".insteadOf \
+            "https://github.com/KDust7/uv-wasm-fork"
+          git submodule update --init --recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: vendor/uv
+
+      - name: Format
+        working-directory: vendor/uv
+        run: cargo fmt --check -p uv-vfs -p uv-wasm-compat -p uv-wasm-http
+
+      - name: Clippy
+        working-directory: vendor/uv
+        run: cargo clippy -p uv-vfs -p uv-wasm-compat -p uv-wasm-http --all-targets -- -D warnings
+
+      - name: The crates the port added pass their own tests
+        working-directory: vendor/uv
+        run: cargo test -p uv-vfs -p uv-wasm-compat -p uv-wasm-http
+
+      - name: Native uv still compiles, because it is the parity oracle
+        working-directory: vendor/uv
+        run: cargo check --workspace

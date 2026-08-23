@@ -1,0 +1,112 @@
+name: rebase-canary
+
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      onto:
+        description: "Upstream ref to trial-rebase onto"
+        required: false
+        default: "main"
+
+concurrency:
+  group: rebase-canary
+  cancel-in-progress: true
+
+jobs:
+  trial:
+    name: the fork can still be carried forward
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the fork
+        env:
+          FORK_TOKEN: ${{ secrets.FORK_TOKEN }}
+        run: |
+          if [ -z "$FORK_TOKEN" ]; then
+            echo "FORK_TOKEN is unset, so the fork cannot be read. See docs/status.md."
+            exit 1
+          fi
+          git config --global \
+            url."https://x-access-token:${FORK_TOKEN}@github.com/KDust7/uv-wasm-fork".insteadOf \
+            "https://github.com/KDust7/uv-wasm-fork"
+          git submodule update --init --recursive
+
+      - name: Trial-rebase onto upstream, and report rather than push
+        id: trial
+        working-directory: vendor/uv
+        env:
+          ONTO: ${{ inputs.onto || 'main' }}
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/canary"
+          report="$RUNNER_TEMP/canary/report.md"
+
+          git config user.email "canary@example.invalid"
+          git config user.name "rebase canary"
+          git remote add trial https://github.com/astral-sh/uv 2>/dev/null || true
+          git fetch --no-tags trial "$ONTO"
+
+          base=$(git merge-base HEAD FETCH_HEAD)
+          carried=$(git rev-list --count "$base"..HEAD)
+          upstream=$(git rev-list --count "$base"..FETCH_HEAD)
+
+          {
+            echo "# Rebase canary"
+            echo
+            echo "- Fork commits carried: **$carried**"
+            echo "- Upstream commits since the base: **$upstream**"
+            echo "- Trialled onto: \`$ONTO\` ($(git rev-parse --short FETCH_HEAD))"
+            echo
+          } > "$report"
+
+          if git rebase FETCH_HEAD > "$RUNNER_TEMP/canary/rebase.log" 2>&1; then
+            echo "clean=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Clean"
+              echo
+              echo "Every carried commit replayed without conflict."
+              echo
+              echo '```'
+              git range-diff "$base"..ORIG_HEAD FETCH_HEAD..HEAD || true
+              echo '```'
+            } >> "$report"
+          else
+            echo "clean=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Conflicted"
+              echo
+              echo "The rebase stopped. Nothing was pushed; this is a canary, not a migration."
+              echo
+              echo '### Files in conflict'
+              echo '```'
+              git diff --name-only --diff-filter=U || true
+              echo '```'
+              echo
+              echo '### Rebase output'
+              echo '```'
+              tail -n 60 "$RUNNER_TEMP/canary/rebase.log" || true
+              echo '```'
+            } >> "$report"
+            git rebase --abort || true
+          fi
+
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rebase-canary
+          path: ${{ runner.temp }}/canary/
+          retention-days: 30
+
+      - name: Say plainly whether the fork still rebases
+        run: |
+          if [ "${{ steps.trial.outputs.clean }}" = "true" ]; then
+            echo "The fork rebases cleanly onto upstream."
+          else
+            echo "::warning::The fork no longer rebases cleanly onto upstream."
+            echo "This is a canary. It reports drift; it does not gate a merge."
+          fi
