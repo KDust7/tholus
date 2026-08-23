@@ -1,0 +1,80 @@
+name: nightly
+
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+    inputs:
+      browser:
+        description: "Run only this browser"
+        required: false
+        default: ""
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+env:
+  WASM_BINDGEN_VERSION: 0.2.126
+
+jobs:
+  browsers:
+    name: the browser gates on ${{ matrix.browser }}
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.browser != 'chromium' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the fork
+        env:
+          FORK_TOKEN: ${{ secrets.FORK_TOKEN }}
+        run: |
+          if [ -z "$FORK_TOKEN" ]; then
+            echo "FORK_TOKEN is unset, so vendor/uv cannot be checked out. See docs/status.md."
+            exit 1
+          fi
+          git config --global \
+            url."https://x-access-token:${FORK_TOKEN}@github.com/KDust7/uv-wasm-fork".insteadOf \
+            "https://github.com/KDust7/uv-wasm-fork"
+          git submodule update --init --recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@${{ env.WASM_BINDGEN_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --linker=isolated --frozen-lockfile
+
+      - name: Build packages
+        run: bun run build
+
+      - name: Build wasm artifact
+        run: cargo xtask build --skip-opt
+
+      - name: Install ${{ matrix.browser }}
+        run: bun run playwright install --with-deps ${{ matrix.browser }}
+
+      - name: The browser gates
+        if: inputs.browser == '' || inputs.browser == matrix.browser
+        env:
+          UV_WASM_BROWSER: ${{ matrix.browser }}
+        run: bun run vitest run --project browser
+
+      - name: Say what a non-Chromium failure means
+        if: failure() && matrix.browser != 'chromium'
+        run: |
+          echo "::warning::The browser gates failed on ${{ matrix.browser }}."
+          echo "Chromium is the per-PR gate; this run reports engine drift rather than blocking."

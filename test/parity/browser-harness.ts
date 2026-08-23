@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, resolve } from "node:path";
-import { type Browser, chromium } from "playwright";
+import { type Browser, type BrowserType, chromium, firefox, webkit } from "playwright";
 
 const TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -17,11 +17,25 @@ export function contentTypeOf(path: string): string {
   return TYPES[extname(path)] ?? "application/octet-stream";
 }
 
-export async function launchChromium(): Promise<Browser> {
+const ENGINES: Record<string, BrowserType> = { chromium, firefox, webkit };
+
+export function chosenBrowser(): string {
+  const named = process.env["UV_WASM_BROWSER"] ?? "chromium";
+  if (!(named in ENGINES)) {
+    throw new Error(
+      `UV_WASM_BROWSER is \`${named}\`, which is not one of ${Object.keys(ENGINES).join(", ")}`,
+    );
+  }
+  return named;
+}
+
+export async function launchBrowser(): Promise<Browser> {
+  const named = chosenBrowser();
+  const engine = ENGINES[named] as BrowserType;
   try {
-    return await chromium.launch();
+    return await engine.launch();
   } catch (error) {
-    if (!String(error).includes("Executable doesn't exist")) {
+    if (named !== "chromium" || !String(error).includes("Executable doesn't exist")) {
       throw error;
     }
     return await chromium.launch({ channel: "chrome" });

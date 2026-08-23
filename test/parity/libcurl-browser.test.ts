@@ -6,9 +6,11 @@ import type { AddressInfo } from "node:net";
 import { connect, type Socket } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type Browser, chromium, type Page } from "playwright";
+import type { Browser, Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WebSocketServer } from "ws";
+
+import { launchBrowser } from "./browser-harness.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const transportPackage = resolve(root, "packages/transport-libcurl/package.json");
@@ -72,17 +74,6 @@ interface RunResult {
 
 interface LibcurlWindow {
   __run: (origin: string, relayUrl: string) => Promise<RunResult>;
-}
-
-async function launchChromium(): Promise<Browser> {
-  try {
-    return await chromium.launch();
-  } catch (error) {
-    if (!String(error).includes("Executable doesn't exist")) {
-      throw error;
-    }
-    return await chromium.launch({ channel: "chrome" });
-  }
 }
 
 function startOrigin(): Promise<{ server: Server; origin: string; port: number }> {
@@ -188,7 +179,7 @@ describe.skipIf(!canRun)(
         socket.on("close", () => upstream.destroy());
       });
 
-      browser = await launchChromium();
+      browser = await launchBrowser();
       page = await browser.newPage();
       await page.goto(`http://127.0.0.1:${pagePort}/index.html`);
 

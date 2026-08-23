@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { Browser, Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { launchChromium, type StaticSite, serveStatic, testbedFiles } from "./browser-harness.js";
+import { launchBrowser, type StaticSite, serveStatic, testbedFiles } from "./browser-harness.js";
 import { createReplayHandler, emptyReplayLog, readSnapshot } from "./replay-server.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -63,7 +63,7 @@ describe.skipIf(!canRun)("the testbed drives uv end to end in a real browser", (
     });
     log.origin = site.origin;
 
-    browser = await launchChromium();
+    browser = await launchBrowser();
     page = await browser.newPage();
     await page.goto(`${site.origin}/index.html`);
     await page.waitForFunction(() => "__uv" in globalThis);

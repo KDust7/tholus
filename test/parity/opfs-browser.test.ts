@@ -3,9 +3,9 @@ import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, resolve } from "node:path";
-import { type Browser, chromium, type Page } from "playwright";
+import type { Browser, Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+import { launchBrowser } from "./browser-harness.js";
 import { root } from "./cli-goldens.js";
 
 const dist = resolve(root, "packages/core/dist");
@@ -29,17 +29,6 @@ interface Probe {
   name: string;
   ok: boolean;
   detail: string;
-}
-
-async function launchChromium(): Promise<Browser> {
-  try {
-    return await chromium.launch();
-  } catch (error) {
-    if (!String(error).includes("Executable doesn't exist")) {
-      throw error;
-    }
-    return await chromium.launch({ channel: "chrome" });
-  }
 }
 
 describe.skipIf(!isBuilt)("the cold store works against a real origin private filesystem", () => {
@@ -79,7 +68,7 @@ describe.skipIf(!isBuilt)("the cold store works against a real origin private fi
     await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
     const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
-    browser = await launchChromium();
+    browser = await launchBrowser();
     page = await browser.newPage();
     await page.goto(`${origin}/index.html`);
   }, 180_000);

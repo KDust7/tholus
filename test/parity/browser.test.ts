@@ -5,8 +5,10 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type Browser, chromium, type Page } from "playwright";
+import type { Browser, Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { launchBrowser } from "./browser-harness.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const assets = resolve(root, "packages/core/assets");
@@ -55,17 +57,6 @@ interface Output {
   stderr: string;
 }
 
-async function launchChromium(): Promise<Browser> {
-  try {
-    return await chromium.launch();
-  } catch (error) {
-    if (!String(error).includes("Executable doesn't exist")) {
-      throw error;
-    }
-    return await chromium.launch({ channel: "chrome" });
-  }
-}
-
 describe.skipIf(!isBuilt)("the engine runs in headless chromium", () => {
   let server: Server;
   let browser: Browser;
@@ -87,7 +78,7 @@ describe.skipIf(!isBuilt)("the engine runs in headless chromium", () => {
     await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
     origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
-    browser = await launchChromium();
+    browser = await launchBrowser();
     page = await browser.newPage();
     await page.goto(`${origin}/index.html`);
     await page.evaluate(() => (globalThis as unknown as EngineWindow).__ready);
