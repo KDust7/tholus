@@ -103,6 +103,81 @@
         }
       ]
     },
+    "transport": {
+      "default": {
+        "kind": "platform"
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "platform"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "fetch"
+            },
+            "rewriteHead": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "libcurl"
+            },
+            "moduleUrl": {
+              "type": "string"
+            },
+            "wasmUrl": {
+              "type": "string"
+            },
+            "relayUrl": {
+              "type": "string"
+            },
+            "userAgent": {
+              "type": "string"
+            },
+            "maxConnections": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "connectionCache": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "connectionsPerHost": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "kind",
+            "moduleUrl",
+            "relayUrl"
+          ]
+        }
+      ]
+    },
     "index": {
       "default": {},
       "type": "object",

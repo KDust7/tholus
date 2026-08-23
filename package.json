@@ -28,7 +28,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage packages tools test/contract",
-    "build": "bun run --filter './packages/*' build",
+    "build": "bun run --filter './packages/*' build && bun run --filter './apps/*' build",
     "wasm:build": "cargo xtask build",
     "size": "bun run --filter @uv-wasm/size-report report"
   },
