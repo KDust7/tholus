@@ -1,11 +1,12 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { normalizeReport } from "./normalize-report.js";
 import { type ReplayServer, startReplayServer } from "./replay-server.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -58,13 +59,55 @@ interface EngineModule {
   Engine: new () => EngineInstance;
 }
 
+interface Variant {
+  name: string;
+  args: string[];
+  expected: string;
+  expectedReport?: string;
+}
+
 interface Snapshot {
   requirements: string[];
   args: string[];
   expected?: string;
+  expectedReport?: string;
+  variants?: Variant[];
   recordedFrom?: string;
   failing?: boolean;
 }
+
+interface Case {
+  scenario: string;
+  label: string;
+  extra: string[];
+  expected?: string;
+  report?: string;
+}
+
+const read = (name: string): Snapshot =>
+  JSON.parse(readFileSync(resolve(fixtures, name, "snapshot.json"), "utf8")) as Snapshot;
+
+const snapshots = new Map(available.map((name) => [name, read(name)] as const));
+
+const cases: Case[] = available.flatMap((name) => {
+  const snapshot = snapshots.get(name) as Snapshot;
+  return [
+    {
+      scenario: name,
+      label: name,
+      extra: [],
+      expected: snapshot.expected,
+      report: snapshot.expectedReport,
+    },
+    ...(snapshot.variants ?? []).map((variant) => ({
+      scenario: name,
+      label: `${name} ${variant.name}`,
+      extra: variant.args,
+      expected: variant.expected,
+      report: variant.expectedReport,
+    })),
+  ];
+});
 
 interface NativeRun {
   status: number | null;
@@ -112,12 +155,11 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
     }
   });
 
-  for (const name of available) {
-    it(`resolves \`${name}\` to the same output as native uv`, async () => {
+  for (const entry of cases) {
+    it(`resolves \`${entry.label}\` to the same output as native uv`, async () => {
+      const name = entry.scenario;
       const dir = resolve(fixtures, name);
-      const snapshot = JSON.parse(
-        await readFile(resolve(dir, "snapshot.json"), "utf8"),
-      ) as Snapshot;
+      const snapshot = snapshots.get(name) as Snapshot;
       const requirements = `${snapshot.requirements.join("\n")}\n`;
 
       let server: ReplayServer | undefined;
@@ -127,6 +169,7 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
           ...snapshot.args,
           "--index-url",
           `${server?.origin}/simple`,
+          ...entry.extra,
           "--directory",
           directory,
         ];
@@ -168,8 +211,11 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
           "one of the two sides asked for something the snapshot does not hold; re-record it",
         ).toEqual([]);
 
-        const golden = snapshot.expected;
-        expect(golden, `${name} was recorded before goldens existed; re-record it`).toBeDefined();
+        const golden = entry.expected;
+        expect(
+          golden,
+          `${entry.label} was recorded before goldens existed; re-record it`,
+        ).toBeDefined();
         expect(
           golden?.length,
           "the recorded golden is empty, so it would agree with anything",
@@ -177,6 +223,16 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
         expect(browserOut).toBe(golden);
         if (live) {
           expect(live.stdout, "the live binary disagrees with the golden; re-record").toBe(golden);
+        }
+
+        if (entry.report !== undefined) {
+          expect(normalizeReport(browserErr)).toBe(normalizeReport(entry.report));
+          if (live) {
+            expect(
+              normalizeReport(live.stderr),
+              "the live binary reports differently from the golden; re-record",
+            ).toBe(normalizeReport(entry.report));
+          }
         }
       } finally {
         await server?.close();

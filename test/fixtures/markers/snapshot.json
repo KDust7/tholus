@@ -1,6 +1,6 @@
 {
-  "recordedAt": "2026-08-19T23:57:21.193Z",
-  "recordedFrom": "7a5e5a1da",
+  "recordedAt": "2026-08-23T16:37:14.190Z",
+  "recordedFrom": "7454ab4b3",
   "requirements": [
     "idna==3.11; python_version >= '3.10'"
   ],
@@ -14,6 +14,17 @@
     "--no-header"
   ],
   "expected": "idna==3.11\n    # via -r requirements.in\n",
+  "expectedReport": "Resolved 1 package in 562ms\n",
+  "variants": [
+    {
+      "name": "no-annotate",
+      "args": [
+        "--no-annotate"
+      ],
+      "expected": "idna==3.11\n",
+      "expectedReport": "Resolved 1 package in 177ms\n"
+    }
+  ],
   "responses": {
     "/simple/idna/": {
       "status": 200,

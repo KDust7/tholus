@@ -1,6 +1,6 @@
 {
-  "recordedAt": "2026-08-19T23:57:27.180Z",
-  "recordedFrom": "7a5e5a1da",
+  "recordedAt": "2026-08-23T16:35:25.257Z",
+  "recordedFrom": "7454ab4b3",
   "requirements": [
     "msgpack==1.1.2"
   ],
@@ -16,6 +16,25 @@
     "3.14"
   ],
   "expected": "msgpack==1.1.2\n    # via -r requirements.in\n",
+  "expectedReport": "Resolved 1 package in 2.22s\n",
+  "variants": [
+    {
+      "name": "no-annotate",
+      "args": [
+        "--no-annotate"
+      ],
+      "expected": "msgpack==1.1.2\n",
+      "expectedReport": "Resolved 1 package in 198ms\n"
+    },
+    {
+      "name": "no-deps",
+      "args": [
+        "--no-deps"
+      ],
+      "expected": "msgpack==1.1.2\n    # via -r requirements.in\n",
+      "expectedReport": "Resolved 1 package in 131ms\n"
+    }
+  ],
   "responses": {
     "/simple/msgpack/": {
       "status": 200,

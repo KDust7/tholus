@@ -1,6 +1,6 @@
 {
-  "recordedAt": "2026-08-19T23:57:20.537Z",
-  "recordedFrom": "7a5e5a1da",
+  "recordedAt": "2026-08-23T16:34:46.479Z",
+  "recordedFrom": "7454ab4b3",
   "requirements": [
     "idna==3.11"
   ],
@@ -14,6 +14,51 @@
     "--no-header"
   ],
   "expected": "idna==3.11\n    # via -r requirements.in\n",
+  "expectedReport": "Resolved 1 package in 303ms\n",
+  "variants": [
+    {
+      "name": "no-annotate",
+      "args": [
+        "--no-annotate"
+      ],
+      "expected": "idna==3.11\n",
+      "expectedReport": "Resolved 1 package in 112ms\n"
+    },
+    {
+      "name": "annotation-line",
+      "args": [
+        "--annotation-style",
+        "line"
+      ],
+      "expected": "idna==3.11                # via -r requirements.in\n",
+      "expectedReport": "Resolved 1 package in 104ms\n"
+    },
+    {
+      "name": "no-deps",
+      "args": [
+        "--no-deps"
+      ],
+      "expected": "idna==3.11\n    # via -r requirements.in\n",
+      "expectedReport": "Resolved 1 package in 73ms\n"
+    },
+    {
+      "name": "quiet",
+      "args": [
+        "--quiet"
+      ],
+      "expected": "idna==3.11\n    # via -r requirements.in\n",
+      "expectedReport": ""
+    },
+    {
+      "name": "platform-linux",
+      "args": [
+        "--python-platform",
+        "linux"
+      ],
+      "expected": "idna==3.11\n    # via -r requirements.in\n",
+      "expectedReport": "Resolved 1 package in 77ms\n"
+    }
+  ],
   "responses": {
     "/simple/idna/": {
       "status": 200,

@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-08-23T12:13:28.463Z",
+  "recordedAt": "2026-08-23T16:35:13.632Z",
   "recordedFrom": "7454ab4b3",
   "requirements": [
     "idna==3.11"
@@ -15,6 +15,26 @@
     "--generate-hashes"
   ],
   "expected": "idna==3.11 \\\n    --hash=sha256:771a87f49d9defaf64091e6e6fe9c18d4833f140bd19464795bc32d966ca37ea \\\n    --hash=sha256:795dafcc9c04ed0c1fb032c2aa73654d8e8c5023a7df64a53f39190ada629902\n    # via -r requirements.in\n",
+  "expectedReport": "Resolved 1 package in 69ms\n",
+  "variants": [
+    {
+      "name": "no-annotate",
+      "args": [
+        "--no-annotate"
+      ],
+      "expected": "idna==3.11 \\\n    --hash=sha256:771a87f49d9defaf64091e6e6fe9c18d4833f140bd19464795bc32d966ca37ea \\\n    --hash=sha256:795dafcc9c04ed0c1fb032c2aa73654d8e8c5023a7df64a53f39190ada629902\n",
+      "expectedReport": "Resolved 1 package in 66ms\n"
+    },
+    {
+      "name": "platform-linux",
+      "args": [
+        "--python-platform",
+        "linux"
+      ],
+      "expected": "idna==3.11 \\\n    --hash=sha256:771a87f49d9defaf64091e6e6fe9c18d4833f140bd19464795bc32d966ca37ea \\\n    --hash=sha256:795dafcc9c04ed0c1fb032c2aa73654d8e8c5023a7df64a53f39190ada629902\n    # via -r requirements.in\n",
+      "expectedReport": "Resolved 1 package in 68ms\n"
+    }
+  ],
   "responses": {
     "/simple/idna/": {
       "status": 200,

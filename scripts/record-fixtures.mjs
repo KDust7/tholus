@@ -23,21 +23,76 @@ const nativeUv = resolve(
 const EXCLUDE_NEWER = "2026-08-01T00:00:00Z";
 
 const scenarios = {
-  "pure-python": { requirements: ["idna==3.11"], extraArgs: [] },
+  "pure-python": {
+    requirements: ["idna==3.11"],
+    extraArgs: [],
+    variants: [
+      { name: "no-annotate", args: ["--no-annotate"] },
+      { name: "annotation-line", args: ["--annotation-style", "line"] },
+      { name: "no-deps", args: ["--no-deps"] },
+      { name: "quiet", args: ["--quiet"] },
+      { name: "platform-linux", args: ["--python-platform", "linux"] },
+    ],
+  },
   markers: {
     requirements: ["idna==3.11; python_version >= '3.10'"],
     extraArgs: [],
+    variants: [{ name: "no-annotate", args: ["--no-annotate"] }],
   },
-  transitive: { requirements: ["requests==2.32.5"], extraArgs: [] },
-  extras: { requirements: ["requests[socks]==2.32.5"], extraArgs: [] },
-  hashes: { requirements: ["idna==3.11"], extraArgs: ["--generate-hashes"] },
-  universal: { requirements: ["requests==2.32.5"], extraArgs: ["--universal"] },
-  stdin: { requirements: ["idna==3.11"], extraArgs: [], stdin: true },
+  transitive: {
+    requirements: ["requests==2.32.5"],
+    extraArgs: [],
+    variants: [
+      { name: "no-annotate", args: ["--no-annotate"] },
+      { name: "annotation-line", args: ["--annotation-style", "line"] },
+      { name: "no-deps", args: ["--no-deps"] },
+      { name: "generate-hashes", args: ["--generate-hashes"] },
+      { name: "platform-linux", args: ["--python-platform", "linux"] },
+      { name: "no-emit-idna", args: ["--no-emit-package", "idna"] },
+    ],
+  },
+  extras: {
+    requirements: ["requests[socks]==2.32.5"],
+    extraArgs: [],
+    variants: [
+      { name: "strip-extras", args: ["--strip-extras"] },
+      { name: "no-strip-extras", args: ["--no-strip-extras"] },
+      { name: "no-annotate", args: ["--no-annotate"] },
+      { name: "no-deps", args: ["--no-deps"] },
+    ],
+  },
+  hashes: {
+    requirements: ["idna==3.11"],
+    extraArgs: ["--generate-hashes"],
+    variants: [
+      { name: "no-annotate", args: ["--no-annotate"] },
+      { name: "platform-linux", args: ["--python-platform", "linux"] },
+    ],
+  },
+  universal: {
+    requirements: ["requests==2.32.5"],
+    extraArgs: ["--universal"],
+    variants: [
+      { name: "no-annotate", args: ["--no-annotate"] },
+      { name: "no-deps", args: ["--no-deps"] },
+      { name: "emit-marker-expression", args: ["--emit-marker-expression"] },
+    ],
+  },
+  stdin: {
+    requirements: ["idna==3.11"],
+    extraArgs: [],
+    stdin: true,
+    variants: [{ name: "no-annotate", args: ["--no-annotate"] }],
+  },
   "pyodide-wheel": {
     requirements: ["msgpack==1.1.2"],
     extraArgs: ["--python-platform", "wasm32-pyodide2026", "--python-version", "3.14"],
     index: PYODIDE_INDEX,
     excludeNewer: false,
+    variants: [
+      { name: "no-annotate", args: ["--no-annotate"] },
+      { name: "no-deps", args: ["--no-deps"] },
+    ],
   },
   install: {
     requirements: ["idna==3.11"],
@@ -384,6 +439,7 @@ async function record(name, scenario) {
   const stdin = scenario.stdin ? requirements : undefined;
   let native;
   const followUps = [];
+  const variants = [];
   if (installing && scenario.target) {
     native = await runNative([...indexed, "--target", join(workspace, "target")]);
   } else if (installing) {
@@ -411,11 +467,33 @@ async function record(name, scenario) {
   } else {
     native = await runNative([...indexed, "--directory", workspace], stdin);
   }
-  rmSync(workspace, { recursive: true, force: true });
   if (native.status !== 0) {
+    rmSync(workspace, { recursive: true, force: true });
     await new Promise((done) => server.close(done));
     throw new Error(`native uv failed for ${name}:\n${native.stderr}`);
   }
+  for (const variant of scenario.variants ?? []) {
+    const run = await runNative([...indexed, ...variant.args, "--directory", workspace], stdin);
+    if (run.status !== 0) {
+      rmSync(workspace, { recursive: true, force: true });
+      await new Promise((done) => server.close(done));
+      throw new Error(`native uv failed for ${name}/${variant.name}:\n${run.stderr}`);
+    }
+    if (run.stdout.trim().length === 0) {
+      rmSync(workspace, { recursive: true, force: true });
+      await new Promise((done) => server.close(done));
+      throw new Error(
+        `${name}/${variant.name} recorded nothing, so the golden would agree with anything`,
+      );
+    }
+    variants.push({
+      name: variant.name,
+      args: variant.args,
+      expected: run.stdout,
+      expectedReport: hostFree(run.stderr),
+    });
+  }
+  rmSync(workspace, { recursive: true, force: true });
   const afterNative = Object.keys(responses).length;
 
   const browser = installing
@@ -427,10 +505,18 @@ async function record(name, scenario) {
         scenario.runtime === true,
       )
     : await runBrowser(name, requirements, indexed, stdin);
-  await new Promise((done) => server.close(done));
   if (browser.status !== 0) {
+    await new Promise((done) => server.close(done));
     throw new Error(`the engine failed for ${name}:\n${browser.stderr}`);
   }
+  for (const variant of scenario.variants ?? []) {
+    const run = await runBrowser(name, requirements, [...indexed, ...variant.args], stdin);
+    if (run.status !== 0) {
+      await new Promise((done) => server.close(done));
+      throw new Error(`the engine failed for ${name}/${variant.name}:\n${run.stderr}`);
+    }
+  }
+  await new Promise((done) => server.close(done));
   const added = Object.keys(responses).length - afterNative;
 
   const outDir = resolve(root, "test/fixtures", name);
@@ -450,7 +536,11 @@ async function record(name, scenario) {
               ...(followUps.length > 0 ? { followUps } : {}),
               expectedReport: hostFree(native.stderr),
             }
-          : { expected: native.stdout }),
+          : {
+              expected: native.stdout,
+              expectedReport: hostFree(native.stderr),
+              ...(variants.length > 0 ? { variants } : {}),
+            }),
         responses,
       },
       null,
@@ -463,7 +553,7 @@ async function record(name, scenario) {
     0,
   );
   console.log(
-    `${name}: ${Object.keys(responses).length} responses (${added} only the browser asked for), ${(bytes / 1024).toFixed(1)} KiB gzipped`,
+    `${name}: ${Object.keys(responses).length} responses (${added} only the browser asked for), ${(bytes / 1024).toFixed(1)} KiB gzipped${variants.length > 0 ? `, ${variants.length} variants` : ""}`,
   );
 }
 
