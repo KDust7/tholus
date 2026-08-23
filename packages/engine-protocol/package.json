@@ -17,8 +17,8 @@
     "schema"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "emit-schema": "bun run build && node dist/cli/emit-schema.js",
+    "build": "tsc -p tsconfig.build.json && node dist/cli/emit-schema.js",
+    "emit-schema": "bun run build",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"
   },

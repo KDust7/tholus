@@ -368,11 +368,13 @@
                       },
                       "version": {
                         "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
                       }
                     },
                     "required": [
-                      "name",
-                      "version"
+                      "name"
                     ]
                   }
                 },
@@ -386,11 +388,13 @@
                       },
                       "version": {
                         "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
                       }
                     },
                     "required": [
-                      "name",
-                      "version"
+                      "name"
                     ]
                   }
                 },
@@ -426,11 +430,13 @@
                     },
                     "version": {
                       "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "name",
-                    "version"
+                    "name"
                   ]
                 },
                 "action": {
