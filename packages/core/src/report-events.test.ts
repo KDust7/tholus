@@ -116,6 +116,37 @@ describe("the shapes uv prints that are not a plain version", () => {
   });
 });
 
+describe("a real multi-package install, taken from a recorded fixture", () => {
+  const TRANSITIVE = [
+    "Using Python 3.14.0 environment at: .venv",
+    "Resolved 5 packages in 10.09s",
+    "Prepared 5 packages in 5.82s",
+    "Installed 5 packages in 1.68s",
+    " + certifi==2026.7.22",
+    " + charset-normalizer==3.4.9",
+    " + idna==3.18",
+    " + requests==2.32.3",
+    " + urllib3==2.7.0",
+    "",
+  ].join("\n");
+
+  it("reports every package uv installed, not just the one that was asked for", () => {
+    const report = reportOf(read([TRANSITIVE]));
+    expect(report?.installed).toEqual([
+      { name: "certifi", version: "2026.7.22" },
+      { name: "charset-normalizer", version: "3.4.9" },
+      { name: "idna", version: "3.18" },
+      { name: "requests", version: "2.32.3" },
+      { name: "urllib3", version: "2.7.0" },
+    ]);
+  });
+
+  it("counts the resolution across the whole tree", () => {
+    const resolved = read([TRANSITIVE]).find((event) => event.type === "resolution-complete");
+    expect(resolved).toMatchObject({ packageCount: 5, durationMs: 10_090 });
+  });
+});
+
 describe("a source build is announced as it happens", () => {
   it("brackets each build with a start and an end", () => {
     const events = read([

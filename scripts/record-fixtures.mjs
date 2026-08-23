@@ -51,6 +51,19 @@ const scenarios = {
     ],
   },
   sync: { requirements: ["idna==3.11"], extraArgs: [], command: "sync" },
+  "install-transitive": {
+    requirements: ["requests==2.32.3"],
+    extraArgs: [],
+    command: "install",
+    followUps: [
+      ["pip", "list"],
+      ["pip", "freeze"],
+      ["pip", "show", "requests"],
+      ["pip", "check"],
+      ["pip", "uninstall", "requests"],
+      ["pip", "list"],
+    ],
+  },
   sdist: {
     requirements: ["idna==3.11"],
     extraArgs: ["--no-binary", "idna"],

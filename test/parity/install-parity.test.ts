@@ -39,6 +39,14 @@ const SCENARIOS: readonly Scenario[] = [
     hasFollowUps: false,
   },
   {
+    name: "install-transitive",
+    distribution: "requests",
+    distInfo: "requests-2.32.3.dist-info",
+    intoTarget: false,
+    reinstallIsNoop: true,
+    hasFollowUps: true,
+  },
+  {
     name: "install-pyodide",
     distribution: "msgpack",
     distInfo: "msgpack-1.1.2.dist-info",
