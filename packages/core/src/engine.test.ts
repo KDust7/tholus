@@ -385,3 +385,154 @@ describe("error mapping", () => {
     expect(error.data).toEqual({ stderr: "traceback" });
   });
 });
+
+describe("the parts of the handle a host reaches for after the first command", () => {
+  interface Wire {
+    sent: { type: string; [key: string]: unknown }[];
+    reply(message: unknown): void;
+    endpoint: () => {
+      postMessage(message: unknown): void;
+      addEventListener(type: "message", listener: (event: { data: unknown }) => void): void;
+      removeEventListener(type: "message", listener: (event: { data: unknown }) => void): void;
+      terminate(): void;
+    };
+  }
+
+  function wire(): Wire {
+    const listeners = new Set<(event: { data: unknown }) => void>();
+    const sent: { type: string; [key: string]: unknown }[] = [];
+    const reply = (message: unknown): void => {
+      for (const listener of [...listeners]) {
+        listener({ data: message });
+      }
+    };
+    return {
+      sent,
+      reply,
+      endpoint: () => ({
+        postMessage(message: unknown): void {
+          const typed = message as { type: string; id?: string };
+          sent.push(typed);
+          if (typed.type === "init") {
+            reply({
+              type: "initResult",
+              id: typed.id,
+              outcome: {
+                ok: true,
+                build: { engine: "0.0.0", uv: "0.12.3", protocol: PROTOCOL_VERSION },
+              },
+            });
+          }
+        },
+        addEventListener(_type: "message", listener: (event: { data: unknown }) => void): void {
+          listeners.add(listener);
+        },
+        removeEventListener(_type: "message", listener: (event: { data: unknown }) => void): void {
+          listeners.delete(listener);
+        },
+        terminate(): void {
+          listeners.clear();
+        },
+      }),
+    };
+  }
+
+  it("resolves an exported tree with its entries and its bytes", async () => {
+    const test = wire();
+    const engine = await createEngine({ endpoint: test.endpoint });
+
+    const exported = engine.exportTree("/work/.venv");
+    const request = test.sent.find((message) => message.type === "exportTree");
+    expect(request).toMatchObject({ path: "/work/.venv" });
+
+    const bytes = new Uint8Array([1, 2, 3]);
+    test.reply({
+      type: "exportTreeResult",
+      id: request?.id,
+      outcome: {
+        ok: true,
+        entries: [{ kind: "file", path: "a.txt", offset: 0, length: 3 }],
+        bytes,
+      },
+    });
+
+    await expect(exported).resolves.toMatchObject({ bytes });
+    engine.terminate();
+  });
+
+  it("rejects an export the engine refused, with the engine's own error", async () => {
+    const test = wire();
+    const engine = await createEngine({ endpoint: test.endpoint });
+
+    const exported = engine.exportTree("/nowhere");
+    const request = test.sent.find((message) => message.type === "exportTree");
+    test.reply({
+      type: "exportTreeResult",
+      id: request?.id,
+      outcome: {
+        ok: false,
+        error: { code: "unsupported", message: "/nowhere is not a directory" },
+      },
+    });
+
+    await expect(exported).rejects.toThrow("/nowhere is not a directory");
+    engine.terminate();
+  });
+
+  it("refuses to export once the engine is disposed", async () => {
+    const test = wire();
+    const engine = await createEngine({ endpoint: test.endpoint });
+    await engine.dispose();
+    await expect(engine.exportTree("/work")).rejects.toBeInstanceOf(EngineCrashedError);
+  });
+
+  it("attaches a runtime and detaches it exactly once", async () => {
+    const test = wire();
+    const engine = await createEngine({ endpoint: test.endpoint });
+
+    const detach = engine.attachRuntime(async () => ({
+      stdout: [],
+      stderr: [],
+      code: 0,
+      writes: [],
+    }));
+    expect(test.sent.filter((message) => message.type === "attachRuntime")).toHaveLength(1);
+
+    detach();
+    detach();
+    expect(
+      test.sent.filter((message) => message.type === "detachRuntime"),
+      "a detach that already ran must not tell the engine twice",
+    ).toHaveLength(1);
+    engine.terminate();
+  });
+
+  it("stops delivering events once a listener unsubscribes", async () => {
+    const test = wire();
+    const engine = await createEngine({ endpoint: test.endpoint });
+
+    const seen: string[] = [];
+    const stop = engine.onEvent((event) => seen.push(event.type));
+    test.reply({ type: "event", event: { type: "log", level: "warn", message: "first" } });
+    stop();
+    test.reply({ type: "event", event: { type: "log", level: "warn", message: "second" } });
+
+    expect(seen).toEqual(["log"]);
+    engine.terminate();
+  });
+
+  it("cancels what is still running when it is disposed", async () => {
+    const test = wire();
+    const engine = await createEngine({ endpoint: test.endpoint });
+
+    const handle = engine.exec(["pip", "install", "slow"]);
+    const settled = handle.exit.catch((error: unknown) => error);
+    await engine.dispose();
+
+    expect(
+      test.sent.filter((message) => message.type === "cancel"),
+      "disposing has to interrupt what is in flight rather than abandon it",
+    ).toHaveLength(1);
+    expect(String(await settled)).toContain("disposed");
+  });
+});
