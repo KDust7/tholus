@@ -1,10 +1,27 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 const FLOOR = 80;
 
-const [reportPath, ...wanted] = process.argv.slice(2);
-if (reportPath === undefined || wanted.length === 0) {
-  throw new Error("usage: check-rust-coverage.mjs <llvm-cov-json> <crate-directory>…");
+const [reportPath, crateRoot, ...wanted] = process.argv.slice(2);
+if (reportPath === undefined || crateRoot === undefined || wanted.length === 0) {
+  throw new Error("usage: check-rust-coverage.mjs <llvm-cov-json> <crates-dir> <crate-name>…");
+}
+
+function sourceFiles(directory) {
+  if (!existsSync(directory)) {
+    return 0;
+  }
+  return readdirSync(directory, { withFileTypes: true }).reduce(
+    (total, entry) =>
+      total +
+      (entry.isDirectory()
+        ? sourceFiles(join(directory, entry.name))
+        : entry.name.endsWith(".rs")
+          ? 1
+          : 0),
+    0,
+  );
 }
 
 const report = JSON.parse(readFileSync(reportPath, "utf8"));
@@ -34,7 +51,12 @@ for (const [crate, { covered, count, files: seen }] of totals) {
     continue;
   }
   const percent = count === 0 ? 0 : (100 * covered) / count;
-  const line = `${crate}: ${percent.toFixed(1)}% of ${count} lines across ${seen} files`;
+  const present = sourceFiles(resolve(crateRoot, crate, "src"));
+  const scope =
+    present > seen
+      ? `, ${seen} of its ${present} source files compile natively; the rest is wasm-only and is covered by the parity grid instead`
+      : "";
+  const line = `${crate}: ${percent.toFixed(1)}% of ${count} lines across ${seen} files${scope}`;
   if (percent < FLOOR) {
     failures.push(`${line}, below the ${FLOOR}% bar`);
   } else {

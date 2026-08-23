@@ -117,6 +117,26 @@ describe.skipIf(!isBuilt)("uv reaches an index through the transport a host chos
     expect(log.requested.length).toBeGreaterThan(0);
   });
 
+  it("rewrote uv's HEAD probes rather than sending them, which is why it exists", () => {
+    const methods = new Set(requests.map((request) => request.method));
+    expect(
+      methods.has("HEAD"),
+      "a HEAD left the transport untouched, so the rewrite that justifies this package did not run",
+    ).toBe(false);
+    expect(
+      methods.has("GET"),
+      "nothing went out as a GET, so nothing was rewritten and nothing was fetched",
+    ).toBe(true);
+  });
+
+  it("served a HEAD-recorded fixture to a rewritten GET, so no re-record is owed", () => {
+    expect(
+      log.misses,
+      "the replay server keys on url alone; if that ever changes, flipping the default stops " +
+        "being a one-line change",
+    ).toEqual([]);
+  });
+
   it("reported each request as an event a host can render", () => {
     expect(requests.length, "a transported request has to be observable").toBeGreaterThan(0);
     for (const request of requests) {
