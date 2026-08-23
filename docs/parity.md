@@ -76,6 +76,21 @@ If that posture ever stops being comfortable, the fixtures are regenerable: dele
 recorder, and the only cost is the recording time. Nothing in the suite depends on the *bytes* being
 in git, only on their being identical between the two binaries at record time.
 
+## How big it is
+
+`test/parity/grid.test.ts` counts the grid from the fixtures and the goldens rather than from a
+number written down somewhere, and fails below the plan's floor of 85 cells. It stands at 141:
+74 CLI cases, 33 compile cases and 34 install cases.
+
+It also refuses three ways of inflating that number: a duplicated cell, a follow-up command repeated
+where the recorded answer did not change, and a fixture no test reads.
+
+Two flags were measured and rejected as parity subjects because their output describes the recording
+machine and not uv: `--python-version`, which makes native download an interpreter it does
+not have, and `--emit-marker-expression` outside `--universal`, which prints the running
+interpreter's `python_full_version`. `--emit-index-url` is rejected for a different reason, it
+prints the replay server's ephemeral port.
+
 ## Running it
 
 ```sh
