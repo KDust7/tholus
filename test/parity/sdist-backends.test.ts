@@ -14,6 +14,7 @@ import { attachPyodide, type PyodideLike } from "@uv-wasm/pyodide";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { jsPath, PROGRAM, root, wasmPath } from "./cli-goldens.js";
+import { normalizeReport } from "./normalize-report.js";
 import { type ReplayServer, startReplayServer } from "./replay-server.js";
 
 interface Scenario {
@@ -73,12 +74,7 @@ if (process.env.CI && (!canRun || !hasPyodide)) {
   );
 }
 
-const DURATION = /\bin \d+(?:\.\d+)?(?:ms|s)\b/g;
-const ENVIRONMENT = /^Using (?:C?Python) .*$/gm;
-
-function normalize(text: string): string {
-  return text.replace(DURATION, "in <DURATION>").replace(ENVIRONMENT, "Using Python <ENVIRONMENT>");
-}
+const normalize = normalizeReport;
 
 interface SeenHook extends RuntimeHookRequest {
   sitePackages: string[];

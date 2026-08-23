@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { jsPath, PROGRAM, root, wasmPath } from "./cli-goldens.js";
+import { normalizeReport } from "./normalize-report.js";
 import { type ReplayServer, startReplayServer } from "./replay-server.js";
 
 interface Scenario {
@@ -90,16 +91,7 @@ interface Snapshot {
   followUps?: FollowUp[];
 }
 
-const DURATION = /\bin \d+(?:\.\d+)?(?:ms|s)\b/g;
-const ENVIRONMENT = /^Using (?:C?Python) .*$/gm;
-const LOCATION = /^Location: .*$/gm;
-
-function normalize(text: string): string {
-  return text
-    .replace(DURATION, "in <DURATION>")
-    .replace(ENVIRONMENT, "Using Python <ENVIRONMENT>")
-    .replace(LOCATION, "Location: <LOCATION>");
-}
+const normalize = normalizeReport;
 
 interface RecordEntry {
   path: string;

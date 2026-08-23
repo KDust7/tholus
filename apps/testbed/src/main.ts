@@ -16,7 +16,7 @@ export interface TestbedFailure {
 export interface TestbedDriver {
   init(config?: EngineConfigInput): Promise<{ ok: boolean; build?: unknown; message?: string }>;
   exec(argv: string[], options?: Omit<ExecOptions, "stdout" | "stderr">): Promise<TestbedResult>;
-  call(method: string, request?: unknown): Promise<unknown | TestbedFailure>;
+  call(method: string, args?: unknown[]): Promise<unknown | TestbedFailure>;
   tree(path: string): Promise<string[] | TestbedFailure>;
   events(): EngineEvent[];
   dispose(): Promise<void>;
@@ -83,7 +83,7 @@ const driver: TestbedDriver = {
     return { code: result.code, cancelled: result.cancelled, stdout, stderr };
   },
 
-  async call(method, request) {
+  async call(method, args = []) {
     const [namespace, name] = method.split(".");
     const api = (running() as unknown as Record<string, Record<string, unknown>>)[namespace ?? ""];
     const call = api?.[name ?? ""];
@@ -91,7 +91,7 @@ const driver: TestbedDriver = {
       return { failed: true, message: `the testbed has no \`${method}\`` };
     }
     try {
-      return (await (call as (input?: unknown) => Promise<unknown>).call(api, request)) ?? null;
+      return (await (call as (...input: unknown[]) => Promise<unknown>).apply(api, args)) ?? null;
     } catch (error) {
       return { failed: true, message: describe(error) };
     }

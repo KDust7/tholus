@@ -11,4 +11,5 @@ export * from "./hook-bridge.js";
 export * from "./interpreter.js";
 export * from "./opfs-store.js";
 export * from "./persistence.js";
+export * from "./report-events.js";
 export * from "./text.js";

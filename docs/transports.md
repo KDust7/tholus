@@ -1,0 +1,91 @@
+# Transports
+
+uv reaches a package index through `fetch`. In a browser that is not always the `fetch` you want, so
+the engine lets a host choose. A transport is anything shaped like `ProxyTransport`:
+
+```ts
+interface ProxyTransport {
+  fetch(input: string, init?: RequestInit): Promise<Response>;
+}
+```
+
+The chosen transport is installed over `globalThis.fetch` inside the worker, before the engine
+boots. uv itself is unaware of it.
+
+## Choosing one
+
+```ts
+const engine = await createEngine({ config: { transport: { kind: "platform" } } });
+```
+
+| `kind` | What it does | When |
+| --- | --- | --- |
+| `platform` *(default)* | Leaves the ambient `fetch` untouched. | The index allows cross-origin reads, or you proxy at the server. |
+| `fetch` | Wraps the ambient `fetch` with the rewrites below. | The index answers `HEAD` badly, or you want the range behavior normalized. |
+| `libcurl` | Routes every request through a Wisp relay via `libcurl.js`. | You need CORS-free access, real cookies, or uv's own `User-Agent` to reach the index. |
+
+## `fetch`
+
+Wraps the platform `fetch` and does four things:
+
+- `HEAD` becomes `GET` with `Range: bytes=0-0`, and the one-byte reply is turned back into a
+  `HEAD`-shaped 200 whose `content-length` comes from `Content-Range`'s total. Pass
+  `rewriteHead: false` to send real `HEAD` requests.
+- Range requests pass through unchanged.
+- Forbidden request headers are stripped before the request is constructed, because the platform
+  drops them anyway and leaving them in only produces confusing failures.
+- `content-encoding` and `content-length` are dropped when the platform already decoded the body,
+  so uv does not try to inflate something that is already inflated.
+
+It never retries. uv owns retry policy, and a second layer of backoff would be invisible to it.
+
+## `libcurl`
+
+`libcurl.js` is a real curl compiled to WebAssembly, tunneling TCP over a WebSocket relay. It is not
+bundled, the host supplies the module, because the worker is a single esbuild bundle and shipping
+~6 MB of curl to every user for an opt-in path is not a trade worth making. Nothing in this repository
+depends on `libcurl.js` at runtime.
+
+```ts
+const engine = await createEngine({
+  config: {
+    transport: {
+      kind: "libcurl",
+      moduleUrl: "https://cdn.example/libcurl.mjs",
+      wasmUrl: "https://cdn.example/libcurl.wasm",
+      relayUrl: "wss://relay.example/ws/",
+      userAgent: "uv/0.12.3",
+    },
+  },
+});
+```
+
+- `moduleUrl` is imported lazily, on the first request, not at boot. The loader accepts the module's
+  `libcurl` named export, its default export, or the namespace itself.
+- `relayUrl` must be `ws:` or `wss:` and must end in a trailing slash, libcurl appends the
+  destination to it. Both are checked when the engine is configured, not when the first download
+  fails.
+- `userAgent` is the reason this transport exists. A browser `Request` silently drops `User-Agent`,
+  `Cookie` and `Host`, so through the platform transport uv is indistinguishable from the page.
+  libcurl sends whatever you give it, and if you give it nothing it sends the *browser's* own
+  `User-Agent`, so set it yourself.
+- `connectionsPerHost` defaults to 16. libcurl's own default is 6, which throttles an index badly.
+  `maxConnections` (60) and `connectionCache` (50) are libcurl's defaults and rarely need changing.
+
+You need a Wisp relay to use this. Running one is out of scope here.
+
+## Writing your own
+
+Any object with a `fetch` method will do, so a host can implement the seam over anything, a service
+worker, a same-origin proxy, an Electron main process. That interface is the whole
+contract; nothing else about a transport is observable to uv.
+
+This is also the boundary that keeps AGPL-licensed proxy clients out of this repository. They are
+host-loaded plugins behind the same `ProxyTransport` shape, never linked or shipped here.
+
+## What a transport cannot fix
+
+uv sets its own `User-Agent` on the reqwest client. On `wasm32-unknown-unknown` that header is
+dropped when `web_sys::Request` is constructed, before any transport sees it, so the `userAgent`
+option above is currently the only way to send one. Aliasing uv's header through to the transport is
+not yet implemented.

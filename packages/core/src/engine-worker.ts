@@ -1,5 +1,6 @@
 import {
   type CacheSpec,
+  type EngineEvent,
   EXIT_CODE_CANCELLED,
   type HostMessage,
   PROTOCOL_VERSION,
@@ -29,6 +30,7 @@ import {
   type StorageRoom,
   webLocks,
 } from "./persistence.js";
+import { createReportReader } from "./report-events.js";
 
 export interface EngineHandle {
   invoke(argv: string[], onOutput: (stream: string, data: Uint8Array) => void): Promise<number>;
@@ -472,6 +474,14 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
       }
     }
 
+    const reader = createReportReader(message.invocationId);
+    const decoder = new TextDecoder("utf-8", { fatal: false });
+    const report = (events: EngineEvent[]): void => {
+      for (const event of events) {
+        emit({ type: "event", event });
+      }
+    };
+
     try {
       const code = await engine.invoke([PROGRAM_NAME, ...message.argv], (stream, data) => {
         if (stream !== "stdout" && stream !== "stderr") {
@@ -485,7 +495,11 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
           data,
         });
         invocation.seq += 1;
+        if (stream === "stderr") {
+          report(reader.push(decoder.decode(data, { stream: true })));
+        }
       });
+      report(reader.flush());
       running.delete(message.invocationId);
       emit({
         type: "exit",

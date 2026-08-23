@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const packageRefSchema = z.object({
   name: z.string(),
-  version: z.string(),
+  version: z.string().optional(),
+  source: z.string().optional(),
 });
 
 export type PackageRef = z.infer<typeof packageRefSchema>;

@@ -35,7 +35,7 @@ interface Outcome {
 interface Driver {
   init(config?: unknown): Promise<{ ok: boolean; build?: { uv: string }; message?: string }>;
   exec(argv: string[], options?: unknown): Promise<Outcome>;
-  call(method: string, request?: unknown): Promise<unknown>;
+  call(method: string, args?: unknown[]): Promise<unknown>;
   tree(path: string): Promise<string[] | { failed: true; message: string }>;
   events(): { type: string }[];
   dispose(): Promise<void>;
@@ -76,10 +76,9 @@ describe.skipIf(!canRun)("the testbed drives uv end to end in a real browser", (
 
     created = await page.evaluate(
       ([venv]) =>
-        (globalThis as unknown as { __uv: Driver }).__uv.call("venv.create", {
-          path: venv,
-          pythonVersion: "/bin/python3",
-        }),
+        (globalThis as unknown as { __uv: Driver }).__uv.call("venv.create", [
+          { path: venv, pythonVersion: "/bin/python3" },
+        ]),
       [VENV] as const,
     );
 
@@ -123,7 +122,7 @@ describe.skipIf(!canRun)("the testbed drives uv end to end in a real browser", (
 
   it("lists the package back through the SDK rather than raw argv", async () => {
     const listed = await page.evaluate(
-      ([venv]) => (globalThis as unknown as { __uv: Driver }).__uv.call("pip.list", { venv }),
+      ([venv]) => (globalThis as unknown as { __uv: Driver }).__uv.call("pip.list", [{ venv }]),
       [VENV] as const,
     );
     expect(listed).toEqual([{ name: "idna", version: "3.11" }]);
@@ -143,10 +142,34 @@ describe.skipIf(!canRun)("the testbed drives uv end to end in a real browser", (
     ).toBe(true);
   }, 180_000);
 
-  it.skip("BLOCKED: reports the install as a structured event, the real worker emits only `log`, so six of the protocol's seven event kinds exist in the mock alone and `pip.install` resolves an empty report against a real engine", async () => {
+  it("reports the install as a structured event, not only as text", async () => {
     const events = await page.evaluate(() =>
       (globalThis as unknown as { __uv: Driver }).__uv.events(),
     );
-    expect(events.map((event) => event.type)).toContain("install-report");
+    const kinds = events.map((event) => event.type);
+    expect(kinds).toContain("install-report");
+    expect(kinds).toContain("resolution-complete");
+    expect(kinds).toContain("phase");
+
+    const report = events.find((event) => event.type === "install-report") as
+      | { installed: { name: string; version?: string }[] }
+      | undefined;
+    expect(report?.installed).toEqual([{ name: "idna", version: "3.11" }]);
   });
+
+  it("resolves a populated report from `pip.uninstall`, which is the API the events exist for", async () => {
+    const report = await page.evaluate(
+      ([venv]) =>
+        (globalThis as unknown as { __uv: Driver }).__uv.call("pip.uninstall", [
+          ["idna"],
+          { venv },
+        ]),
+      [VENV] as const,
+    );
+    expect(
+      report,
+      "an empty report here is the defect this gate exists for: the SDK reporting nothing while " +
+        "uv did the work",
+    ).toMatchObject({ removed: [{ name: "idna", version: "3.11" }] });
+  }, 180_000);
 });
