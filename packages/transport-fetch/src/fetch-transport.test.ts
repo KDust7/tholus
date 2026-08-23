@@ -18,17 +18,53 @@ function recorder(reply: (seen: Seen) => Response): {
   calls: Seen[];
 } {
   const calls: Seen[] = [];
-  const fetch = (async (input: string, init: RequestInit = {}) => {
+  const fetch = (async (input: string | Request, init?: RequestInit) => {
+    const request = input instanceof Request ? input : new Request(input, init);
     const seen: Seen = {
-      url: String(input),
-      method: (init.method ?? "GET").toUpperCase(),
-      headers: new Headers(init.headers),
+      url: request.url,
+      method: request.method,
+      headers: request.headers,
     };
     calls.push(seen);
     return reply(seen);
   }) as unknown as typeof globalThis.fetch;
   return { fetch, calls };
 }
+
+describe("uv calls fetch the way reqwest does: one Request, no init", () => {
+  it("keeps the method and headers of a Request handed over on its own", async () => {
+    const { fetch, calls } = recorder(() => new Response("ok"));
+    const transport = createFetchTransport({ fetch, rewriteHead: false });
+
+    await transport.fetch(
+      new Request("https://files.example/a.whl", {
+        method: "HEAD",
+        headers: { accept: "application/vnd.pypi.simple.v1+json" },
+      }),
+    );
+
+    expect(
+      calls[0]?.method,
+      "reqwest's wasm client calls fetch(request); reading init instead turns every request into a GET",
+    ).toBe("HEAD");
+    expect(calls[0]?.headers.get("accept")).toBe("application/vnd.pypi.simple.v1+json");
+  });
+
+  it("still rewrites a Request-shaped HEAD when asked to", async () => {
+    const { fetch, calls } = recorder(
+      () => new Response("x", { status: 206, headers: { "content-range": "bytes 0-0/99" } }),
+    );
+    const transport = createFetchTransport({ fetch });
+
+    const response = await transport.fetch(
+      new Request("https://files.example/a.whl", { method: "HEAD" }),
+    );
+
+    expect(calls[0]?.method).toBe("GET");
+    expect(calls[0]?.headers.get("range")).toBe("bytes=0-0");
+    expect(response.headers.get("content-length")).toBe("99");
+  });
+});
 
 describe("headers a browser would refuse are dropped before the request is made", () => {
   it("keeps ordinary headers and drops the ones fetch forbids", () => {

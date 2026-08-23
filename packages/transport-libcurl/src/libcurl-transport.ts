@@ -3,7 +3,7 @@ import type { ProxyTransport } from "@uv-wasm/engine-protocol";
 export type { ProxyTransport };
 
 export interface LibcurlSession {
-  fetch(input: string, init?: RequestInit): Promise<Response>;
+  fetch(input: string | Request, init?: RequestInit): Promise<Response>;
   set_connections(total: number, cache: number, perHost: number): void;
   close(): void;
 }
@@ -88,6 +88,21 @@ export function withUserAgent(headers: Headers, userAgent: string | undefined): 
   return carrying;
 }
 
+export function plainHeaders(headers: Headers): Record<string, string> {
+  const plain: Record<string, string> = {};
+  headers.forEach((value, name) => {
+    plain[name] = value;
+  });
+  return plain;
+}
+
+export function requestOf(input: string | Request, init?: RequestInit): Request {
+  if (init === undefined) {
+    return input instanceof Request ? input : new Request(input);
+  }
+  return new Request(input as RequestInfo, init);
+}
+
 export function createLibcurlTransport(options: LibcurlTransportOptions): LibcurlTransport {
   assertRelayUrl(options.relayUrl);
 
@@ -119,10 +134,19 @@ export function createLibcurlTransport(options: LibcurlTransportOptions): Libcur
   };
 
   return {
-    async fetch(input: string, init: RequestInit = {}): Promise<Response> {
+    async fetch(input: string | Request, init?: RequestInit): Promise<Response> {
       const session = await ready();
-      const headers = withUserAgent(new Headers(init.headers), options.userAgent);
-      return session.fetch(input, { ...init, headers });
+      const request = requestOf(input, init);
+      const carrying = withUserAgent(new Headers(request.headers), options.userAgent);
+      const body =
+        request.method === "GET" || request.method === "HEAD"
+          ? undefined
+          : await request.arrayBuffer();
+      return session.fetch(request.url, {
+        method: request.method,
+        headers: plainHeaders(carrying),
+        ...(body === undefined ? {} : { body }),
+      });
     },
 
     async dispose(): Promise<void> {

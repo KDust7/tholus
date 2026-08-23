@@ -369,15 +369,17 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
         ((replacement: typeof globalThis.fetch) => {
           globalThis.fetch = replacement;
         });
-      install((async (input: string, init: RequestInit = {}) => {
+      install((async (input: string | Request, init?: RequestInit) => {
         const response = await transport.fetch(input, init);
         const length = response.headers.get("content-length");
         emit({
           type: "event",
           event: {
             type: "request",
-            method: (init.method ?? "GET").toUpperCase(),
-            url: input,
+            method: (
+              init?.method ?? (input instanceof Request ? input.method : "GET")
+            ).toUpperCase(),
+            url: input instanceof Request ? input.url : input,
             status: response.status,
             fromCache: false,
             ...(length === null || Number.isNaN(Number(length))

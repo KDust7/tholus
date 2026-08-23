@@ -1086,10 +1086,9 @@ describe("the host chooses the transport, and the platform's own fetch is the de
     const { installed, install } = installs();
     const seen: string[] = [];
     const original = globalThis.fetch;
-    globalThis.fetch = (async (_input: string, request: RequestInit = {}) => {
-      seen.push(
-        `${(request.method ?? "GET").toUpperCase()} ${new Headers(request.headers).get("range")}`,
-      );
+    globalThis.fetch = (async (input: string | Request, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      seen.push(`${request.method} ${request.headers.get("range")}`);
       return new Response("x", {
         status: 206,
         headers: { "content-range": "bytes 0-0/4321" },
@@ -1116,8 +1115,9 @@ describe("the host chooses the transport, and the platform's own fetch is the de
     const { installed, install } = installs();
     const seen: string[] = [];
     const original = globalThis.fetch;
-    globalThis.fetch = (async (_input: string, request: RequestInit = {}) => {
-      seen.push((request.method ?? "GET").toUpperCase());
+    globalThis.fetch = (async (input: string | Request, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      seen.push(request.method);
       return new Response(null, { status: 200 });
     }) as unknown as typeof globalThis.fetch;
 

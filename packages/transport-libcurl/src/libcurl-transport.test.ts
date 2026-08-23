@@ -15,8 +15,9 @@ import {
 const RELAY = "wss://relay.example/ws/";
 
 interface Recorded {
-  input: string;
-  init: RequestInit;
+  url: string;
+  method: string;
+  headers: Headers;
 }
 
 interface Fake {
@@ -41,8 +42,13 @@ function fakeLibcurl(respond: () => Response = () => new Response("ok")): Fake {
   };
 
   class Session implements LibcurlSession {
-    fetch(input: string, init: RequestInit = {}): Promise<Response> {
-      fake.requests.push({ input, init });
+    fetch(input: string | Request, init: RequestInit = {}): Promise<Response> {
+      const url = input instanceof Request ? input.url : input;
+      fake.requests.push({
+        url,
+        method: (init.method ?? "GET").toUpperCase(),
+        headers: new Headers(init.headers),
+      });
       return Promise.resolve(respond());
     }
 
@@ -233,7 +239,7 @@ describe("a real User-Agent is the reason to reach for this transport at all", (
     });
 
     await transport.fetch("https://example.invalid/", { headers: { accept: "*/*" } });
-    const sent = new Headers(fake.requests[0]?.init.headers);
+    const sent = fake.requests[0]?.headers as Headers;
     expect(sent.get("user-agent")).toBe("uv/0.12.3");
     expect(sent.get("accept")).toBe("*/*");
   });
@@ -248,8 +254,8 @@ describe("the method and body reach libcurl unchanged, because it needs no rewri
     });
 
     await transport.fetch("https://example.invalid/x.whl", { method: "HEAD" });
-    expect(fake.requests[0]?.init.method).toBe("HEAD");
-    expect(new Headers(fake.requests[0]?.init.headers).get("range")).toBeNull();
+    expect(fake.requests[0]?.method).toBe("HEAD");
+    expect(fake.requests[0]?.headers.get("range")).toBeNull();
   });
 
   it("passes a Range request through as written", async () => {
@@ -260,7 +266,7 @@ describe("the method and body reach libcurl unchanged, because it needs no rewri
     });
 
     await transport.fetch("https://example.invalid/x.whl", { headers: { range: "bytes=0-1023" } });
-    expect(new Headers(fake.requests[0]?.init.headers).get("range")).toBe("bytes=0-1023");
+    expect(fake.requests[0]?.headers.get("range")).toBe("bytes=0-1023");
   });
 
   it("returns what libcurl returned, without retrying, because uv owns retry policy", async () => {

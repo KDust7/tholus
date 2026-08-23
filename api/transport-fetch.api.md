@@ -1,6 +1,6 @@
 # @uv-wasm/transport-fetch
 
-8 public exports.
+9 public exports.
 
 ```ts
 export declare function createFetchTransport(options?: FetchTransportOptions): ProxyTransport;
@@ -15,8 +15,10 @@ export interface FetchTransportOptions {
 FORBIDDEN_HEADERS: readonly string[]
 
 export interface ProxyTransport {
-    fetch(input: string, init?: RequestInit): Promise<Response>;
+    fetch(input: string | Request, init?: RequestInit): Promise<Response>;
 }
+
+export declare function requestOf(input: string | Request, init?: RequestInit): Request;
 
 export declare function stripForbidden(headers: Headers): Headers;
 

@@ -927,7 +927,7 @@ export declare class ProtocolError extends Error {
 export type ProtocolVersion = typeof PROTOCOL_VERSION;
 
 export interface ProxyTransport {
-    fetch(input: string, init?: RequestInit): Promise<Response>;
+    fetch(input: string | Request, init?: RequestInit): Promise<Response>;
 }
 
 export type ResizeMessage = z.infer<typeof resizeMessageSchema>;

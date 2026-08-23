@@ -90,19 +90,28 @@ function headResponse(probe: Response): Response {
   });
 }
 
+export function requestOf(input: string | Request, init?: RequestInit): Request {
+  if (init === undefined) {
+    return input instanceof Request ? input : new Request(input);
+  }
+  return new Request(input as RequestInfo, {
+    ...init,
+    headers: stripForbidden(new Headers(init.headers)),
+  });
+}
+
 export function createFetchTransport(options: FetchTransportOptions = {}): ProxyTransport {
   const underlying = options.fetch ?? globalThis.fetch.bind(globalThis);
   const rewriteHead = options.rewriteHead ?? true;
 
   return {
-    async fetch(input: string, init: RequestInit = {}): Promise<Response> {
-      const headers = stripForbidden(new Headers(init.headers));
-      const method = (init.method ?? "GET").toUpperCase();
+    async fetch(input: string | Request, init?: RequestInit): Promise<Response> {
+      const request = requestOf(input, init);
 
-      if (method === "HEAD" && rewriteHead) {
-        const probing = new Headers(headers);
+      if (request.method === "HEAD" && rewriteHead) {
+        const probing = new Headers(request.headers);
         probing.set("range", "bytes=0-0");
-        const probe = await underlying(input, { ...init, method: "GET", headers: probing });
+        const probe = await underlying(new Request(request, { method: "GET", headers: probing }));
         if (probe.status === 206) {
           await probe.body?.cancel();
           return headResponse(probe);
@@ -124,7 +133,7 @@ export function createFetchTransport(options: FetchTransportOptions = {}): Proxy
         });
       }
 
-      const response = await underlying(input, { ...init, method, headers });
+      const response = await underlying(request);
       if (!wasDecoded(response.headers)) {
         return response;
       }

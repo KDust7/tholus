@@ -1,3 +1,3 @@
 export interface ProxyTransport {
-  fetch(input: string, init?: RequestInit): Promise<Response>;
+  fetch(input: string | Request, init?: RequestInit): Promise<Response>;
 }

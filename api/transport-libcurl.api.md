@@ -1,6 +1,6 @@
 # @uv-wasm/transport-libcurl
 
-12 public exports.
+14 public exports.
 
 ```ts
 export declare function assertLibcurlShape(module: unknown, wantsWasmUrl: boolean): LibcurlModule;
@@ -25,7 +25,7 @@ export interface LibcurlModule {
 }
 
 export interface LibcurlSession {
-    fetch(input: string, init?: RequestInit): Promise<Response>;
+    fetch(input: string | Request, init?: RequestInit): Promise<Response>;
     set_connections(total: number, cache: number, perHost: number): void;
     close(): void;
 }
@@ -44,9 +44,13 @@ export interface LibcurlTransportOptions {
     connectionsPerHost?: number;
 }
 
+export declare function plainHeaders(headers: Headers): Record<string, string>;
+
 export interface ProxyTransport {
-    fetch(input: string, init?: RequestInit): Promise<Response>;
+    fetch(input: string | Request, init?: RequestInit): Promise<Response>;
 }
+
+export declare function requestOf(input: string | Request, init?: RequestInit): Request;
 
 export declare function withUserAgent(headers: Headers, userAgent: string | undefined): Headers;
 ```
