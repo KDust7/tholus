@@ -70,7 +70,7 @@ describe("the report describes what a package actually exports", () => {
 
   it("reports nothing for a file that is not a module", () => {
     const entry = resolve(sandbox, "script.d.ts");
-    writeFileSync(entry, "declare const notExported: number;" + String.fromCharCode(10), "utf8");
+    writeFileSync(entry, `declare const notExported: number;${String.fromCharCode(10)}`, "utf8");
     expect(surfaceOf(entry)).toEqual([]);
   });
 });

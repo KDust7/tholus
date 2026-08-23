@@ -36,8 +36,13 @@ interface Rendered {
   everything: string[];
 }
 
-function render(stream: string, columns: number, rows: number): Promise<Rendered> {
-  const terminal = new Terminal({ cols: columns, rows, allowProposedApi: true });
+function render(
+  stream: string,
+  columns: number,
+  rows: number,
+  convertEol = true,
+): Promise<Rendered> {
+  const terminal = new Terminal({ cols: columns, rows, convertEol, allowProposedApi: true });
   return new Promise((done) => {
     terminal.write(stream, () => {
       const buffer = terminal.buffer.active;
@@ -107,9 +112,10 @@ describe.skipIf(!canRun)("what a real terminal makes of the bytes uv paints", ()
 
   it("installed, so there is a real render to look at", () => {
     expect(code, `the install failed: ${stream}`).toBe(0);
-    expect(stream.length, "nothing was written, so this gate would pass on silence").toBeGreaterThan(
-      0,
-    );
+    expect(
+      stream.length,
+      "nothing was written, so this gate would pass on silence",
+    ).toBeGreaterThan(0);
   });
 
   it("painted progress rather than printing a static log", () => {
@@ -130,15 +136,32 @@ describe.skipIf(!canRun)("what a real terminal makes of the bytes uv paints", ()
     const { everything } = await render(stream, COLUMNS, ROWS);
     const lines = nonEmpty(everything);
 
-    expect(lines, "uv's own summary is not on the screen").toContain("Installed 1 package");
+    expect(
+      lines.filter((line) => /^Installed 1 package in /.test(line)),
+      "uv's own summary is not on the screen",
+    ).toHaveLength(1);
     expect(
       lines.filter((line) => line.includes("Preparing packages")),
       "a progress frame was left behind instead of being erased",
     ).toEqual([]);
     expect(
-      lines.filter((line) => /█|░|\[=+>?\s*\]/.test(line)),
+      lines.filter((line) => /[█░]/.test(line)),
       "a progress bar was left drawn on the final screen",
     ).toEqual([]);
+    expect(
+      lines.filter((line) => /^\s+\S/.test(line) && !line.trimStart().startsWith("+")),
+      "a line starts indented, which is what a terminal that will not convert LF produces",
+    ).toEqual([]);
+  });
+
+  it("staircases without the conversion, which is the trap the xterm package warns about", async () => {
+    const { everything } = await render(stream, COLUMNS, ROWS, false);
+    const indented = nonEmpty(everything).filter((line) => /^\s+\S/.test(line));
+    expect(
+      indented.length,
+      "uv emits bare LF, so a terminal that does not convert it must staircase; " +
+        "if this ever comes back empty the gate above has stopped proving anything",
+    ).toBeGreaterThan(0);
   });
 
   it("wraps nothing past the width it was told about", async () => {
@@ -150,6 +173,8 @@ describe.skipIf(!canRun)("what a real terminal makes of the bytes uv paints", ()
 
   it("renders the same summary at a different width", async () => {
     const { everything } = await render(stream, 120, ROWS);
-    expect(nonEmpty(everything)).toContain("Installed 1 package");
+    expect(
+      nonEmpty(everything).filter((line) => /^Installed 1 package in /.test(line)),
+    ).toHaveLength(1);
   });
 });

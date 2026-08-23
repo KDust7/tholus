@@ -1,5 +1,5 @@
 import type { Disposable, TerminalLike } from "./terminal.js";
-import { TerminalWriter } from "./terminal.js";
+import { TerminalWriter, warnUnlessConvertingEol } from "./terminal.js";
 
 export interface ExecResultLike {
   code: number;
@@ -39,6 +39,7 @@ export async function runInTerminal(
   argv: string[],
   options: RunOptions = {},
 ): Promise<ExecResultLike> {
+  warnUnlessConvertingEol(terminal);
   const writer = options.writer ?? new TerminalWriter(terminal);
   const terminateAfter = options.terminateAfter ?? 2;
   const handle = engine.exec(argv, {

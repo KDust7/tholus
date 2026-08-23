@@ -94,6 +94,26 @@ only. It is emitted only when you choose a transport: the `platform` default del
 there is nothing to read; deriving it from a response body would mean interposing on the download
 path, which is not a trade worth making for a progress bar.
 
+## Wiring it to a terminal
+
+`@uv-wasm/xterm` writes uv's bytes through untouched, no rewriting, no line-ending translation,
+because a terminal is the thing that owns rendering. That leaves one setting the host has to get
+right:
+
+```ts
+const terminal = new Terminal({ convertEol: true });
+```
+
+uv writes bare `LF`. A terminal that does not convert it moves the cursor down without returning
+it to column 0, so every line starts where the last one ended and the output reads as a staircase.
+`runInTerminal` warns once on a terminal that says `convertEol: false`, and says nothing when the
+terminal does not report the option at all, xterm.js is not the only terminal shaped like
+`TerminalLike`.
+
+`test/parity/tty-render.test.ts` replays a real install through a headless terminal both ways: with
+the conversion nothing is indented and every progress frame is erased behind the summary; without it
+the staircase reappears, which is what keeps that gate honest.
+
 ## Reading what uv built
 
 ```ts

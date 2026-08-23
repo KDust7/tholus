@@ -1,6 +1,6 @@
 # @uv-wasm/xterm
 
-23 public exports.
+25 public exports.
 
 ```ts
 export interface AttachOptions {
@@ -45,6 +45,8 @@ export interface EngineLike {
         stderr?: (chunk: Uint8Array) => void;
     }): ExecHandleLike;
 }
+
+EOL_WARNING: string
 
 export interface ExecHandleLike {
     readonly exit: Promise<ExecResultLike>;
@@ -110,6 +112,9 @@ export declare function splitArgv(line: string): string[];
 export interface TerminalLike {
     readonly cols: number;
     readonly rows: number;
+    readonly options?: {
+        convertEol?: boolean;
+    };
     write(data: string | Uint8Array, callback?: () => void): void;
     onData(listener: (data: string) => void): Disposable;
     onResize(listener: (size: TerminalSize) => void): Disposable;
@@ -145,4 +150,6 @@ export declare class TerminalWriter {
 export declare class UnterminatedQuote extends Error {
     constructor(quote: string);
 }
+
+export declare function warnUnlessConvertingEol(terminal: TerminalLike, report?: (message: string) => void): void;
 ```

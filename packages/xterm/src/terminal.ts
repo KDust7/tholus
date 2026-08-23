@@ -10,9 +10,27 @@ export interface TerminalSize {
 export interface TerminalLike {
   readonly cols: number;
   readonly rows: number;
+  readonly options?: { convertEol?: boolean };
   write(data: string | Uint8Array, callback?: () => void): void;
   onData(listener: (data: string) => void): Disposable;
   onResize(listener: (size: TerminalSize) => void): Disposable;
+}
+
+export const EOL_WARNING =
+  "uv writes bare LF, so a terminal without `convertEol: true` renders its output as a staircase. " +
+  "Set it when constructing the terminal.";
+
+const warned = new WeakSet<object>();
+
+export function warnUnlessConvertingEol(
+  terminal: TerminalLike,
+  report: (message: string) => void = (message) => console.warn(message),
+): void {
+  if (terminal.options?.convertEol !== false || warned.has(terminal)) {
+    return;
+  }
+  warned.add(terminal);
+  report(EOL_WARNING);
 }
 
 export const HIGH_WATER_BYTES = 256 * 1024;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TerminalWriter } from "./terminal.js";
+import { EOL_WARNING, TerminalWriter, warnUnlessConvertingEol } from "./terminal.js";
 import { FakeTerminal } from "./testing/fake-terminal.js";
 
 const encoder = new TextEncoder();
@@ -112,5 +112,28 @@ describe("a coalesced batch is measured in bytes, not in javascript characters",
       terminal.text,
       "a string's length counts utf-16 units, so sizing the buffer by it under-allocates",
     ).toBe("startRésolu ✓ ☃!");
+  });
+});
+
+describe("a terminal that will not convert uv's bare newlines", () => {
+  const complaints = (options?: { convertEol?: boolean }): string[] => {
+    const said: string[] = [];
+    const terminal = new FakeTerminal();
+    const subject = options === undefined ? terminal : Object.assign(terminal, { options });
+    warnUnlessConvertingEol(subject, (message) => said.push(message));
+    warnUnlessConvertingEol(subject, (message) => said.push(message));
+    return said;
+  };
+
+  it("is told once, because uv writes LF and a terminal without the option staircases", () => {
+    expect(complaints({ convertEol: false })).toEqual([EOL_WARNING]);
+  });
+
+  it("is left alone when it converts", () => {
+    expect(complaints({ convertEol: true })).toEqual([]);
+  });
+
+  it("is left alone when it says nothing either way, since xterm.js is not the only terminal", () => {
+    expect(complaints()).toEqual([]);
   });
 });
