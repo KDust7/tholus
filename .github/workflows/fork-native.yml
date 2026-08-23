@@ -32,8 +32,12 @@ jobs:
           git submodule update --init --recursive
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+
+      - name: Take the toolchain the fork pins, not the one we prefer
+        working-directory: vendor/uv
+        run: |
+          rustup show active-toolchain
+          rustup component add rustfmt clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
