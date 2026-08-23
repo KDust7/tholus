@@ -1,0 +1,22 @@
+{
+  "name": "@uv-wasm/demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0 OR MIT",
+  "description": "A static, framework-free page that runs uv in a terminal and hands the environment to Pyodide",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && esbuild dist/main.js --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/main.js --allow-overwrite --loader:.css=text",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@uv-wasm/core": "workspace:*",
+    "@uv-wasm/pyodide": "workspace:*",
+    "@uv-wasm/xterm": "workspace:*",
+    "@xterm/xterm": "6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "esbuild": "^0.27.2"
+  }
+}

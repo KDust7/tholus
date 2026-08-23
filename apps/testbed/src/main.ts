@@ -1,4 +1,4 @@
-import { type Engine, type EngineConfigInput, type ExecOptions, createEngine } from "@uv-wasm/core";
+import { createEngine, type Engine, type EngineConfigInput, type ExecOptions } from "@uv-wasm/core";
 import type { EngineEvent } from "@uv-wasm/engine-protocol";
 
 export interface TestbedResult {
@@ -85,9 +85,7 @@ const driver: TestbedDriver = {
 
   async call(method, request) {
     const [namespace, name] = method.split(".");
-    const api = (running() as unknown as Record<string, Record<string, unknown>>)[
-      namespace ?? ""
-    ];
+    const api = (running() as unknown as Record<string, Record<string, unknown>>)[namespace ?? ""];
     const call = api?.[name ?? ""];
     if (typeof call !== "function") {
       return { failed: true, message: `the testbed has no \`${method}\`` };

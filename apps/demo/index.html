@@ -1,0 +1,74 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>uv in the browser</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #e6e6e6;
+    --dim: #8b8b8b;
+    --edge: #2a2a2a;
+    --paper: #101010;
+    --accent: #7dd3a0;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    background: var(--paper);
+    color: var(--ink);
+    font: 14px/1.5 ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.9rem 1.2rem;
+    border-bottom: 1px solid var(--edge);
+  }
+
+  h1 { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: 0.02em; }
+
+  #build { color: var(--dim); font-size: 0.8rem; }
+
+  #terminal { min-height: 0; padding: 0.6rem 0.4rem; }
+
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.2rem;
+    border-top: 1px solid var(--edge);
+  }
+
+  button {
+    font: inherit;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    padding: 0.3rem 0.7rem;
+    cursor: pointer;
+  }
+
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: 0.4; cursor: default; }
+
+  #status { margin-left: auto; color: var(--dim); font-size: 0.8rem; }
+</style>
+<header>
+  <h1>uv, running in this tab</h1>
+  <span id="build">booting…</span>
+</header>
+<div id="terminal"></div>
+<footer>
+  <button id="mount" disabled>hand the environment to Python</button>
+  <span id="status"></span>
+</footer>
+<script type="module" src="/demo/main.js"></script>
