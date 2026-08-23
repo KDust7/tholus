@@ -147,6 +147,42 @@ describe("a real multi-package install, taken from a recorded fixture", () => {
   });
 });
 
+describe("a dry run says what it would do, and the SDK has to hear it", () => {
+  const DRY = [
+    "Resolved 1 package in 12ms",
+    "Would download 1 package",
+    "Would install 1 package",
+    " + idna==3.11",
+    "",
+  ].join("\n");
+
+  it("reports the packages a dry run would have installed", () => {
+    const report = reportOf(read([DRY]));
+    expect(
+      report?.installed,
+      "uv never writes `Installed` for a dry run, so a reader keyed only on that reports nothing",
+    ).toEqual([{ name: "idna", version: "3.11" }]);
+  });
+
+  it("still opens the phases a dry run walks through", () => {
+    const phases = read([DRY])
+      .filter((event) => event.type === "phase")
+      .map((event) => `${event.phase}:${event.state}`);
+    expect(phases).toEqual([
+      "resolving:start",
+      "resolving:end",
+      "downloading:start",
+      "downloading:end",
+      "installing:start",
+      "installing:end",
+    ]);
+  });
+
+  it("says nothing when uv says it would change nothing", () => {
+    expect(kinds(read(["Would make no changes\n"]))).toEqual([]);
+  });
+});
+
 describe("a source build is announced as it happens", () => {
   it("brackets each build with a start and an end", () => {
     const events = read([

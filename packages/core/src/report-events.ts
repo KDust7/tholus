@@ -6,6 +6,8 @@ const ANSI = new RegExp(`${ESCAPE}\\[[0-9;]*[A-Za-z]`, "g");
 const SUMMARY =
   /^(Resolved|Prepared|Installed|Uninstalled|Audited) (\d+) packages? in (\d+(?:\.\d+)?)(ms|s|m)$/;
 
+const WOULD = /^Would (download|install|uninstall) (\d+) packages?$/;
+
 const CHANGE = /^ ([+~-]) (\S+?)(?:==(\S+)| @ (\S+))?$/;
 
 const BUILDING = /^\s*(Building|Built) (\S+?)(?:==(\S+)| @ (\S+))?$/;
@@ -16,6 +18,12 @@ const PHASE_OF: Record<string, EnginePhase> = {
   Installed: "installing",
   Uninstalled: "uninstalling",
   Audited: "auditing",
+};
+
+const WOULD_PHASE_OF: Record<string, EnginePhase> = {
+  download: "downloading",
+  install: "installing",
+  uninstall: "uninstalling",
 };
 
 const MULTIPLIER: Record<string, number> = { ms: 1, s: 1000, m: 60_000 };
@@ -92,6 +100,16 @@ export function createReportReader(invocationId: string): ReportReader {
       if (building[1] === "Building" && open !== "building") {
         into.push({ type: "phase", invocationId, phase: "building", state: "start" });
         open = "building";
+      }
+      return;
+    }
+
+    const would = WOULD.exec(text);
+    if (would) {
+      const phase = WOULD_PHASE_OF[would[1] as string] as EnginePhase;
+      closePhase(phase, into);
+      if (phase === "installing" || phase === "uninstalling") {
+        reported = true;
       }
       return;
     }
