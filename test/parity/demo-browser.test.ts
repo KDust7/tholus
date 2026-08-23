@@ -10,6 +10,7 @@ import { createReplayHandler, emptyReplayLog, readSnapshot } from "./replay-serv
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const fixture = resolve(root, "test/fixtures/install");
+const conflictFixture = resolve(root, "test/fixtures/conflicts");
 
 const files = new Map<string, string>([
   ["/", resolve(root, "apps/demo/index.html")],
@@ -44,6 +45,7 @@ const VENV = "/work/.venv";
 interface DemoHandle {
   run(line: string): Promise<number>;
   mountPython(): void;
+  useRelay(relayUrl: string): Promise<void>;
 }
 
 const screenOf = (page: Page): Promise<string> => page.locator(".xterm-screen").innerText();
@@ -66,7 +68,12 @@ describe.skipIf(!canRun)("the demo runs uv in a terminal, in a real browser", ()
   const pageErrors: string[] = [];
 
   beforeAll(async () => {
-    const replay = createReplayHandler(await readSnapshot(fixture), log);
+    const installable = await readSnapshot(fixture);
+    const conflicting = await readSnapshot(conflictFixture);
+    const replay = createReplayHandler(
+      { ...installable, responses: { ...conflicting.responses, ...installable.responses } },
+      log,
+    );
     site = await serveStatic(
       files,
       (request, response) => {
@@ -77,7 +84,10 @@ describe.skipIf(!canRun)("the demo runs uv in a terminal, in a real browser", ()
         replay(request, response);
         return true;
       },
-      pyodideDir === undefined ? [] : [{ prefix: "/pyodide/", directory: pyodideDir }],
+      [
+        { prefix: "/libcurl/", directory: resolve(root, "apps/demo/dist/libcurl") },
+        ...(pyodideDir === undefined ? [] : [{ prefix: "/pyodide/", directory: pyodideDir }]),
+      ],
     );
     log.origin = site.origin;
 
@@ -212,6 +222,56 @@ ${transcript}`,
     },
     900_000,
   );
+
+  it("reads an unsatisfiable resolution out in uv's own words", async () => {
+    const code = await run(
+      page,
+      `uv pip install uv-wasm-left==1.0.0 uv-wasm-right==1.0.0 --python ${VENV} --no-cache ` +
+        `--index-url ${site.origin}/simple --python-version 3.14`,
+    );
+    const screen = await screenOf(page);
+
+    expect(code, `the conflict resolved, which it must not:\n${screen}`).not.toBe(0);
+    expect(screen).toContain("No solution found when resolving dependencies");
+    expect(
+      screen,
+      "the derivation tree is the readable half; without it this is just a failure",
+    ).toContain("uv-wasm-shared");
+    expect(log.misses, `the index was asked for ${log.misses.join(", ")}`).toEqual([]);
+  }, 600_000);
+
+  it("refuses a relay URL that is not a websocket, and keeps working", async () => {
+    await page.evaluate(
+      (url) => (globalThis as unknown as { __demo: DemoHandle }).__demo.useRelay(url),
+      "https://not-a-relay.invalid/",
+    );
+
+    const said = await page.locator("#status").innerText();
+    expect(said).toMatch(/ws:|wss:/);
+    expect(
+      await page.locator("#relay").isDisabled(),
+      "the input stayed disabled, so the mistake cannot be corrected",
+    ).toBe(false);
+    expect(await run(page, "uv --version"), "the demo stopped working after a bad relay").toBe(0);
+  }, 600_000);
+
+  it("ships the libcurl module the relay path names", async () => {
+    const response = await page.request.get(`${site.origin}/libcurl/libcurl.mjs`);
+    expect(
+      response.status(),
+      "the demo offers a relay it cannot actually load; the build must copy libcurl beside the page",
+    ).toBe(200);
+    expect((await page.request.get(`${site.origin}/libcurl/libcurl.wasm`)).status()).toBe(200);
+  }, 120_000);
+
+  it("refuses a relay URL with no trailing slash, which libcurl needs", async () => {
+    await page.evaluate(
+      (url) => (globalThis as unknown as { __demo: DemoHandle }).__demo.useRelay(url),
+      "wss://relay.invalid",
+    );
+
+    expect(await page.locator("#status").innerText()).toMatch(/trailing slash/);
+  }, 600_000);
 
   it("raised no uncaught page errors along the way", () => {
     expect(pageErrors).toEqual([]);

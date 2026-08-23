@@ -18,6 +18,12 @@ rules. With `{kind:"libcurl"}` they are tunneled through a Wisp relay the host s
 construction sees every request and response, see [transports.md](transports.md). Choosing that
 transport means choosing to trust that relay.
 
+`apps/demo` is shaped so that this is a choice you make, not one made for you: no
+relay is configured until you type one into the footer, and the page says so beneath the terminal.
+A relay operator sees every hostname you reach and the size and timing of every response, which is
+enough to identify which packages you installed even though the bodies are TLS-protected end to end.
+Run your own, or do not name one.
+
 ## What an index can observe
 
 The same things any package installer reveals: which packages and versions you asked for, and when.

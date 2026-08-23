@@ -74,6 +74,13 @@ const engine = await createEngine({
 
 You need a Wisp relay to use this. Running one is out of scope here.
 
+`apps/demo` is the worked example: it takes a relay URL in the footer, and naming one rebuilds the
+engine with this transport instead of reconfiguring the running one, because the transport is
+installed in the worker before uv boots. The new engine is created before the old one is torn down,
+so a relay that is refused leaves a working page. The demo serves `libcurl.mjs` and `libcurl.wasm`
+from its own origin under `/libcurl/`; a deployment has to copy them there, see
+[hosting.md](hosting.md).
+
 ## Writing your own
 
 Any object with a `fetch` method will do, so a host can implement the seam over anything, a service

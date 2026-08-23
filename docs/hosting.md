@@ -14,6 +14,10 @@ uv-wasm is static files. There is no server to run, and this project operates no
 The worker resolves `engine.js` and `engine_bg.wasm` relative to its own URL, so keeping the shipped
 layout is the path of least resistance.
 
+Only if you offer the libcurl transport, add `libcurl.mjs` and `libcurl.wasm` wherever your
+`moduleUrl` and `wasmUrl` point, `apps/demo` puts them under `/libcurl/`. They are imported lazily,
+on the first request through that transport, so a page that never names a relay never fetches them.
+
 ## No COOP/COEP
 
 You do not need cross-origin isolation. The engine is single-threaded and uses no

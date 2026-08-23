@@ -62,6 +62,20 @@
 
   #status { margin-left: auto; color: var(--dim); font-size: 0.8rem; }
 
+  input {
+    font: inherit;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+    padding: 0.3rem 0.5rem;
+    min-width: 22ch;
+  }
+
+  input::placeholder { color: var(--dim); }
+  input:focus-visible, button:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+  input:disabled, button:disabled { opacity: 0.4; }
+
   #disclaimer {
     flex-basis: 100%;
     margin: 0.4rem 0 0;
@@ -79,11 +93,15 @@
 <div id="terminal"></div>
 <footer>
   <button id="mount" disabled>hand the environment to Python</button>
+  <input id="relay" type="url" placeholder="wss://your-wisp-relay/" spellcheck="false"
+         aria-label="Wisp relay URL">
+  <button id="connect">route through it</button>
   <span id="status"></span>
   <p id="disclaimer">
     An unofficial port of <a href="https://github.com/astral-sh/uv">Astral's uv</a> to WebAssembly.
     Not affiliated with or endorsed by Astral. Nothing you type leaves this tab except the package
-    requests themselves, which go straight to the index, there is no server in between.
+    requests themselves, which go straight to the index, there is no server in between. Name a Wisp
+    relay and they go through that instead; it is yours to run, and it sees which hosts you reach.
   </p>
 </footer>
 <script type="module" src="/demo/main.js"></script>

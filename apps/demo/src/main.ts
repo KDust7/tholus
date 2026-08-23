@@ -1,6 +1,6 @@
 import { createEngine, type Engine } from "@uv-wasm/core";
 import { attachPyodide, type PyodideLike, type PyodideRuntime } from "@uv-wasm/pyodide";
-import { attachTerminal } from "@uv-wasm/xterm";
+import { attachTerminal, type TerminalSession } from "@uv-wasm/xterm";
 import { Terminal } from "@xterm/xterm";
 import terminalStyles from "@xterm/xterm/css/xterm.css";
 
@@ -12,10 +12,15 @@ const MOTD = [
 
 const VENV = "/work/.venv";
 const SITE_PACKAGES = `${VENV}/lib/python3.14/site-packages`;
+const USER_AGENT = "uv/0.12.3 (+https://github.com/astral-sh/uv)";
+const PLATFORM = { kind: "platform" } as const;
+
+type Transport = typeof PLATFORM | ReturnType<typeof relayTransport>;
 
 export interface DemoHandle {
   run(line: string): Promise<number>;
   mountPython(): void;
+  useRelay(relayUrl: string): Promise<void>;
 }
 
 const el = <T extends Element>(selector: string): T => {
@@ -32,6 +37,16 @@ const describe = (error: unknown): string =>
 const status = (text: string): void => {
   el("#status").textContent = text;
 };
+
+function relayTransport(relayUrl: string) {
+  return {
+    kind: "libcurl",
+    moduleUrl: "/libcurl/libcurl.mjs",
+    wasmUrl: "/libcurl/libcurl.wasm",
+    relayUrl,
+    userAgent: USER_AGENT,
+  } as const;
+}
 
 async function loadPyodide(): Promise<PyodideLike> {
   const specifier = "/pyodide/pyodide.mjs";
@@ -55,11 +70,12 @@ async function main(): Promise<void> {
   });
   terminal.open(el("#terminal"));
 
+  const start = async (transport: Transport): Promise<Engine> =>
+    createEngine({ config: { cwd: "/work", cache: { kind: "opfs" }, transport } });
+
   let engine: Engine;
   try {
-    engine = await createEngine({
-      config: { cwd: "/work", cache: { kind: "opfs" } },
-    });
+    engine = await start(PLATFORM);
   } catch (error) {
     terminal.write(`\r\nuv could not start: ${describe(error)}\r\n`);
     el("#build").textContent = "failed to boot";
@@ -98,17 +114,20 @@ async function main(): Promise<void> {
     }
   };
 
-  const session = attachTerminal(terminal, engine, {
-    motd: MOTD,
-    cwd: "/work",
-    commands: {
-      python: ({ argv, write }) => python(argv, write),
-      clear: () => {
-        terminal.clear();
-        return 0;
+  const attach = (to: Engine): TerminalSession =>
+    attachTerminal(terminal, to, {
+      motd: MOTD,
+      cwd: "/work",
+      commands: {
+        python: ({ argv, write }) => python(argv, write),
+        clear: () => {
+          terminal.clear();
+          return 0;
+        },
       },
-    },
-  });
+    });
+
+  let session = attach(engine);
 
   const mount = el<HTMLButtonElement>("#mount");
   mount.disabled = false;
@@ -132,11 +151,46 @@ async function main(): Promise<void> {
     })();
   });
 
+  const relay = el<HTMLInputElement>("#relay");
+  const connect = el<HTMLButtonElement>("#connect");
+
+  const useRelay = async (relayUrl: string): Promise<void> => {
+    const wanted = relayUrl.trim();
+    connect.disabled = true;
+    relay.disabled = true;
+    status(wanted === "" ? "reconnecting through this tab…" : `reconnecting through ${wanted}…`);
+    let replacement: Engine;
+    try {
+      replacement = await start(wanted === "" ? PLATFORM : relayTransport(wanted));
+    } catch (error) {
+      status(describe(error));
+      terminal.write(`\r\nThe relay was refused: ${describe(error)}\r\n`);
+      connect.disabled = false;
+      relay.disabled = false;
+      return;
+    }
+
+    session.dispose();
+    runtime = undefined;
+    void engine.dispose();
+    engine = replacement;
+    session = attach(engine);
+    mount.disabled = false;
+    status(wanted === "" ? "using this tab's own fetch" : `routing through ${wanted}`);
+    connect.disabled = false;
+    relay.disabled = false;
+  };
+
+  connect.addEventListener("click", () => {
+    void useRelay(relay.value);
+  });
+
   (globalThis as unknown as { __demo: DemoHandle }).__demo = {
     run: (line) => session.executeLine(line),
     mountPython: () => {
       mount.click();
     },
+    useRelay,
   };
 }
 
