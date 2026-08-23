@@ -56,6 +56,26 @@ bun run --filter @uv-wasm/parity record        # the CLI goldens
 
 All of them need a native uv built from the same fork commit as the artifact.
 
+## What the fixtures contain, and why that is publishable
+
+The snapshots embed the actual bytes of the distributions each scenario downloads, 8.9 MB across
+27 distributions, because a replay server that did not would be replaying nothing. The pre-reveal
+checklist asks for this posture to be stated, not assumed, so:
+
+- Everything embedded is an unmodified upstream artifact from PyPI, recorded byte for byte. None
+  is patched, repacked or renamed.
+- The licenses are permissive, checked against PyPI and not from memory: Apache-2.0
+  (`requests`, `msgpack`), MIT (`urllib3`, `charset-normalizer`, `zipp`, `attrs`, `setuptools`,
+  `hatchling`, `pathspec`, `pluggy`), BSD-3-Clause (`idna`, `flit-core`), MPL-2.0 (`certifi`). All
+  permit redistribution; MPL-2.0's source-availability condition is satisfied by the artifact being
+  the unmodified upstream one.
+- Four are ours, `uv_wasm_left`, `uv_wasm_right`, `uv_wasm_shared` (two versions), hand-authored
+  to produce a resolution conflict that no real package pair reliably produces.
+
+If that posture ever stops being comfortable, the fixtures are regenerable: delete them, run the
+recorder, and the only cost is the recording time. Nothing in the suite depends on the *bytes* being
+in git, only on their being identical between the two binaries at record time.
+
 ## Running it
 
 ```sh
