@@ -1,4 +1,4 @@
-import type { IndexOptions } from "@uv-wasm/engine-protocol";
+import type { IndexOptions } from "@tholus/engine-protocol";
 
 export const UV_DEFAULT_INDEX = "UV_DEFAULT_INDEX";
 export const UV_INDEX = "UV_INDEX";

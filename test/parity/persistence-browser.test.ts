@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, resolve } from "node:path";
-import { PROTOCOL_VERSION } from "@uv-wasm/engine-protocol";
+import { PROTOCOL_VERSION } from "@tholus/engine-protocol";
 import type { Browser, Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { chosenBrowser, launchBrowser } from "./browser-harness.js";
@@ -35,7 +35,7 @@ const TYPES: Record<string, string> = {
 
 const PAGE = `<!doctype html>
 <meta charset="utf-8">
-<title>uv-wasm persistence</title>
+<title>tholus persistence</title>
 <script type="module">
 globalThis.__boot = (id) => {
   const worker = new Worker("/dist/worker.js", { type: "module" });
@@ -63,7 +63,7 @@ globalThis.__await = async (id, type, budgetMs) => {
 };
 globalThis.__wipeOpfs = async () => {
   const root = await navigator.storage.getDirectory();
-  await root.removeEntry("uv-wasm", { recursive: true }).catch(() => {});
+  await root.removeEntry("tholus", { recursive: true }).catch(() => {});
   return true;
 };
 </script>`;

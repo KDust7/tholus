@@ -1,4 +1,4 @@
-import type { ProxyTransport } from "@uv-wasm/engine-protocol";
+import type { ProxyTransport } from "@tholus/engine-protocol";
 
 export type { ProxyTransport };
 

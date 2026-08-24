@@ -2,8 +2,8 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { applyHookWrites, type HookVfs, hookTrees, sitePackagesOf } from "@uv-wasm/core";
-import { attachPyodide, type PyodideLike, type PyodideRuntime } from "@uv-wasm/pyodide";
+import { applyHookWrites, type HookVfs, hookTrees, sitePackagesOf } from "@tholus/core";
+import { attachPyodide, type PyodideLike, type PyodideRuntime } from "@tholus/pyodide";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { jsPath, wasmPath } from "./cli-goldens.js";

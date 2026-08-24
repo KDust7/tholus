@@ -7,8 +7,8 @@ import {
   loadTranscript,
   replayTranscript,
   transcriptNames,
-} from "@uv-wasm/contract-transcripts";
-import type { WorkerMessage } from "@uv-wasm/engine-protocol";
+} from "@tholus/contract-transcripts";
+import type { WorkerMessage } from "@tholus/engine-protocol";
 import { describe, expect, it } from "vitest";
 import { createEngineWorker, type EngineExports } from "../../packages/core/src/engine-worker.js";
 

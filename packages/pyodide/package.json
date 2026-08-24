@@ -1,5 +1,5 @@
 {
-  "name": "@uv-wasm/pyodide",
+  "name": "@tholus/pyodide",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -20,10 +20,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KDust7/uv-wasm.git",
+    "url": "git+https://github.com/KDust7/tholus.git",
     "directory": "packages/pyodide"
   },
-  "homepage": "https://github.com/KDust7/uv-wasm#readme",
+  "homepage": "https://github.com/KDust7/tholus#readme",
   "publishConfig": {
     "access": "public",
     "provenance": true
@@ -43,8 +43,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@uv-wasm/core": "workspace:*",
-    "@uv-wasm/engine-protocol": "workspace:*"
+    "@tholus/core": "workspace:*",
+    "@tholus/engine-protocol": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

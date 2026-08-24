@@ -426,7 +426,7 @@ async function record(name, scenario) {
   origin = `http://127.0.0.1:${port}`;
 
   const requirements = `${scenario.requirements.join("\n")}\n`;
-  const workspace = mkdtempSync(join(tmpdir(), `uv-wasm-record-${name}-`));
+  const workspace = mkdtempSync(join(tmpdir(), `tholus-record-${name}-`));
   writeFileSync(join(workspace, "requirements.in"), requirements);
 
   const syncing = scenario.command === "sync";

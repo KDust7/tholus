@@ -1,4 +1,4 @@
-import type { TreeEntry } from "@uv-wasm/engine-protocol";
+import type { TreeEntry } from "@tholus/engine-protocol";
 import { describe, expect, it } from "vitest";
 
 import type { PyodideFacts } from "./facts.js";

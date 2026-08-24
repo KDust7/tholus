@@ -1,6 +1,6 @@
-import { createEngine, type Engine } from "@uv-wasm/core";
-import { attachPyodide, type PyodideLike, type PyodideRuntime } from "@uv-wasm/pyodide";
-import { attachTerminal, type TerminalSession } from "@uv-wasm/xterm";
+import { createEngine, type Engine } from "@tholus/core";
+import { attachPyodide, type PyodideLike, type PyodideRuntime } from "@tholus/pyodide";
+import { attachTerminal, type TerminalSession } from "@tholus/xterm";
 import { Terminal } from "@xterm/xterm";
 import terminalStyles from "@xterm/xterm/css/xterm.css";
 

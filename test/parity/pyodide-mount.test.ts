@@ -3,8 +3,8 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { type ExportVfs, exportTree } from "@uv-wasm/core";
-import { attachPyodide, type PyodideLike, type PyodideRuntime } from "@uv-wasm/pyodide";
+import { type ExportVfs, exportTree } from "@tholus/core";
+import { attachPyodide, type PyodideLike, type PyodideRuntime } from "@tholus/pyodide";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { jsPath, PROGRAM, root, wasmPath } from "./cli-goldens.js";

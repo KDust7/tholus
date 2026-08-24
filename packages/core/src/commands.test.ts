@@ -1,4 +1,4 @@
-import { createMockEngine, type MockScript } from "@uv-wasm/mock-engine";
+import { createMockEngine, type MockScript } from "@tholus/mock-engine";
 import { describe, expect, it } from "vitest";
 import { parseShow, runCommand } from "./commands.js";
 import { createEngine } from "./engine.js";

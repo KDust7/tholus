@@ -1,5 +1,5 @@
 {
-  "name": "uv-wasm-monorepo",
+  "name": "tholus-monorepo",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -30,8 +30,8 @@
     "test:coverage": "vitest run --coverage packages tools test/contract",
     "build": "bun run --filter './packages/*' build && bun run --filter './apps/*' build",
     "wasm:build": "cargo xtask build",
-    "size": "bun run --filter @uv-wasm/size-report report",
-    "api": "bun run --filter @uv-wasm/api-report report"
+    "size": "bun run --filter @tholus/size-report report",
+    "api": "bun run --filter @tholus/api-report report"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.7",

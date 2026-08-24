@@ -1,4 +1,4 @@
-import type { TreeEntry } from "@uv-wasm/engine-protocol";
+import type { TreeEntry } from "@tholus/engine-protocol";
 import type { PyodideFacts, PyodideFileSystem } from "./facts.js";
 
 export const MOUNT_ROOT = "/uv_envs";

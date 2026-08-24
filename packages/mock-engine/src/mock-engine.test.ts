@@ -2,7 +2,7 @@ import {
   EXIT_CODE_CANCELLED,
   PROTOCOL_VERSION,
   type WorkerMessage,
-} from "@uv-wasm/engine-protocol";
+} from "@tholus/engine-protocol";
 import { describe, expect, it } from "vitest";
 import { createMockEngine } from "./index.js";
 import { matchCommand } from "./script.js";

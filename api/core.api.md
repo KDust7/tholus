@@ -1,4 +1,4 @@
-# @uv-wasm/core
+# @tholus/core
 
 123 public exports.
 
@@ -404,7 +404,7 @@ export interface InstallRequest extends CommandOptions {
     requireHashes?: boolean;
 }
 
-INTERNAL_NAME = "uv-wasm"
+INTERNAL_NAME = "tholus"
 
 export declare function interpreterAbiTag(vfs: ProfileReader, path?: string): string;
 
@@ -587,7 +587,7 @@ export interface StorageRoom {
     usage: number;
 }
 
-STORE_ROOT = "uv-wasm"
+STORE_ROOT = "tholus"
 
 STORE_VERSION = "v1"
 

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { EXIT_CODE_CANCELLED } from "@uv-wasm/engine-protocol";
+import { EXIT_CODE_CANCELLED } from "@tholus/engine-protocol";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import type { EngineEndpoint } from "../../packages/core/src/endpoint.js";

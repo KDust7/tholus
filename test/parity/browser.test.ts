@@ -26,7 +26,7 @@ const TARGET_TRIPLE = /\b[a-z0-9_]+(?:-[a-z0-9_]+){2,3}\)/;
 
 const PAGE = `<!doctype html>
 <meta charset="utf-8">
-<title>uv-wasm engine</title>
+<title>tholus engine</title>
 <script type="module">
 import init, { Engine, version, buildInfo } from "./engine.js";
 globalThis.__ready = (async () => {

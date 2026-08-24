@@ -34,7 +34,7 @@ if (process.env.CI && !canCompare) {
 if (!canCompare) {
   console.warn(
     `[native-parity] SKIPPED, needs the engine artifact in packages/core/assets and goldens at ${goldensPath}. ` +
-      "Record them with `bun run --filter @uv-wasm/parity record` where a native uv exists.",
+      "Record them with `bun run --filter @tholus/parity record` where a native uv exists.",
   );
 }
 

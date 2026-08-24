@@ -31,10 +31,10 @@ async function main(): Promise<void> {
     const entries = surfaceOf(entry);
     await writeFile(
       resolve(out, `${name}.api.md`),
-      renderReport(`@uv-wasm/${name}`, entries),
+      renderReport(`@tholus/${name}`, entries),
       "utf8",
     );
-    process.stdout.write(`@uv-wasm/${name}: ${entries.length} exports\n`);
+    process.stdout.write(`@tholus/${name}: ${entries.length} exports\n`);
   }
 
   if (missing.length > 0) {

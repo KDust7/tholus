@@ -1,4 +1,4 @@
-import type { HookTree } from "@uv-wasm/engine-protocol";
+import type { HookTree } from "@tholus/engine-protocol";
 import { describe, expect, it } from "vitest";
 import { collectWrite, removeMirror, runBuildHook, walkMirror } from "./build.js";
 import type { PyodideLike } from "./facts.js";

@@ -1,5 +1,5 @@
-import { MAX_STDIN_BYTES, PROTOCOL_VERSION } from "@uv-wasm/engine-protocol";
-import { createMockEngine, type MockScript } from "@uv-wasm/mock-engine";
+import { MAX_STDIN_BYTES, PROTOCOL_VERSION } from "@tholus/engine-protocol";
+import { createMockEngine, type MockScript } from "@tholus/mock-engine";
 import { describe, expect, it } from "vitest";
 import { createEngine } from "./engine.js";
 import { EngineCrashedError, ProtocolMismatchError, toEngineError } from "./errors.js";

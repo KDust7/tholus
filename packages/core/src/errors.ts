@@ -1,4 +1,4 @@
-import type { ErrorCode, StructuredErrorInfo } from "@uv-wasm/engine-protocol";
+import type { ErrorCode, StructuredErrorInfo } from "@tholus/engine-protocol";
 
 export abstract class EngineError extends Error {
   abstract readonly code: ErrorCode;

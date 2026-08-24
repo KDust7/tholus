@@ -1,4 +1,4 @@
-import type { ExportedTree } from "@uv-wasm/core";
+import type { ExportedTree } from "@tholus/core";
 import { type HookInvocation, type HookOutcome, runBuildHook } from "./build.js";
 import { type PyodideFacts, type PyodideLike, probePyodide } from "./facts.js";
 import { checkAbi, MOUNT_ROOT, type WrittenTree, writeTree } from "./mount.js";

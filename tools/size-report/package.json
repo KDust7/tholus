@@ -1,5 +1,5 @@
 {
-  "name": "@uv-wasm/size-report",
+  "name": "@tholus/size-report",
   "version": "0.0.0",
   "private": true,
   "type": "module",

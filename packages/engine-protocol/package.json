@@ -1,10 +1,10 @@
 {
-  "name": "@uv-wasm/engine-protocol",
+  "name": "@tholus/engine-protocol",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0 OR MIT",
-  "description": "Wire contract between the uv-wasm engine worker and its host",
+  "description": "Wire contract between the tholus engine worker and its host",
   "keywords": [
     "uv",
     "pip",
@@ -20,10 +20,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KDust7/uv-wasm.git",
+    "url": "git+https://github.com/KDust7/tholus.git",
     "directory": "packages/engine-protocol"
   },
-  "homepage": "https://github.com/KDust7/uv-wasm#readme",
+  "homepage": "https://github.com/KDust7/tholus#readme",
   "publishConfig": {
     "access": "public",
     "provenance": true

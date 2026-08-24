@@ -1,4 +1,4 @@
-import type { EngineEvent, PackageRef, StructuredErrorInfo } from "@uv-wasm/engine-protocol";
+import type { EngineEvent, PackageRef, StructuredErrorInfo } from "@tholus/engine-protocol";
 import type { Engine, ExecOptions } from "./engine.js";
 import { type EngineError, toEngineError, UnsupportedError } from "./errors.js";
 import { collectText } from "./text.js";

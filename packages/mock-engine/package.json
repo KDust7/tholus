@@ -1,5 +1,5 @@
 {
-  "name": "@uv-wasm/mock-engine",
+  "name": "@tholus/mock-engine",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -20,7 +20,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@uv-wasm/engine-protocol": "workspace:*"
+    "@tholus/engine-protocol": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",

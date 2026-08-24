@@ -55,5 +55,5 @@ fn engine_reports_its_identity() {
         info.contains("\"protocol\""),
         "build info missing protocol field: {info}"
     );
-    assert!(uv_wasm_engine::version().starts_with("uv-wasm "));
+    assert!(uv_wasm_engine::version().starts_with("tholus "));
 }

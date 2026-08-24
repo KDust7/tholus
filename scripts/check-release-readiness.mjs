@@ -83,8 +83,22 @@ if (brand.includes("STORAGE_SCOPE")) {
 if (/from "\.\/brand\.js"/.test(coldStore)) {
   problems.push("packages/core/src/opfs-store.ts imports the brand, so STORE_ROOT would follow a rename: it must stay a fixed literal");
 }
-if (!/export const STORE_ROOT = "[^"]+";/.test(coldStore)) {
-  problems.push("packages/core/src/opfs-store.ts no longer declares STORE_ROOT as a literal");
+const STORE_ROOT_FOREVER = "uv-wasm";
+const storeRoot = coldStore.match(/export const STORE_ROOT = "([^"]+)";/)?.[1];
+if (storeRoot !== STORE_ROOT_FOREVER) {
+  problems.push(
+    `STORE_ROOT is ${JSON.stringify(storeRoot)} but every build has written "${STORE_ROOT_FOREVER}" to opfs. ` +
+      "It is pinned to that literal here on purpose: changing it orphans every user's stored state, " +
+      "and a repo-wide rename will happily move both the constant and the test that guards it.",
+  );
+}
+
+const engineLib = readFileSync(join(root, "crates/uv-wasm-engine/src/lib.rs"), "utf8");
+const reportedName = engineLib.match(/format!\("(\S+) \{ENGINE_VERSION\}/)?.[1];
+if (reportedName === undefined) {
+  problems.push("crates/uv-wasm-engine/src/lib.rs no longer renders a name before ENGINE_VERSION, so the brand it reports cannot be checked");
+} else if (reportedName !== internalName) {
+  problems.push(`the engine reports itself as "${reportedName}" while the brand is "${internalName}": engine.version() is public surface and the two must move together`);
 }
 if (strayBrand.length > 0) {
   problems.push(

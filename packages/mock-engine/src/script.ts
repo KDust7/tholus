@@ -1,4 +1,4 @@
-import type { BuildIdentity, EngineEvent, StructuredErrorInfo } from "@uv-wasm/engine-protocol";
+import type { BuildIdentity, EngineEvent, StructuredErrorInfo } from "@tholus/engine-protocol";
 
 export type MockStep =
   | { kind: "stdout"; text: string }

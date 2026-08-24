@@ -1,4 +1,4 @@
-import { engineConfigSchema } from "@uv-wasm/engine-protocol";
+import { engineConfigSchema } from "@tholus/engine-protocol";
 import { describe, expect, it } from "vitest";
 
 import { cacheRoot, derivedEnv, RUST_LOG, resolveEnvironment, UV_NO_CACHE } from "./config-env.js";

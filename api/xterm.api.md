@@ -1,4 +1,4 @@
-# @uv-wasm/xterm
+# @tholus/xterm
 
 25 public exports.
 

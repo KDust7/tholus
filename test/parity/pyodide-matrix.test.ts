@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import type { PyodideLike } from "@uv-wasm/pyodide";
+import type { PyodideLike } from "@tholus/pyodide";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { asPythonVersion } from "./pyodide-versions.js";

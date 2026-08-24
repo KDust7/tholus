@@ -8,9 +8,9 @@ import {
   parseHostMessage,
   type StructuredErrorInfo,
   type WorkerMessage,
-} from "@uv-wasm/engine-protocol";
-import { createFetchTransport } from "@uv-wasm/transport-fetch";
-import { createLibcurlTransport, type LibcurlModule } from "@uv-wasm/transport-libcurl";
+} from "@tholus/engine-protocol";
+import { createFetchTransport } from "@tholus/transport-fetch";
+import { createLibcurlTransport, type LibcurlModule } from "@tholus/transport-libcurl";
 import { PROGRAM_NAME } from "./brand.js";
 import { cacheRoot, resolveEnvironment } from "./config-env.js";
 import { exportTree } from "./export-tree.js";

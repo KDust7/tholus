@@ -24,7 +24,7 @@ uv's own code, unmodified.
   host page  ──────────────────────────────────────────────────────┐
     xterm.js terminal    programmatic API    resolver-only API      │
              │                   │                   │             │
-             └───────────── @uv-wasm/core ───────────┘             │  main thread
+             └───────────── @tholus/core ───────────┘             │  main thread
                                  │                                 │
               ┌──────────────────┴──────────────────┐              │
         transport (fetch | libcurl)          Pyodide adapter        │
@@ -45,13 +45,13 @@ design requires `SharedArrayBuffer`, so embedding pages need no COOP/COEP header
 
 ## The protocol is the contract
 
-`@uv-wasm/engine-protocol` defines every message crossing the worker boundary as a zod schema, and
+`@tholus/engine-protocol` defines every message crossing the worker boundary as a zod schema, and
 emits those schemas as JSON Schema documents that the Rust side validates against. Both
 implementations answer to the same document, so neither can drift silently.
 
 Alongside it, `test/contract/transcripts/` holds golden message sequences for the canonical flows,
 handshake, streaming output, stdin round-trip, cancellation, structured failure. Any implementation
-claiming to be an engine must satisfy them. `@uv-wasm/mock-engine` satisfies them today, which is
+claiming to be an engine must satisfy them. `@tholus/mock-engine` satisfies them today, which is
 what lets the SDK be built and tested before the real engine compiles.
 
 ## Why there are two output channels

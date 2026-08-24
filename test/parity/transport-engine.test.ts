@@ -107,7 +107,7 @@ describe.skipIf(!isBuilt)("uv reaches an index through the transport a host chos
   it("installs through the fetch transport, which uv calls with a Request", () => {
     expect(
       code,
-      `the install failed through the transport:\n$stderr.split("\n").slice(-20).join("\n")`,
+      `the install failed through the transport:\n${stderr.split("\n").slice(-20).join("\n")}`,
     ).toBe(0);
     expect(stderr).toContain("+ idna==3.11");
   });

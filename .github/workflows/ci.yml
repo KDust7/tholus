@@ -47,7 +47,7 @@ jobs:
 
       - name: Verify emitted protocol schemas are current
         run: |
-          bun run --filter @uv-wasm/engine-protocol emit-schema
+          bun run --filter @tholus/engine-protocol emit-schema
           git diff --exit-code -- packages/engine-protocol/schema
 
       - name: Release readiness

@@ -128,7 +128,7 @@ describe.skipIf(!isBuilt || chosenBrowser() === "webkit")(
       const dec = new TextDecoder();
       try {
         const root = await navigator.storage.getDirectory();
-        await root.removeEntry("uv-wasm", { recursive: true }).catch(() => {});
+        await root.removeEntry("tholus", { recursive: true }).catch(() => {});
         const store = await openColdStore(root);
 
         say("a fresh store has no manifest", (await store.readManifest()) === undefined);

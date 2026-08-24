@@ -4,7 +4,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { PROTOCOL_VERSION } from "@uv-wasm/engine-protocol";
+import { PROTOCOL_VERSION } from "@tholus/engine-protocol";
 import type { Browser, Page } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { launchBrowser } from "./browser-harness.js";
@@ -19,7 +19,7 @@ const isBuilt = [wasmPath, enginePath, workerPath].every((path) => existsSync(pa
 
 const PAGE = `<!doctype html>
 <meta charset="utf-8">
-<title>uv-wasm worker</title>
+<title>tholus worker</title>
 <script type="module">
 const worker = new Worker("/dist/worker.js", { type: "module" });
 globalThis.__failure = undefined;

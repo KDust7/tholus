@@ -1,4 +1,4 @@
-import type { HookTree, HookWrite, TreeEntry } from "@uv-wasm/engine-protocol";
+import type { HookTree, HookWrite, TreeEntry } from "@tholus/engine-protocol";
 import type { PyodideFileSystem, PyodideLike } from "./facts.js";
 import { runHook } from "./hook.js";
 import { writeTree } from "./mount.js";
@@ -174,7 +174,7 @@ export function runBuildHook(pyodide: PyodideLike, invocation: HookInvocation): 
     sweep();
     return {
       ...result,
-      stderr: [...result.stderr, ...leftovers.map((left) => `uv-wasm: ${left}`)],
+      stderr: [...result.stderr, ...leftovers.map((left) => `tholus: ${left}`)],
       writes,
     };
   } catch (error) {

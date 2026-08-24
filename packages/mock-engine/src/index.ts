@@ -5,7 +5,7 @@ import {
   PROTOCOL_VERSION,
   parseHostMessage,
   type WorkerMessage,
-} from "@uv-wasm/engine-protocol";
+} from "@tholus/engine-protocol";
 import { type MockScript, type MockStep, matchCommand } from "./script.js";
 
 export * from "./script.js";

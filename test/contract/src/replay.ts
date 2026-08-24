@@ -1,4 +1,4 @@
-import { parseHostMessage, parseWorkerMessage } from "@uv-wasm/engine-protocol";
+import { parseHostMessage, parseWorkerMessage } from "@tholus/engine-protocol";
 import { type MatchFailure, matchValue } from "./match.js";
 import type { Transcript } from "./schema.js";
 

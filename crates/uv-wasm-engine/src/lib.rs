@@ -32,7 +32,7 @@ pub fn uv_version() -> &'static str {
 
 #[wasm_bindgen]
 pub fn version() -> String {
-    format!("uv-wasm {ENGINE_VERSION} (uv {})", uv_version())
+    format!("tholus {ENGINE_VERSION} (uv {})", uv_version())
 }
 
 #[wasm_bindgen(js_name = buildInfo)]

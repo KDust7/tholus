@@ -1,10 +1,10 @@
 {
-  "name": "@uv-wasm/transport-libcurl",
+  "name": "@tholus/transport-libcurl",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0 OR MIT",
-  "description": "A uv-wasm transport over a host-supplied libcurl.js, for Wisp relays and a real User-Agent",
+  "description": "A tholus transport over a host-supplied libcurl.js, for Wisp relays and a real User-Agent",
   "keywords": [
     "uv",
     "pip",
@@ -21,10 +21,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KDust7/uv-wasm.git",
+    "url": "git+https://github.com/KDust7/tholus.git",
     "directory": "packages/transport-libcurl"
   },
-  "homepage": "https://github.com/KDust7/uv-wasm#readme",
+  "homepage": "https://github.com/KDust7/tholus#readme",
   "publishConfig": {
     "access": "public",
     "provenance": true
@@ -44,7 +44,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@uv-wasm/engine-protocol": "workspace:*"
+    "@tholus/engine-protocol": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

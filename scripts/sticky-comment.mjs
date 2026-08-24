@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-const MARKER = "<!-- uv-wasm:parity -->";
+const MARKER = "<!-- tholus:parity -->";
 
 const [bodyPath] = process.argv.slice(2);
 if (bodyPath === undefined) {

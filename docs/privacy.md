@@ -1,6 +1,6 @@
 # Privacy
 
-uv-wasm runs entirely in the page. This document says what that means concretely: what leaves the
+tholus runs entirely in the page. This document says what that means concretely: what leaves the
 browser, what is stored, and what a host controls.
 
 ## What leaves the browser
@@ -10,7 +10,7 @@ Only package-index traffic, and only to the indexes you configure.
 uv fetches index pages, metadata and distribution archives from `indexUrl` and any
 `extraIndexUrls`, and from whatever URLs those pages point at, usually a separate file host. That is
 the whole of it. There is no telemetry, no analytics, no crash reporting and no call to any
-uv-wasm-operated service. There is no uv-wasm-operated service.
+tholus-operated service. There is no tholus-operated service.
 
 The requests are made by uv itself, through whichever transport the host chose. With
 `{kind:"platform"}` they are ordinary browser `fetch` calls and follow the page's own CORS and CSP

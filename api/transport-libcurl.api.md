@@ -1,4 +1,4 @@
-# @uv-wasm/transport-libcurl
+# @tholus/transport-libcurl
 
 14 public exports.
 

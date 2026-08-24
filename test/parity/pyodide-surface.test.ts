@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import type { PyodideLike } from "@uv-wasm/pyodide";
+import type { PyodideLike } from "@tholus/pyodide";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { asPythonVersion } from "./pyodide-versions.js";

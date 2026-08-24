@@ -2,7 +2,7 @@ import {
   EXIT_CODE_CANCELLED,
   PROTOCOL_VERSION,
   type WorkerMessage,
-} from "@uv-wasm/engine-protocol";
+} from "@tholus/engine-protocol";
 import { describe, expect, it } from "vitest";
 import {
   createEngineWorker,
@@ -158,7 +158,7 @@ class FakeEngine implements EngineHandle {
 
   setCwd(path: string): void {
     if (this.options.rejectsCwd) {
-      throw new Error(`uv-wasm: could not enter \`${path}\``);
+      throw new Error(`tholus: could not enter \`${path}\``);
     }
     this.directories.push(path);
   }
@@ -269,7 +269,7 @@ function harness(
   const engines: FakeEngine[] = [];
   const exports = {
     default: async () => undefined,
-    version: () => "uv-wasm 0.0.0 (uv 0.12.3)",
+    version: () => "tholus 0.0.0 (uv 0.12.3)",
     buildInfo: () => `{"engine":"0.0.0","uv":"0.12.3","protocol":"${PROTOCOL_VERSION}"}`,
     Engine: class extends FakeEngine {
       constructor() {

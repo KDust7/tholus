@@ -2,7 +2,7 @@
 
 uv can resolve, download and install into a virtual environment entirely on its own. What it cannot
 do is *run Python*, there is no interpreter inside the engine. Pyodide supplies one, and
-`@uv-wasm/pyodide` connects the two in both directions:
+`@tholus/pyodide` connects the two in both directions:
 
 - Mounting, hand an environment uv built to Pyodide so `import` finds it.
 - Build hooks, let uv run a package's PEP 517 backend inside Pyodide, so source distributions
@@ -14,7 +14,7 @@ the things that genuinely need an interpreter, and says so.
 ## Attaching
 
 ```ts
-import { attachPyodide } from "@uv-wasm/pyodide";
+import { attachPyodide } from "@tholus/pyodide";
 import { loadPyodide } from "pyodide";
 
 const pyodide = await loadPyodide();
@@ -52,7 +52,7 @@ When uv needs to build a package from source it needs a Python to run the backen
 requests to the runtime:
 
 ```ts
-import { applyHookWrites, hookTrees, sitePackagesOf } from "@uv-wasm/core";
+import { applyHookWrites, hookTrees, sitePackagesOf } from "@tholus/core";
 
 engine.attachRuntime(async (invocation) => {
   const outcome = await runtime.hook(invocation);

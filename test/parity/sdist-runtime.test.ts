@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import type { HookVfs, RuntimeHookRequest } from "@uv-wasm/core";
+import type { HookVfs, RuntimeHookRequest } from "@tholus/core";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { jsPath, PROGRAM, wasmPath } from "./cli-goldens.js";

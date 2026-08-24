@@ -36,7 +36,7 @@ if (process.env.CI && !canRun) {
 
 const PAGE = `<!doctype html>
 <meta charset="utf-8">
-<title>uv-wasm libcurl transport</title>
+<title>tholus libcurl transport</title>
 <script type="module">
 import { createLibcurlTransport } from "/transport/index.js";
 

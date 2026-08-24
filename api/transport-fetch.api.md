@@ -1,4 +1,4 @@
-# @uv-wasm/transport-fetch
+# @tholus/transport-fetch
 
 9 public exports.
 

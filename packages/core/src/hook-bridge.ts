@@ -1,4 +1,4 @@
-import type { HookTree, HookWrite } from "@uv-wasm/engine-protocol";
+import type { HookTree, HookWrite } from "@tholus/engine-protocol";
 import { type ExportVfs, exportTree, guard, type ImportVfs, importTree } from "./export-tree.js";
 
 export interface RuntimeHookRequest {

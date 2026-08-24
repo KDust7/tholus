@@ -1,4 +1,4 @@
-import type { TreeEntry } from "@uv-wasm/engine-protocol";
+import type { TreeEntry } from "@tholus/engine-protocol";
 
 export interface ExportVfs {
   fsRead(path: string): Uint8Array;

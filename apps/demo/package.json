@@ -1,5 +1,5 @@
 {
-  "name": "@uv-wasm/demo",
+  "name": "@tholus/demo",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@uv-wasm/core": "workspace:*",
-    "@uv-wasm/pyodide": "workspace:*",
-    "@uv-wasm/xterm": "workspace:*",
+    "@tholus/core": "workspace:*",
+    "@tholus/pyodide": "workspace:*",
+    "@tholus/xterm": "workspace:*",
     "@xterm/xterm": "6.0.0"
   },
   "devDependencies": {

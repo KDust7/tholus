@@ -1,4 +1,4 @@
-# @uv-wasm/engine-protocol
+# @tholus/engine-protocol
 
 97 public exports.
 

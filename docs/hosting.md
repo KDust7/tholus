@@ -1,6 +1,6 @@
 # Hosting
 
-uv-wasm is static files. There is no server to run, and this project operates none.
+tholus is static files. There is no server to run, and this project operates none.
 
 ## What you serve
 

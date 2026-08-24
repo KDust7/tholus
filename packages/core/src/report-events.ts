@@ -1,4 +1,4 @@
-import type { EngineEvent, EnginePhase, PackageRef } from "@uv-wasm/engine-protocol";
+import type { EngineEvent, EnginePhase, PackageRef } from "@tholus/engine-protocol";
 
 const ESCAPE = String.fromCharCode(27);
 const ANSI = new RegExp(`${ESCAPE}\\[[0-9;]*[A-Za-z]`, "g");

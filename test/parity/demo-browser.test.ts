@@ -273,7 +273,7 @@ ${transcript}`,
   it("reads an unsatisfiable resolution out in uv's own words", async () => {
     const code = await run(
       page,
-      `uv pip install uv-wasm-left==1.0.0 uv-wasm-right==1.0.0 --python ${VENV} --no-cache ` +
+      `uv pip install tholus-left==1.0.0 tholus-right==1.0.0 --python ${VENV} --no-cache ` +
         `--index-url ${site.origin}/simple --python-version 3.14`,
     );
     await page
@@ -292,7 +292,7 @@ ${transcript}`,
     expect(
       screen,
       "the derivation tree is the readable half; without it this is just a failure",
-    ).toContain("uv-wasm-shared");
+    ).toContain("tholus-shared");
     expect(log.misses, `the index was asked for ${log.misses.join(", ")}`).toEqual([]);
   }, 600_000);
 

@@ -2,7 +2,12 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { type ColdStore, createPersistence, type Persistence, readCacheTree } from "@uv-wasm/core";
+import {
+  type ColdStore,
+  createPersistence,
+  type Persistence,
+  readCacheTree,
+} from "@tholus/core";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { jsPath, PROGRAM, root, wasmPath } from "./cli-goldens.js";

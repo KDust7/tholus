@@ -108,10 +108,10 @@ describe("the small pieces", () => {
   });
 
   it("renders a report a diff can be read from", () => {
-    const rendered = renderReport("@uv-wasm/example", [
+    const rendered = renderReport("@tholus/example", [
       { name: "alpha", kind: "function", signature: "export declare function alpha(): void;" },
     ]);
-    expect(rendered).toContain("# @uv-wasm/example");
+    expect(rendered).toContain("# @tholus/example");
     expect(rendered).toContain("1 public export.");
     expect(rendered).toContain("export declare function alpha(): void;");
   });

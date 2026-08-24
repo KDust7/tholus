@@ -1,4 +1,4 @@
-import type { MockScript } from "@uv-wasm/mock-engine";
+import type { MockScript } from "@tholus/mock-engine";
 
 export const canonicalScript: MockScript = {
   commands: [

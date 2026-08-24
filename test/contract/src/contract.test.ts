@@ -1,4 +1,4 @@
-import { createMockEngine } from "@uv-wasm/mock-engine";
+import { createMockEngine } from "@tholus/mock-engine";
 import { describe, expect, it } from "vitest";
 import { canonicalScript } from "./canonical-script.js";
 import { loadAllTranscripts, loadTranscript, transcriptNames } from "./load.js";

@@ -146,7 +146,7 @@ describe.skipIf(!canCompare)("uv pip compile matches native against one frozen i
     const mod = (await import(pathToFileURL(jsPath).href)) as unknown as EngineModule;
     await mod.default({ module_or_path: new Uint8Array(await readFile(wasmPath)) });
     engine = new mod.Engine();
-    workspace = mkdtempSync(join(tmpdir(), "uv-wasm-compile-"));
+    workspace = mkdtempSync(join(tmpdir(), "tholus-compile-"));
   }, 180_000);
 
   afterAll(() => {

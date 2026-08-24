@@ -1,4 +1,4 @@
-import type { HookWrite, TreeEntry } from "@uv-wasm/engine-protocol";
+import type { HookWrite, TreeEntry } from "@tholus/engine-protocol";
 import { describe, expect, it } from "vitest";
 import {
   applyHookWrites,

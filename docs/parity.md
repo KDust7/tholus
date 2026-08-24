@@ -51,7 +51,7 @@ Re-recording:
 ```sh
 node scripts/record-fixtures.mjs [scenario…]   # compile, install, sync, pyodide
 node scripts/make-conflict-fixture.mjs         # the hand-authored conflict
-bun run --filter @uv-wasm/parity record        # the CLI goldens
+bun run --filter @tholus/parity record        # the CLI goldens
 ```
 
 All of them need a native uv built from the same fork commit as the artifact.

@@ -15,7 +15,7 @@ import {
   type TtyConfig,
   type TtySize,
   type WorkerMessage,
-} from "@uv-wasm/engine-protocol";
+} from "@tholus/engine-protocol";
 import { DEFAULT_CWD } from "./brand.js";
 import { createPipApi, createVenvApi } from "./commands.js";
 import { type EndpointFactory, workerEndpoint } from "./endpoint.js";

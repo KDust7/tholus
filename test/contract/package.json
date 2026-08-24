@@ -1,5 +1,5 @@
 {
-  "name": "@uv-wasm/contract-transcripts",
+  "name": "@tholus/contract-transcripts",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,12 +13,12 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@uv-wasm/engine-protocol": "workspace:*",
+    "@tholus/engine-protocol": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
-    "@uv-wasm/mock-engine": "workspace:*",
+    "@tholus/mock-engine": "workspace:*",
     "vitest": "^4.1.10"
   }
 }

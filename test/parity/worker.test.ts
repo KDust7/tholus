@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { PROTOCOL_VERSION, type WorkerMessage } from "@uv-wasm/engine-protocol";
+import { PROTOCOL_VERSION, type WorkerMessage } from "@tholus/engine-protocol";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createEngineWorker, type EngineExports } from "../../packages/core/src/engine-worker.js";
 import { normalize } from "./cli-goldens.js";

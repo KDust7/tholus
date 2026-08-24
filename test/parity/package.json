@@ -1,5 +1,5 @@
 {
-  "name": "@uv-wasm/parity",
+  "name": "@tholus/parity",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,10 +13,10 @@
   "devDependencies": {
     "@types/node": "^24.13.3",
     "@types/ws": "^8.18.1",
-    "@uv-wasm/contract-transcripts": "workspace:*",
-    "@uv-wasm/core": "workspace:*",
-    "@uv-wasm/engine-protocol": "workspace:*",
-    "@uv-wasm/pyodide": "workspace:*",
+    "@tholus/contract-transcripts": "workspace:*",
+    "@tholus/core": "workspace:*",
+    "@tholus/engine-protocol": "workspace:*",
+    "@tholus/pyodide": "workspace:*",
     "@xterm/headless": "^6.0.0",
     "pyodide": "314.0.5",
     "vitest": "^4.1.10",

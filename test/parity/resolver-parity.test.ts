@@ -48,7 +48,7 @@ describe.skipIf(!canCompare)("the engine resolves the same lockfile as native uv
     const mod = (await import(pathToFileURL(jsPath).href)) as unknown as EngineModule;
     await mod.default({ module_or_path: new Uint8Array(await readFile(wasmPath)) });
     engine = new mod.Engine();
-    workspace = mkdtempSync(join(tmpdir(), "uv-wasm-lock-"));
+    workspace = mkdtempSync(join(tmpdir(), "tholus-lock-"));
     writeFileSync(join(workspace, "pyproject.toml"), PYPROJECT);
   }, 180_000);
 

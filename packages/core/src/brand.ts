@@ -1,4 +1,4 @@
-export const INTERNAL_NAME = "uv-wasm";
+export const INTERNAL_NAME = "tholus";
 
 export const PROGRAM_NAME = "uv";
 

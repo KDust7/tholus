@@ -1,4 +1,4 @@
-import type { EngineEvent } from "@uv-wasm/engine-protocol";
+import type { EngineEvent } from "@tholus/engine-protocol";
 import { describe, expect, it } from "vitest";
 
 import { createReportReader, millisecondsOf, stripAnsi } from "./report-events.js";

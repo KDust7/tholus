@@ -1,4 +1,4 @@
-# @uv-wasm/mock-engine
+# @tholus/mock-engine
 
 6 public exports.
 

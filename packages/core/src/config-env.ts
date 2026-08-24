@@ -1,4 +1,4 @@
-import type { EngineConfig } from "@uv-wasm/engine-protocol";
+import type { EngineConfig } from "@tholus/engine-protocol";
 import { indexEnv } from "./index-env.js";
 
 export const UV_NO_CACHE = "UV_NO_CACHE";

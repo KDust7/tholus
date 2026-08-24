@@ -99,7 +99,7 @@ describe.skipIf(!ready)("a real Pyodide cross venv agrees with the target we ass
   let server: ReplayServer | undefined;
 
   beforeAll(async () => {
-    workspace = mkdtempSync(join(tmpdir(), "uv-wasm-crossvenv-"));
+    workspace = mkdtempSync(join(tmpdir(), "tholus-crossvenv-"));
     const script = join(workspace, "probe.py");
     writeFileSync(script, `${PROBE}\n`);
     const run = runCross([script]);

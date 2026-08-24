@@ -8,8 +8,8 @@ import {
   hookTrees,
   type RuntimeHookRequest,
   sitePackagesOf,
-} from "@uv-wasm/core";
-import { attachPyodide, type PyodideLike } from "@uv-wasm/pyodide";
+} from "@tholus/core";
+import { attachPyodide, type PyodideLike } from "@tholus/pyodide";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { jsPath, PROGRAM, wasmPath } from "./cli-goldens.js";

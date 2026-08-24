@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "uv-wasm-monorepo",
+      "name": "tholus-monorepo",
       "devDependencies": {
         "@biomejs/biome": "^2.5.7",
         "@types/node": "^24.13.3",
@@ -15,13 +15,12 @@
       },
     },
     "apps/demo": {
-      "name": "@uv-wasm/demo",
+      "name": "@tholus/demo",
       "version": "0.0.0",
       "dependencies": {
-        "@uv-wasm/core": "workspace:*",
-        "@uv-wasm/engine-protocol": "workspace:*",
-        "@uv-wasm/pyodide": "workspace:*",
-        "@uv-wasm/xterm": "workspace:*",
+        "@tholus/core": "workspace:*",
+        "@tholus/pyodide": "workspace:*",
+        "@tholus/xterm": "workspace:*",
         "@xterm/xterm": "6.0.0",
       },
       "devDependencies": {
@@ -31,11 +30,11 @@
       },
     },
     "apps/testbed": {
-      "name": "@uv-wasm/testbed",
+      "name": "@tholus/testbed",
       "version": "0.0.0",
       "dependencies": {
-        "@uv-wasm/core": "workspace:*",
-        "@uv-wasm/engine-protocol": "workspace:*",
+        "@tholus/core": "workspace:*",
+        "@tholus/engine-protocol": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "^24.13.3",
@@ -43,22 +42,22 @@
       },
     },
     "packages/core": {
-      "name": "@uv-wasm/core",
+      "name": "@tholus/core",
       "version": "0.0.0",
       "dependencies": {
-        "@uv-wasm/engine-protocol": "workspace:*",
-        "@uv-wasm/transport-fetch": "workspace:*",
-        "@uv-wasm/transport-libcurl": "workspace:*",
+        "@tholus/engine-protocol": "workspace:*",
+        "@tholus/transport-fetch": "workspace:*",
+        "@tholus/transport-libcurl": "workspace:*",
       },
       "devDependencies": {
+        "@tholus/mock-engine": "workspace:*",
         "@types/node": "^24.13.3",
-        "@uv-wasm/mock-engine": "workspace:*",
         "esbuild": "^0.27.2",
         "vitest": "^4.1.10",
       },
     },
     "packages/engine-protocol": {
-      "name": "@uv-wasm/engine-protocol",
+      "name": "@tholus/engine-protocol",
       "version": "0.0.0",
       "dependencies": {
         "zod": "^4.4.3",
@@ -68,10 +67,10 @@
       },
     },
     "packages/mock-engine": {
-      "name": "@uv-wasm/mock-engine",
+      "name": "@tholus/mock-engine",
       "version": "0.0.0",
       "dependencies": {
-        "@uv-wasm/engine-protocol": "workspace:*",
+        "@tholus/engine-protocol": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "^26.2.0",
@@ -79,11 +78,11 @@
       },
     },
     "packages/pyodide": {
-      "name": "@uv-wasm/pyodide",
+      "name": "@tholus/pyodide",
       "version": "0.0.0",
       "dependencies": {
-        "@uv-wasm/core": "workspace:*",
-        "@uv-wasm/engine-protocol": "workspace:*",
+        "@tholus/core": "workspace:*",
+        "@tholus/engine-protocol": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "^24.13.3",
@@ -91,10 +90,10 @@
       },
     },
     "packages/transport-fetch": {
-      "name": "@uv-wasm/transport-fetch",
+      "name": "@tholus/transport-fetch",
       "version": "0.0.0",
       "dependencies": {
-        "@uv-wasm/engine-protocol": "workspace:*",
+        "@tholus/engine-protocol": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "^24.13.3",
@@ -102,10 +101,10 @@
       },
     },
     "packages/transport-libcurl": {
-      "name": "@uv-wasm/transport-libcurl",
+      "name": "@tholus/transport-libcurl",
       "version": "0.0.0",
       "dependencies": {
-        "@uv-wasm/engine-protocol": "workspace:*",
+        "@tholus/engine-protocol": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "^24.13.3",
@@ -114,10 +113,10 @@
       },
     },
     "packages/xterm": {
-      "name": "@uv-wasm/xterm",
+      "name": "@tholus/xterm",
       "version": "0.0.0",
       "dependencies": {
-        "@uv-wasm/core": "workspace:*",
+        "@tholus/core": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "^24.13.3",
@@ -125,28 +124,28 @@
       },
     },
     "test/contract": {
-      "name": "@uv-wasm/contract-transcripts",
+      "name": "@tholus/contract-transcripts",
       "version": "0.0.0",
       "dependencies": {
-        "@uv-wasm/engine-protocol": "workspace:*",
+        "@tholus/engine-protocol": "workspace:*",
         "zod": "^4.4.3",
       },
       "devDependencies": {
+        "@tholus/mock-engine": "workspace:*",
         "@types/node": "^24.13.3",
-        "@uv-wasm/mock-engine": "workspace:*",
         "vitest": "^4.1.10",
       },
     },
     "test/parity": {
-      "name": "@uv-wasm/parity",
+      "name": "@tholus/parity",
       "version": "0.0.0",
       "devDependencies": {
+        "@tholus/contract-transcripts": "workspace:*",
+        "@tholus/core": "workspace:*",
+        "@tholus/engine-protocol": "workspace:*",
+        "@tholus/pyodide": "workspace:*",
         "@types/node": "^24.13.3",
         "@types/ws": "^8.18.1",
-        "@uv-wasm/contract-transcripts": "workspace:*",
-        "@uv-wasm/core": "workspace:*",
-        "@uv-wasm/engine-protocol": "workspace:*",
-        "@uv-wasm/pyodide": "workspace:*",
         "@xterm/headless": "^6.0.0",
         "pyodide": "314.0.5",
         "vitest": "^4.1.10",
@@ -154,7 +153,7 @@
       },
     },
     "tools/api-report": {
-      "name": "@uv-wasm/api-report",
+      "name": "@tholus/api-report",
       "version": "0.0.0",
       "devDependencies": {
         "@types/node": "^24.13.3",
@@ -163,7 +162,7 @@
       },
     },
     "tools/size-report": {
-      "name": "@uv-wasm/size-report",
+      "name": "@tholus/size-report",
       "version": "0.0.0",
       "devDependencies": {
         "@types/node": "^24.13.3",
@@ -206,6 +205,32 @@
     "@biomejs/cli-win32-arm64": ["@biomejs/cli-win32-arm64@2.5.7", "", { "os": "win32", "cpu": "arm64" }, "sha512-Oq4x0CCwP4jirrcTywXs5kOGZ4v5vuEP+gWrbtjApOA2CL9F3F9GlIdQIci8AKSCa/zURanMRpX/4wQ7Am6hHg=="],
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.7", "", { "os": "win32", "cpu": "x64" }, "sha512-V+0wu/nrj2S+MhP4EQ0uHNolP0IALEsz45pg0WoKkHfDeh0+ItHwP/p7bX5RPoMOl9NkpHYWdYPhIcy2mACHvQ=="],
+
+    "@tholus/api-report": ["@tholus/api-report@workspace:tools/api-report"],
+
+    "@tholus/contract-transcripts": ["@tholus/contract-transcripts@workspace:test/contract"],
+
+    "@tholus/core": ["@tholus/core@workspace:packages/core"],
+
+    "@tholus/demo": ["@tholus/demo@workspace:apps/demo"],
+
+    "@tholus/engine-protocol": ["@tholus/engine-protocol@workspace:packages/engine-protocol"],
+
+    "@tholus/mock-engine": ["@tholus/mock-engine@workspace:packages/mock-engine"],
+
+    "@tholus/parity": ["@tholus/parity@workspace:test/parity"],
+
+    "@tholus/pyodide": ["@tholus/pyodide@workspace:packages/pyodide"],
+
+    "@tholus/size-report": ["@tholus/size-report@workspace:tools/size-report"],
+
+    "@tholus/testbed": ["@tholus/testbed@workspace:apps/testbed"],
+
+    "@tholus/transport-fetch": ["@tholus/transport-fetch@workspace:packages/transport-fetch"],
+
+    "@tholus/transport-libcurl": ["@tholus/transport-libcurl@workspace:packages/transport-libcurl"],
+
+    "@tholus/xterm": ["@tholus/xterm@workspace:packages/xterm"],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.27.7", "", { "os": "aix", "cpu": "ppc64" }, "sha512-EKX3Qwmhz1eMdEJokhALr0YiD0lhQNwDqkPYyPhiSwKrh7/4KRjQc04sZ8db+5DVVnZ1LmbNDI1uAMPEUBnQPg=="],
 
@@ -310,32 +335,6 @@
     "@types/node": ["@types/node@24.13.3", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q=="],
 
     "@types/ws": ["@types/ws@8.18.1", "", { "dependencies": { "@types/node": "*" } }, "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg=="],
-
-    "@uv-wasm/api-report": ["@uv-wasm/api-report@workspace:tools/api-report"],
-
-    "@uv-wasm/contract-transcripts": ["@uv-wasm/contract-transcripts@workspace:test/contract"],
-
-    "@uv-wasm/core": ["@uv-wasm/core@workspace:packages/core"],
-
-    "@uv-wasm/demo": ["@uv-wasm/demo@workspace:apps/demo"],
-
-    "@uv-wasm/engine-protocol": ["@uv-wasm/engine-protocol@workspace:packages/engine-protocol"],
-
-    "@uv-wasm/mock-engine": ["@uv-wasm/mock-engine@workspace:packages/mock-engine"],
-
-    "@uv-wasm/parity": ["@uv-wasm/parity@workspace:test/parity"],
-
-    "@uv-wasm/pyodide": ["@uv-wasm/pyodide@workspace:packages/pyodide"],
-
-    "@uv-wasm/size-report": ["@uv-wasm/size-report@workspace:tools/size-report"],
-
-    "@uv-wasm/testbed": ["@uv-wasm/testbed@workspace:apps/testbed"],
-
-    "@uv-wasm/transport-fetch": ["@uv-wasm/transport-fetch@workspace:packages/transport-fetch"],
-
-    "@uv-wasm/transport-libcurl": ["@uv-wasm/transport-libcurl@workspace:packages/transport-libcurl"],
-
-    "@uv-wasm/xterm": ["@uv-wasm/xterm@workspace:packages/xterm"],
 
     "@vitest/coverage-v8": ["@vitest/coverage-v8@4.1.10", "", { "dependencies": { "@bcoe/v8-coverage": "^1.0.2", "@vitest/utils": "4.1.10", "ast-v8-to-istanbul": "^1.0.0", "istanbul-lib-coverage": "^3.2.2", "istanbul-lib-report": "^3.0.1", "istanbul-reports": "^3.2.0", "magicast": "^0.5.2", "obug": "^2.1.1", "std-env": "^4.0.0-rc.1", "tinyrainbow": "^3.1.0" }, "peerDependencies": { "@vitest/browser": "4.1.10", "vitest": "4.1.10" }, "optionalPeers": ["@vitest/browser"] }, "sha512-IM49HmthevbgAO4anp1hwtoT9wYe59w0LR00gr+eagHE+ZJ5lK4sLPeO0ubgoJcwLk6dehU3R24N+FbEEKDc8g=="],
 

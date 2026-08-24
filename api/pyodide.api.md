@@ -1,4 +1,4 @@
-# @uv-wasm/pyodide
+# @tholus/pyodide
 
 30 public exports.
 

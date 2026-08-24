@@ -1,10 +1,10 @@
 {
-  "name": "@uv-wasm/xterm",
+  "name": "@tholus/xterm",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0 OR MIT",
-  "description": "Drives a uv-wasm engine from an xterm.js terminal, bytes verbatim",
+  "description": "Drives a tholus engine from an xterm.js terminal, bytes verbatim",
   "keywords": [
     "uv",
     "pip",
@@ -21,10 +21,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KDust7/uv-wasm.git",
+    "url": "git+https://github.com/KDust7/tholus.git",
     "directory": "packages/xterm"
   },
-  "homepage": "https://github.com/KDust7/uv-wasm#readme",
+  "homepage": "https://github.com/KDust7/tholus#readme",
   "publishConfig": {
     "access": "public",
     "provenance": true
@@ -44,7 +44,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@uv-wasm/core": "workspace:*"
+    "@tholus/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

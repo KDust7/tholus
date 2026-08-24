@@ -129,9 +129,9 @@ describe("a session reads lines, runs them, and prompts again", () => {
     attachTerminal(
       terminal,
       fakeEngine(() => 0),
-      { motd: "uv-wasm ready" },
+      { motd: "tholus ready" },
     );
-    expect(terminal.text).toContain("uv-wasm ready\r\n");
+    expect(terminal.text).toContain("tholus ready\r\n");
     expect(terminal.text.endsWith("uv$ ")).toBe(true);
   });
 

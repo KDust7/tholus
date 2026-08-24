@@ -12,7 +12,7 @@ use crate::fs;
 use crate::python;
 
 const ALREADY_RUNNING: &str =
-    "uv-wasm: an invocation is already running; invocations must be serialized";
+    "tholus: an invocation is already running; invocations must be serialized";
 
 const EXIT_CODE_CANCELLED: u8 = 130;
 
@@ -77,7 +77,7 @@ impl Engine {
     #[wasm_bindgen(js_name = setCwd)]
     pub fn set_cwd(&self, path: &str) -> Result<(), JsError> {
         uv_vfs::set_current_dir(path)
-            .map_err(|error| JsError::new(&format!("uv-wasm: could not enter `{path}`: {error}")))
+            .map_err(|error| JsError::new(&format!("tholus: could not enter `{path}`: {error}")))
     }
 
     #[cfg(target_family = "wasm")]

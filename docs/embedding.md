@@ -1,6 +1,6 @@
 # Embedding uv
 
-`@uv-wasm/core` runs uv in a dedicated Worker and gives the page a typed handle to it. Two layers are
+`@tholus/core` runs uv in a dedicated Worker and gives the page a typed handle to it. Two layers are
 exposed and you can mix them freely:
 
 - Layer 0, `engine.exec(argv, options)`, uv's command line exactly as it is on a terminal.
@@ -10,7 +10,7 @@ exposed and you can mix them freely:
 ## Starting one
 
 ```ts
-import { createEngine } from "@uv-wasm/core";
+import { createEngine } from "@tholus/core";
 
 const engine = await createEngine({
   config: {
@@ -115,7 +115,7 @@ path, which is not a trade worth making for a progress bar.
 
 ## Wiring it to a terminal
 
-`@uv-wasm/xterm` writes uv's bytes through untouched, no rewriting, no line-ending translation,
+`@tholus/xterm` writes uv's bytes through untouched, no rewriting, no line-ending translation,
 because a terminal is the thing that owns rendering. That leaves one setting the host has to get
 right:
 
