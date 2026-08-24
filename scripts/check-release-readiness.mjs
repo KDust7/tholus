@@ -2,6 +2,8 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { DEPENDENCY_FIELDS, WORKSPACE_PROTOCOL } from "./rewrite-workspace-deps.mjs";
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const SHIPPING = [
@@ -52,9 +54,9 @@ if (versions.size !== 1) {
 
 const workspacePinned = SHIPPING.flatMap((name) => {
   const pkg = manifest(name);
-  return ["dependencies", "peerDependencies", "optionalDependencies"].flatMap((field) =>
+  return DEPENDENCY_FIELDS.flatMap((field) =>
     Object.entries(pkg[field] ?? {})
-      .filter(([, range]) => typeof range === "string" && range.startsWith("workspace:"))
+      .filter(([, range]) => typeof range === "string" && range.startsWith(WORKSPACE_PROTOCOL))
       .map(([dependency]) => `packages/${name}: ${field}.${dependency}`),
   );
 });
