@@ -587,7 +587,7 @@ export interface StorageRoom {
     usage: number;
 }
 
-STORE_ROOT = "tholus"
+STORE_ROOT = "uv-wasm"
 
 STORE_VERSION = "v1"
 
