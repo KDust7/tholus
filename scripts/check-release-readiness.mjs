@@ -50,6 +50,29 @@ if (versions.size !== 1) {
   problems.push(`the shipping packages are not in lockstep: ${[...versions].sort().join(", ")}`);
 }
 
+const workspacePinned = SHIPPING.flatMap((name) => {
+  const pkg = manifest(name);
+  return ["dependencies", "peerDependencies", "optionalDependencies"].flatMap((field) =>
+    Object.entries(pkg[field] ?? {})
+      .filter(([, range]) => typeof range === "string" && range.startsWith("workspace:"))
+      .map(([dependency]) => `packages/${name}: ${field}.${dependency}`),
+  );
+});
+
+if (workspacePinned.length > 0) {
+  const release = readFileSync(join(root, ".github/workflows/release.yml"), "utf8");
+  for (const script of ["rewrite-workspace-deps.mjs", "check-tarballs.mjs"]) {
+    if (!release.includes(script)) {
+      problems.push(
+        `${workspacePinned.length} shipping dependencies use the workspace protocol, which npm cannot resolve, ` +
+          `but .github/workflows/release.yml never runs scripts/${script}. Publishing would ship tarballs ` +
+          "that fail every consumer install with EUNSUPPORTEDPROTOCOL:\n  " +
+          workspacePinned.join("\n  "),
+      );
+    }
+  }
+}
+
 const readme = readFileSync(join(root, "README.md"), "utf8");
 if (!DISCLAIMER.test(readme)) problems.push("README.md carries no non-affiliation disclaimer");
 
@@ -121,4 +144,4 @@ if (problems.length > 0) {
   for (const problem of problems) console.error(`  - ${problem}`);
   process.exit(1);
 }
-console.log(`\nAll ${SHIPPING.length} shipping packages are ready to publish once the brand is chosen.`);
+console.log(`\nAll ${SHIPPING.length} shipping packages are ready to publish once the scope is claimed.`);

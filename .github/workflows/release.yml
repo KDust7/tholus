@@ -85,6 +85,9 @@ jobs:
       - name: The whole suite, against what is about to ship
         run: bun run vitest run
 
+      - name: Pin the workspace ranges npm cannot resolve
+        run: node scripts/rewrite-workspace-deps.mjs "${{ inputs.version }}"
+
       - name: Pack every package, which works whether or not they are private
         run: |
           mkdir -p "$RUNNER_TEMP/tarballs"
@@ -92,6 +95,11 @@ jobs:
             npm pack "./packages/$name" --pack-destination "$RUNNER_TEMP/tarballs"
           done
           ls -la "$RUNNER_TEMP/tarballs"
+
+      - name: Nothing in the tarballs would fail a consumer's install
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: node scripts/check-tarballs.mjs "$RUNNER_TEMP/tarballs" "${{ inputs.version }}"
 
       - uses: actions/upload-artifact@v5
         with:
