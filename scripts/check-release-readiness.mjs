@@ -61,6 +61,8 @@ for (const guide of ["comparison.md", "embedding.md", "hosting.md", "parity.md",
 }
 
 const brand = readFileSync(join(root, "packages/core/src/brand.ts"), "utf8");
+const coldStore = readFileSync(join(root, "packages/core/src/opfs-store.ts"), "utf8");
+const internalName = brand.match(/INTERNAL_NAME = "([^"]+)"/)?.[1];
 const strayBrand = readdirSync(join(root, "packages"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .flatMap((entry) => {
@@ -68,9 +70,22 @@ const strayBrand = readdirSync(join(root, "packages"), { withFileTypes: true })
     return existsSync(src) ? walk(src) : [];
   })
   .filter((file) => !file.endsWith("brand.ts") && !file.endsWith(".test.ts"))
-  .filter((file) => /"uv-wasm"|'uv-wasm'/.test(readFileSync(file, "utf8")));
+  .filter((file) => {
+    if (internalName === undefined) return false;
+    const source = readFileSync(file, "utf8").replace(/export const STORE_ROOT = "[^"]+";/, "");
+    return new RegExp(`["']${internalName}["']`).test(source);
+  });
 
-if (!brand.includes("INTERNAL_NAME")) problems.push("packages/core/src/brand.ts no longer declares INTERNAL_NAME");
+if (internalName === undefined) problems.push("packages/core/src/brand.ts no longer declares INTERNAL_NAME");
+if (brand.includes("STORAGE_SCOPE")) {
+  problems.push("packages/core/src/brand.ts declares STORAGE_SCOPE again, which re-couples the opfs directory to the brand: renaming would then orphan every user's stored state");
+}
+if (/from "\.\/brand\.js"/.test(coldStore)) {
+  problems.push("packages/core/src/opfs-store.ts imports the brand, so STORE_ROOT would follow a rename: it must stay a fixed literal");
+}
+if (!/export const STORE_ROOT = "[^"]+";/.test(coldStore)) {
+  problems.push("packages/core/src/opfs-store.ts no longer declares STORE_ROOT as a literal");
+}
 if (strayBrand.length > 0) {
   problems.push(
     `the internal name is hard-coded outside brand.ts, so renaming at reveal would miss it:\n  ${strayBrand

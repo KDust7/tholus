@@ -1,6 +1,4 @@
-import { STORAGE_SCOPE } from "./brand.js";
-
-export const STORE_ROOT = STORAGE_SCOPE;
+export const STORE_ROOT = "uv-wasm";
 export const STORE_VERSION = "v1";
 export const CACHE_DIRECTORY = "cache";
 export const MANIFEST_FILE = "manifest.json";

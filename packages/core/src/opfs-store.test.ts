@@ -178,3 +178,9 @@ describe("the cold store keeps uv's cache in its own corner of opfs", () => {
     expect(root.leaked()).toBe(0);
   });
 });
+
+describe("the store root is a fixed constant rather than the brand", () => {
+  it("keeps the name every shipped release has written, so a rename orphans nobody", () => {
+    expect(STORE_ROOT).toBe("uv-wasm");
+  });
+});

@@ -1,6 +1,6 @@
 # @uv-wasm/core
 
-124 public exports.
+123 public exports.
 
 ```ts
 export declare function applyHookWrites(vfs: HookVfs, writes: readonly HookWrite[]): void;
@@ -581,8 +581,6 @@ export declare class SdistNeedsRuntimeError extends EngineError {
 }
 
 export declare function sitePackagesOf(vfs: ExportVfs, venv: string): string[];
-
-STORAGE_SCOPE = "uv-wasm"
 
 export interface StorageRoom {
     quota: number;
