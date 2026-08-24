@@ -64,6 +64,7 @@ export default defineConfig({
           include: [
             "packages/*/src/**/*.test.ts",
             "packages/*/test/**/*.test.ts",
+            "scripts/**/*.test.ts",
             "test/contract/src/**/*.test.ts",
             "test/parity/**/*.test.ts",
             "tools/*/src/**/*.test.ts",
