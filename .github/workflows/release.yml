@@ -1,0 +1,118 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Pack and check without publishing"
+        type: boolean
+        default: true
+      version:
+        description: "Version every shipping package must already carry"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  WASM_BINDGEN_VERSION: 0.2.126
+
+jobs:
+  release:
+    name: publish every package together, or none
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check out the fork
+        env:
+          FORK_TOKEN: ${{ secrets.FORK_TOKEN }}
+        run: |
+          if [ -z "$FORK_TOKEN" ]; then
+            echo "FORK_TOKEN is unset, so vendor/uv cannot be checked out. See docs/status.md."
+            exit 1
+          fi
+          git config --global \
+            url."https://x-access-token:${FORK_TOKEN}@github.com/KDust7/uv-wasm-fork".insteadOf \
+            "https://github.com/KDust7/uv-wasm-fork"
+          git submodule update --init --recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@${{ env.WASM_BINDGEN_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - run: bun install --linker=isolated --frozen-lockfile
+
+      - name: Everything the reveal needs is in place
+        run: node scripts/check-release-readiness.mjs
+
+      - name: Every shipping package carries the version being released
+        run: |
+          for name in core engine-protocol pyodide transport-fetch transport-libcurl xterm; do
+            carried=$(node -p "require('./packages/$name/package.json').version")
+            if [ "$carried" != "${{ inputs.version }}" ]; then
+              echo "packages/$name is at $carried, not ${{ inputs.version }}"
+              exit 1
+            fi
+          done
+          echo "all six carry ${{ inputs.version }}"
+
+      - name: Build packages
+        run: bun run build
+
+      - name: Build wasm artifact
+        run: cargo xtask build
+
+      - name: Install the browser the gates run in
+        run: bun run playwright install --with-deps chromium
+
+      - name: The whole suite, against what is about to ship
+        run: bun run vitest run
+
+      - name: Pack every package, which works whether or not they are private
+        run: |
+          mkdir -p "$RUNNER_TEMP/tarballs"
+          for name in core engine-protocol pyodide transport-fetch transport-libcurl xterm; do
+            npm pack "./packages/$name" --pack-destination "$RUNNER_TEMP/tarballs"
+          done
+          ls -la "$RUNNER_TEMP/tarballs"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: tarballs
+          path: ${{ runner.temp }}/tarballs
+
+      - name: Stop here on a dry run
+        if: inputs.dry_run
+        run: |
+          echo "::notice::Dry run. Six tarballs are attached; nothing was published."
+          echo "Re-run with dry_run unchecked to publish."
+
+      - name: Publish all six, or none
+        if: ${{ !inputs.dry_run }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN is unset; a publish would fail halfway and leave the SDK split."
+            exit 1
+          fi
+          for name in core engine-protocol pyodide transport-fetch transport-libcurl xterm; do
+            npm publish "./packages/$name" --provenance --access public
+          done
