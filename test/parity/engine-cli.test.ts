@@ -112,4 +112,17 @@ describe.skipIf(!isBuilt)("the built engine answers uv's command line", () => {
     await invoke(["uv", "--version"]);
     expect(engine.isRunning()).toBe(false);
   });
+
+  it("finds a directory to keep credentials in, which it could not before", async () => {
+    const stored = await invoke(["uv", "auth", "login", "example.invalid", "--token", "probe"]);
+
+    expect(
+      `${stored.stdout}${stored.stderr}`,
+      "uv-auth reached past uv-dirs to etcetera once, and etcetera has no home directory here",
+    ).not.toContain("Could not determine user data directory");
+    expect(stored.code, `uv auth login failed: ${stored.stderr}`).toBe(0);
+
+    const read = await invoke(["uv", "auth", "token", "example.invalid"]);
+    expect(read.stdout.trim()).toBe("probe");
+  });
 });
