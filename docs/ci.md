@@ -26,6 +26,19 @@ The `wasm-bindgen` crate version and the CLI version must match; the CLI refuses
 module built by a different version. The crate is pinned exactly in the workspace manifest and the
 workflow reads the same number from `WASM_BINDGEN_VERSION`.
 
+## Running the gate before you push
+
+`bash scripts/verify-local.sh` runs the parts of the `javascript` job that fail on drift rather than
+on behavior, build, lint, typecheck, the emitted protocol schemas, release readiness, the public
+API report, and the fork-rewrite tests, and reports every failure rather than stopping at the first.
+
+The two drift checks are the ones worth running locally, because neither is visible in a normal test
+run: both regenerate an artifact and `git diff --exit-code` the committed copy. The API report
+reads `dist/`, not `src/`, so a source change that is not rebuilt regenerates the *old* surface and
+reports success. `verify-local.sh` builds first for that reason.
+
+The suite and coverage are left out of it; run `bun run test:coverage` separately.
+
 ## Size policy
 
 Budgets live in `tools/size-report/budgets.json` and are advisory, matching the project
