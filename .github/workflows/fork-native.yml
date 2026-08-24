@@ -73,6 +73,9 @@ jobs:
           cat "$RUNNER_TEMP/rust-cov.txt"
           exit "$status"
 
+      - name: Nothing reaches past a shim the port depends on
+        run: node "$GITHUB_WORKSPACE/scripts/check-shim-bypass.mjs"
+
       - name: Native uv still compiles, because it is the parity oracle
         working-directory: vendor/uv
         run: cargo check --workspace
