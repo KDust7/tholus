@@ -10,8 +10,12 @@ Runs on every push to `main` and every pull request.
 
 - `bun run lint` (biome)
 - `bun run typecheck` (tsc 6.0 per package)
-- `bun run test:coverage`, gated at 80% lines/functions/branches/statements
+- `bun run test:coverage`, gated at 80% lines/functions/branches/statements, per package as well as
+  overall
 - regenerates the protocol JSON Schema artifacts and fails if the committed copies drift
+- `node scripts/check-release-readiness.mjs`, which fails on anything that would make a publish
+  wrong and stays quiet about the packages still being private
+- regenerates the public API report and fails if the committed copies drift
 
 `wasm engine` job, installs the Rust toolchain pinned by `rust-toolchain.toml` plus a
 `wasm-bindgen-cli` matching the `wasm-bindgen` crate version exactly, then:
@@ -52,17 +56,38 @@ Exceeding the raw or brotli budget prints a warning explaining the consequence, 
 20 MB of wasm, V8 stops caching compiled code and every visit pays a full recompile, but does not
 fail the build.
 
-## Workflows still to come
+## The other workflows
 
-These are specified in the implementation plan and land with the work they verify:
+All of these exist and have been watched running; none is still owed.
 
-| Workflow | Lands with | Purpose |
+| Workflow | Trigger | Purpose |
 | --- | --- | --- |
-| `fork-native.yml` | Phase 1 | Runs upstream uv's own test suite inside `vendor/uv` to prove the fork's native behavior is unchanged |
-| `parity.yml` | Phase 2 | Golden-output parity against native uv; becomes the required merge gate |
-| `rebase-canary.yml` | Phase 1 | Weekly trial rebase onto the latest uv tag, publishing a `git range-diff` artifact |
-| `nightly.yml` | Phase 3 | Full parity matrix across Chromium, Firefox, and WebKit; Pyodide version matrix; live-PyPI smoke |
-| `release.yml` | MVP | Lockstep publish of every package with provenance |
+| `fork-native.yml` | push, PR | Runs the fork's own crates natively, `uv-vfs`, `uv-wasm-compat`, `uv-wasm-http`, with fmt, clippy, tests and coverage, so the port's Rust is checked outside the browser |
+| `rebase-canary.yml` | weekly | Trial rebase onto the latest uv tag, publishes a `git range-diff` artifact and does not fail the branch |
+| `nightly.yml` | nightly | The full parity matrix across Chromium, Firefox and WebKit, the Pyodide stable/prev/next matrix, and the live-PyPI smoke |
+| `release.yml` | manual | Lockstep publish of all six packages with provenance, defaulting to a dry run |
+
+There is no `parity.yml`. The parity gate runs inside `ci.yml`'s `wasm engine` job, against the
+artifact that job just built, which is the point, since a parity run against a stale artifact
+proves nothing.
+
+### What `release.yml` does that is easy to miss
+
+Two steps exist because `npm pack` will happily produce a tarball that cannot be installed:
+
+- Pin the workspace ranges npm cannot resolve. The six packages depend on each other with
+  `workspace:*`. npm has no such protocol, it copies the range into the tarball verbatim and every
+  consumer install dies with `EUNSUPPORTEDPROTOCOL`. `scripts/rewrite-workspace-deps.mjs` pins them
+  to the release version, and it runs after the suite so the tests still exercise the linked
+  workspace.
+- Read the tarballs back. `scripts/check-tarballs.mjs` opens each `.tgz`, parses the tar in
+  process, and inspects the `package.json` npm wrote into it, refusing on a surviving `workspace:`
+  range, a wrong version, a `private: true` outside a dry run, or a missing engine. The engine is
+  gitignored and built by `cargo xtask build`, so packing before that step would ship an SDK with no
+  wasm in it.
+
+Both are covered by `scripts/publish-gates.test.ts`, and the readiness check fails if `release.yml`
+stops running either one.
 
 ## Local equivalents
 
