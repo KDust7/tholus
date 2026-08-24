@@ -53,7 +53,7 @@ const EXEMPT = new Map([
     [
       {
         line: "std::env::set_var(EnvVars::UV, current_exe);",
-        why: 'gated by #[cfg(not(target_family = "wasm"))]: it propagates uv to child processes, and a browser has none',
+        why: "guarded by std::env::current_exe(), which returns Err on wasm, so the set_var never runs; it propagates uv to child processes and a browser has none",
       },
     ],
   ],
