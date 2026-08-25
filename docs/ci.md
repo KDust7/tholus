@@ -34,12 +34,18 @@ workflow reads the same number from `WASM_BINDGEN_VERSION`.
 
 `bash scripts/verify-local.sh` runs the parts of the `javascript` job that fail on drift rather than
 on behavior, build, lint, typecheck, the emitted protocol schemas, release readiness, the public
-API report, and the fork-rewrite tests, and reports every failure rather than stopping at the first.
+API report, and the fork-rewrite tests, and reports every failure rather than stopping at the
+first.
 
-The two drift checks are the ones worth running locally, because neither is visible in a normal test
-run: both regenerate an artifact and `git diff --exit-code` the committed copy. The API report
-reads `dist/`, not `src/`, so a source change that is not rebuilt regenerates the *old* surface and
-reports success. `verify-local.sh` builds first for that reason.
+The two drift checks are the ones worth running locally, because neither is visible in a normal
+test run. The API report reads `dist/`, not `src/`, so a source change that is not rebuilt
+regenerates the *old* surface and reports success. `verify-local.sh` builds first for that reason.
+
+CI can check drift with `git diff --exit-code`, because its checkout is clean. Locally that is the
+wrong question, it cannot tell your uncommitted edit from stale committed output, so it fails on
+any dirty tree, which is every tree that needs checking. `verify-local.sh` snapshots the generated
+directory, regenerates, and compares the two: if regenerating changes nothing, the copies on disk
+are current, whatever else is uncommitted.
 
 The suite and coverage are left out of it; run `bun run test:coverage` separately.
 
@@ -76,15 +82,15 @@ proves nothing.
 Two steps exist because `npm pack` will happily produce a tarball that cannot be installed:
 
 - Pin the workspace ranges npm cannot resolve. The six packages depend on each other with
-  `workspace:*`. npm has no such protocol, it copies the range into the tarball verbatim and every
-  consumer install dies with `EUNSUPPORTEDPROTOCOL`. `scripts/rewrite-workspace-deps.mjs` pins them
-  to the release version, and it runs after the suite so the tests still exercise the linked
-  workspace.
+  `workspace:*`. npm has no such protocol, it copies the range into the tarball verbatim and
+  every consumer install dies with `EUNSUPPORTEDPROTOCOL`. `scripts/rewrite-workspace-deps.mjs`
+  pins them to the release version, and it runs after the suite so the tests still exercise
+  the linked workspace.
 - Read the tarballs back. `scripts/check-tarballs.mjs` opens each `.tgz`, parses the tar in
-  process, and inspects the `package.json` npm wrote into it, refusing on a surviving `workspace:`
-  range, a wrong version, a `private: true` outside a dry run, or a missing engine. The engine is
-  gitignored and built by `cargo xtask build`, so packing before that step would ship an SDK with no
-  wasm in it.
+  process, and inspects the `package.json` npm wrote into it, refusing on a surviving
+  `workspace:` range, a wrong version, a `private: true` outside a dry run, or a missing engine.
+  The engine is gitignored and built by `cargo xtask build`, so packing before that step would
+  ship an SDK with no wasm in it.
 
 Both are covered by `scripts/publish-gates.test.ts`, and the readiness check fails if `release.yml`
 stops running either one.
