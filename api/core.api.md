@@ -1,6 +1,6 @@
 # @tholus/core
 
-123 public exports.
+124 public exports.
 
 ```ts
 export declare function applyHookWrites(vfs: HookVfs, writes: readonly HookWrite[]): void;
@@ -404,7 +404,7 @@ export interface InstallRequest extends CommandOptions {
     requireHashes?: boolean;
 }
 
-INTERNAL_NAME = "tholus"
+INTERNAL_NAME = "uv-wasm"
 
 export declare function interpreterAbiTag(vfs: ProfileReader, path?: string): string;
 
@@ -531,6 +531,8 @@ PROGRAM_NAME = "uv"
 export declare class ProtocolMismatchError extends EngineError {
     readonly code: "protocol-mismatch";
 }
+
+PUBLISHED_NAME = "tholus"
 
 QUOTA_HIGH_WATER = 0.9
 

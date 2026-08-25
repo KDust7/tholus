@@ -23,7 +23,7 @@ const written: string[] = [];
 for (const [name, schema] of Object.entries(artifacts)) {
   const json = z.toJSONSchema(schema, { unrepresentable: "any", io: "input" });
   const document = {
-    $id: `https://tholus.invalid/protocol/${PROTOCOL_VERSION}/${name}.json`,
+    $id: `https://uv-wasm.invalid/protocol/${PROTOCOL_VERSION}/${name}.json`,
     ...json,
   };
   const path = join(outDir, `${name}.json`);

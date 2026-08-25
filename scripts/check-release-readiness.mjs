@@ -87,7 +87,9 @@ for (const guide of ["comparison.md", "embedding.md", "hosting.md", "parity.md",
 
 const brand = readFileSync(join(root, "packages/core/src/brand.ts"), "utf8");
 const coldStore = readFileSync(join(root, "packages/core/src/opfs-store.ts"), "utf8");
+const INTERNAL_NAME_FOREVER = "uv-wasm";
 const internalName = brand.match(/INTERNAL_NAME = "([^"]+)"/)?.[1];
+const publishedName = brand.match(/PUBLISHED_NAME = "([^"]+)"/)?.[1];
 const strayBrand = readdirSync(join(root, "packages"), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .flatMap((entry) => {
@@ -96,12 +98,28 @@ const strayBrand = readdirSync(join(root, "packages"), { withFileTypes: true })
   })
   .filter((file) => !file.endsWith("brand.ts") && !file.endsWith(".test.ts"))
   .filter((file) => {
-    if (internalName === undefined) return false;
-    const source = readFileSync(file, "utf8").replace(/export const STORE_ROOT = "[^"]+";/, "");
-    return new RegExp(`["']${internalName}["']`).test(source);
+    if (publishedName === undefined) return false;
+    return new RegExp(`["']${publishedName}["']`).test(readFileSync(file, "utf8"));
   });
 
-if (internalName === undefined) problems.push("packages/core/src/brand.ts no longer declares INTERNAL_NAME");
+if (internalName !== INTERNAL_NAME_FOREVER) {
+  problems.push(
+    `INTERNAL_NAME is ${JSON.stringify(internalName)} but the internal identity is pinned to ` +
+      `"${INTERNAL_NAME_FOREVER}": it is what the crates, the opfs directory, the cache lock and the ` +
+      "recorded fixtures are all named, and none of those move when the published name does.",
+  );
+}
+if (publishedName === undefined) {
+  problems.push("packages/core/src/brand.ts no longer declares PUBLISHED_NAME");
+} else {
+  for (const name of SHIPPING) {
+    const declared = manifest(name).name;
+    const expected = `@${publishedName}/${name}`;
+    if (declared !== expected) {
+      problems.push(`packages/${name} publishes as ${declared}, not ${expected}`);
+    }
+  }
+}
 if (brand.includes("STORAGE_SCOPE")) {
   problems.push("packages/core/src/brand.ts declares STORAGE_SCOPE again, which re-couples the opfs directory to the brand: renaming would then orphan every user's stored state");
 }
@@ -122,8 +140,8 @@ const engineLib = readFileSync(join(root, "crates/uv-wasm-engine/src/lib.rs"), "
 const reportedName = engineLib.match(/format!\("(\S+) \{ENGINE_VERSION\}/)?.[1];
 if (reportedName === undefined) {
   problems.push("crates/uv-wasm-engine/src/lib.rs no longer renders a name before ENGINE_VERSION, so the brand it reports cannot be checked");
-} else if (reportedName !== internalName) {
-  problems.push(`the engine reports itself as "${reportedName}" while the brand is "${internalName}": engine.version() is public surface and the two must move together`);
+} else if (reportedName !== publishedName) {
+  problems.push(`the engine reports itself as "${reportedName}" while the published name is "${publishedName}": engine.version() is public surface and the two must move together`);
 }
 if (strayBrand.length > 0) {
   problems.push(

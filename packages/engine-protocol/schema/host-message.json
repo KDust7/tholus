@@ -1,5 +1,5 @@
 {
-  "$id": "https://tholus.invalid/protocol/0/host-message.json",
+  "$id": "https://uv-wasm.invalid/protocol/0/host-message.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "oneOf": [
     {

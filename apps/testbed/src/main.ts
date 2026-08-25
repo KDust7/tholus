@@ -1,9 +1,4 @@
-import {
-  createEngine,
-  type Engine,
-  type EngineConfigInput,
-  type ExecOptions,
-} from "@tholus/core";
+import { createEngine, type Engine, type EngineConfigInput, type ExecOptions } from "@tholus/core";
 import type { EngineEvent } from "@tholus/engine-protocol";
 
 export interface TestbedResult {
