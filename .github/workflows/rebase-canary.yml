@@ -26,7 +26,7 @@ jobs:
           FORK_TOKEN: ${{ secrets.FORK_TOKEN }}
         run: |
           if [ -z "$FORK_TOKEN" ]; then
-            echo "FORK_TOKEN is unset, so the fork cannot be read. See docs/status.md."
+            echo "FORK_TOKEN is unset, so the fork cannot be read."
             exit 1
           fi
           git config --global \

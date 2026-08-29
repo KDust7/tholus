@@ -30,7 +30,7 @@ jobs:
           FORK_TOKEN: ${{ secrets.FORK_TOKEN }}
         run: |
           if [ -z "$FORK_TOKEN" ]; then
-            echo "FORK_TOKEN is unset, so vendor/uv cannot be checked out. See docs/status.md."
+            echo "FORK_TOKEN is unset, so vendor/uv cannot be checked out."
             exit 1
           fi
           git config --global \

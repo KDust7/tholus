@@ -34,7 +34,7 @@ jobs:
           FORK_TOKEN: ${{ secrets.FORK_TOKEN }}
         run: |
           if [ -z "$FORK_TOKEN" ]; then
-            echo "FORK_TOKEN is unset, so vendor/uv cannot be checked out. See docs/status.md."
+            echo "FORK_TOKEN is unset, so vendor/uv cannot be checked out."
             exit 1
           fi
           git config --global \
@@ -91,7 +91,7 @@ jobs:
           FORK_TOKEN: ${{ secrets.FORK_TOKEN }}
         run: |
           if [ -z "$FORK_TOKEN" ]; then
-            echo "FORK_TOKEN is unset, so vendor/uv cannot be checked out. See docs/status.md."
+            echo "FORK_TOKEN is unset, so vendor/uv cannot be checked out."
             exit 1
           fi
           git config --global             url."https://x-access-token:${FORK_TOKEN}@github.com/KDust7/uv-wasm-fork".insteadOf             "https://github.com/KDust7/uv-wasm-fork"
@@ -152,7 +152,7 @@ jobs:
           FORK_TOKEN: ${{ secrets.FORK_TOKEN }}
         run: |
           if [ -z "$FORK_TOKEN" ]; then
-            echo "FORK_TOKEN is unset, so vendor/uv cannot be checked out. See docs/status.md."
+            echo "FORK_TOKEN is unset, so vendor/uv cannot be checked out."
             exit 1
           fi
           git config --global             url."https://x-access-token:${FORK_TOKEN}@github.com/KDust7/uv-wasm-fork".insteadOf             "https://github.com/KDust7/uv-wasm-fork"

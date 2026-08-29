@@ -92,7 +92,7 @@ jobs:
         run: |
           if [ -z "$FORK_TOKEN" ]; then
             echo "FORK_TOKEN is unset. GITHUB_TOKEN cannot read a second private repository,"
-            echo "so vendor/uv cannot be checked out. See docs/status.md."
+            echo "so vendor/uv cannot be checked out."
             exit 1
           fi
           git config --global \
