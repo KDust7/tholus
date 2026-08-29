@@ -90,8 +90,8 @@ default; uv installs those.
 
 ## The private API this depends on, and how you find out it went
 
-Mounting a compiled extension needs `pyodide._api.loadDynlib`, which is private. Decision 22 accepted
-that with a version-gated bridge and a nightly tripwire, and both exist:
+Mounting a compiled extension needs `pyodide._api.loadDynlib`, which is private. That is an accepted
+risk, with a version-gated bridge and a nightly tripwire, and both exist:
 
 - `test/parity/pyodide-surface.test.ts` asserts every member the adapter touches (thirteen `FS.*`
   methods, `runPython`, and `_api.loadDynlib`) against the pinned Pyodide, on every run.
