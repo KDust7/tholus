@@ -54,11 +54,11 @@ for (const [crate, { covered, count, files: seen }] of totals) {
   const present = sourceFiles(resolve(crateRoot, crate, "src"));
   const scope =
     present > seen
-      ? `, ${seen} of its ${present} source files compile natively; the rest is wasm-only and is covered by the parity grid instead`
+      ? `; ${seen} of its ${present} source files compile natively; the rest is wasm-only and is covered by the parity grid instead`
       : "";
   const line = `${crate}: ${percent.toFixed(1)}% of ${count} lines across ${seen} files${scope}`;
   if (percent < FLOOR) {
-    failures.push(`${line}, below the ${FLOOR}% bar`);
+    failures.push(`${line}, which is below the ${FLOOR}% bar`);
   } else {
     console.log(line);
   }

@@ -126,7 +126,7 @@ if (escapes.length > 0) {
   for (const escape of escapes) {
     console.error(`  ${escape.file}`);
     console.error(
-      `    uses ${escape.shim.what} directly; ${escape.shim.ownedBy} owns the browser-aware version, use ${escape.shim.instead}`,
+      `    uses ${escape.shim.what} directly; ${escape.shim.ownedBy} owns the browser-aware version, so use ${escape.shim.instead}`,
     );
     for (const line of escape.lines) {
       console.error(`      ${line.number}: ${line.text}`);
@@ -153,7 +153,7 @@ for (const [where, entries] of EXEMPT) {
       );
       process.exit(1);
     }
-    console.log(`exempt: ${where}, ${entry.why}`);
+    console.log(`exempt: ${where}: ${entry.why}`);
   }
 }
 

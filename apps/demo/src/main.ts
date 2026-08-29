@@ -103,7 +103,7 @@ async function main(): Promise<void> {
 
   const python = async (argv: string[], write: (text: string) => void): Promise<number> => {
     if (!runtime) {
-      write("Python is not loaded yet, press the button below first.\r\n");
+      write("Python is not loaded yet. Press the button below first.\r\n");
       return 1;
     }
     const source = argv[1] === "-c" ? argv.slice(2).join(" ") : undefined;
