@@ -27,8 +27,8 @@ jobs:
             exit 1
           fi
           git config --global \
-            url."https://x-access-token:${FORK_TOKEN}@github.com/KDust7/uv-wasm-fork".insteadOf \
-            "https://github.com/KDust7/uv-wasm-fork"
+            url."https://x-access-token:${FORK_TOKEN}@github.com/KDust7/tholus-fork".insteadOf \
+            "https://github.com/KDust7/tholus-fork"
           git submodule update --init --recursive
 
       - uses: dtolnay/rust-toolchain@stable

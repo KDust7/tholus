@@ -1,4 +1,4 @@
 [submodule "vendor/uv"]
 	path = vendor/uv
-	url = https://github.com/KDust7/uv-wasm-fork.git
+	url = https://github.com/KDust7/tholus-fork.git
 	branch = wasm/v0.12.3
