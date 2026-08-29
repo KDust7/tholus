@@ -206,6 +206,7 @@ describe.skipIf(!canRun || chosenBrowser() !== "chromium")(
       const between = log.requested.length;
       await install("b", "/second");
       secondRound = log.requested.slice(between);
+      await page.evaluate((worker) => (globalThis as unknown as Scope).__kill(worker), "b");
 
       await new Promise<void>((done) => server.close(() => done()));
     }, 900_000);
