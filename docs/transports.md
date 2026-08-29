@@ -41,7 +41,7 @@ promoting it to the default would be a behavior change rather than a naming one.
   it. That is a performance cliff with no error attached.
 
 Both are reasons to keep the rewrite opt-in for the hosts that need it, which is exactly what an
-index refusing `HEAD` looks like,
+index refusing `HEAD` looks like.
 [ADR 0005](decisions/0005-the-browsers-own-fetch-is-the-default.md) records the whole call. `test/parity/transport-engine.test.ts` gates it either way: it
 drives a real install through this transport and asserts no `HEAD` survived.
 
@@ -63,7 +63,7 @@ It never retries. uv owns retry policy, and a second layer of backoff would be i
 ## `libcurl`
 
 `libcurl.js` is a real curl compiled to WebAssembly, tunneling TCP over a WebSocket relay. It is not
-bundled, the host supplies the module, because the worker is a single esbuild bundle and shipping
+bundled; the host supplies the module, because the worker is a single esbuild bundle and shipping
 ~6 MB of curl to every user for an opt-in path is not a trade worth making. Nothing in this repository
 depends on `libcurl.js` at runtime.
 
@@ -83,12 +83,12 @@ const engine = await createEngine({
 
 - `moduleUrl` is imported lazily, on the first request, not at boot. The loader accepts the module's
   `libcurl` named export, its default export, or the namespace itself.
-- `relayUrl` must be `ws:` or `wss:` and must end in a trailing slash, libcurl appends the
+- `relayUrl` must be `ws:` or `wss:` and must end in a trailing slash, because libcurl appends the
   destination to it. Both are checked when the engine is configured, not when the first download
   fails.
 - `userAgent` is the reason this transport exists. A browser `Request` silently drops `User-Agent`,
   `Cookie` and `Host`, so through the platform transport uv is indistinguishable from the page.
-  libcurl sends whatever you give it, and if you give it nothing it sends the *browser's* own
+  libcurl sends whatever you give it, and if you give it nothing it sends the browser's own
   `User-Agent`, so set it yourself.
 - `connectionsPerHost` defaults to 16. libcurl's own default is 6, which throttles an index badly.
   `maxConnections` (60) and `connectionCache` (50) are libcurl's defaults and rarely need changing.
@@ -99,12 +99,12 @@ You need a Wisp relay to use this. Running one is out of scope here.
 engine with this transport instead of reconfiguring the running one, because the transport is
 installed in the worker before uv boots. The new engine is created before the old one is torn down,
 so a relay that is refused leaves a working page. The demo serves `libcurl.mjs` and `libcurl.wasm`
-from its own origin under `/libcurl/`; a deployment has to copy them there, see
+from its own origin under `/libcurl/`; a deployment has to copy them there; see
 [hosting.md](hosting.md).
 
 ## Writing your own
 
-Any object with a `fetch` method will do, so a host can implement the seam over anything, a service
+Any object with a `fetch` method will do, so a host can implement the seam over anything: a service
 worker, a same-origin proxy, an Electron main process. That interface is the whole
 contract; nothing else about a transport is observable to uv.
 

@@ -15,7 +15,7 @@ The worker resolves `engine.js` and `engine_bg.wasm` relative to its own URL, so
 layout is the path of least resistance.
 
 Only if you offer the libcurl transport, add `libcurl.mjs` and `libcurl.wasm` wherever your
-`moduleUrl` and `wasmUrl` point, `apps/demo` puts them under `/libcurl/`. They are imported lazily,
+`moduleUrl` and `wasmUrl` point; `apps/demo` puts them under `/libcurl/`. They are imported lazily,
 on the first request through that transport, so a page that never names a relay never fetches them.
 
 ## No COOP/COEP
@@ -27,8 +27,8 @@ those headers break embedding in most real pages, and the whole point is to drop
 
 ## Compression
 
-Serve the wasm with brotli. It is the difference between 18.3 MiB and 4.1 MiB on the wire, a
-factor of 4.5, and by far the largest single thing you control.
+Serve the wasm with brotli. It is the difference between 18.3 MiB and 4.1 MiB on the wire, a factor
+of 4.5, and by far the largest single thing you control.
 
 ```
 Content-Encoding: br
@@ -50,7 +50,7 @@ Cache-Control: public, max-age=31536000, immutable
 ```
 
 The artifact is large and changes only when you ship a new build, so an immutable, content-addressed
-URL is the right call. Do not serve it with a short max-age and revalidation, you will pay a
+URL is the right call. Do not serve it with a short max-age and revalidation. You will pay a
 round trip on every load for a file that never changes.
 
 Your HTML should be the opposite: `Cache-Control: no-cache`, so a new deploy is picked up.
@@ -81,7 +81,7 @@ Content-Security-Policy:
 ```
 
 Narrow `connect-src` to the indexes you configure. If you use the libcurl transport, add the
-relay's `wss://` origin instead, every request goes there rather than to the index.
+relay's `wss://` origin instead, since every request goes there and not to the index.
 
 ## Storage
 

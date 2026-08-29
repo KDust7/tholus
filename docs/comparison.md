@@ -9,7 +9,7 @@ where it stops, and which one you want.
 | --- | --- | --- | --- | --- | --- |
 | this project | PubGrub, full backtracking | `uv.lock`, `pip compile` | persistent, OPFS | PEP 517 via a Pyodide you supply | any PEP 503 index |
 | micropip | first satisfying version, no backtracking | none | none | none | Pyodide's index, PyPI wheels |
-| Pyodide's `loadPackage` | none, a fixed graph | none | browser HTTP cache | none | Pyodide's own build only |
+| Pyodide's `loadPackage` | none; a fixed graph | none | browser HTTP cache | none | Pyodide's own build only |
 
 ## micropip
 
@@ -29,7 +29,7 @@ records what it chose.
 ## Pyodide's `loadPackage`
 
 `pyodide.loadPackage("numpy")` is not a package manager. It fetches a package from the build Pyodide
-was released with, whose versions are pinned to that release, `numpy` is exactly one version per
+was released with, whose versions are pinned to that release: `numpy` is exactly one version per
 Pyodide version. That is a feature for the packages with compiled extensions, because those *have*
 to come from Pyodide's own cross-build to load at all.
 
@@ -41,20 +41,20 @@ Python package that Pyodide never built falls through to PyPI.
 ## What this project costs
 
 The engine is a ~18 MiB WebAssembly module (~4 MiB over brotli), which is a real download and a real
-compile. That buys uv itself, the resolver, the installer, the cache, the lockfile format, the
+compile. That buys uv itself: the resolver, the installer, the cache, the lockfile format, the
 `pip` command surface, and byte-identical output to the native binary. If all you need is one
 pure-Python wheel in a notebook cell, micropip is smaller and already there.
 
 It is worth it when any of these is true:
 
-- the resolution has to be right, several requirements, overlapping constraints, or a conflict
+- the resolution has to be right: several requirements, overlapping constraints, or a conflict
   you need explained, not just raised;
-- the environment has to be reproducible, `uv pip compile` and `uv lock` produce the same
+- the environment has to be reproducible: `uv pip compile` and `uv lock` produce the same
   artifacts a terminal would, hashes included, so an environment resolved in a browser can be
   installed on a server;
-- the same install happens repeatedly, the cache survives a reload, and a warm reinstall makes
+- the same install happens repeatedly: the cache survives a reload, and a warm reinstall makes
   no network request at all;
-- you want a terminal, `uv` in an xterm.js session behaves like `uv` in a terminal, progress
+- you want a terminal: `uv` in an xterm.js session behaves like `uv` in a terminal, progress
   bars and colors included.
 
 ## What it does not do
@@ -65,13 +65,13 @@ It is worth it when any of these is true:
 - It cannot install a Python. `python-build-standalone` has no `wasm32` build, so
   `uv python install` correctly finds nothing. The interpreter is the Pyodide the host supplies.
 - It is not a sandbox escape. The same-origin policy still applies: an index has to send CORS
-  headers, or you have to route through a transport that does not need them, see
+  headers, or you have to route through a transport that does not need them. See
   [transports.md](transports.md).
 
 ## Which to reach for
 
-- One wheel, in a notebook, no reproducibility requirement → micropip.
-- Something with a compiled extension that Pyodide already builds → `loadPackage`, or this
-  project, which will resolve to the same wheel.
-- A dependency set, a lockfile, a cache, a terminal, or output you intend to trust → this
+- One wheel, in a notebook, no reproducibility requirement: micropip.
+- Something with a compiled extension that Pyodide already builds: `loadPackage`, or this
+  project, which resolves to the same wheel.
+- A dependency set, a lockfile, a cache, a terminal, or output you intend to trust: this
   project.

@@ -3,8 +3,8 @@
 `@tholus/core` runs uv in a dedicated Worker and gives the page a typed handle to it. Two layers are
 exposed and you can mix them freely:
 
-- Layer 0, `engine.exec(argv, options)`, uv's command line exactly as it is on a terminal.
-- Layer 1, `engine.pip.*` and `engine.venv.*`, which build the argv for you and return parsed
+- Layer 0 is `engine.exec(argv, options)`, uv's command line exactly as it is on a terminal.
+- Layer 1 is `engine.pip.*` and `engine.venv.*`, which build the argv for you and return parsed
   results.
 
 ## Starting one
@@ -37,7 +37,7 @@ await createEngine({ workerUrl: new URL("/vendor/uv/worker.js", location.origin)
 
 ## Running a command
 
-`argv` starts at the subcommand, the program name is the engine's business, not yours.
+`argv` starts at the subcommand. The program name is the engine's business, not yours.
 
 ```ts
 const handle = engine.exec(["pip", "install", "idna"], {
@@ -68,8 +68,8 @@ const report = await engine.pip.install({
 const installed = await engine.pip.list({ venv: "/work/.venv" });
 ```
 
-These throw on failure, `ResolutionConflictError` when uv could not solve, `UnsupportedError`
-otherwise, where `exec` only reports a non-zero code. Use whichever failure style suits the surface
+These throw on failure, where `exec` only reports a non-zero code: `ResolutionConflictError` when
+uv could not solve, `UnsupportedError` otherwise. Use whichever failure style suits the surface
 you are building.
 
 ## Watching it boot
@@ -85,7 +85,7 @@ const engine = await createEngine({
 });
 ```
 
-Four phases arrive in order, `compile-start`, `compile-done`, `init-start`, `ready`, and the two
+Four phases arrive in order (`compile-start`, `compile-done`, `init-start`, `ready`) and the two
 that end a stage carry the milliseconds it took. They all arrive before `createEngine` resolves,
 which is the whole point and also the trap: a listener attached to the returned engine is too late to
 see any of them, so this is a `createEngine` option rather than an `onEvent` type. A listener that
@@ -104,7 +104,7 @@ engine.onEvent((event) => {
 Events also arrive per invocation through `options.onEvent`. What is emitted today: `log`, `phase`,
 `resolution-complete`, `install-report`, `runtime-finalize` and `request`.
 
-`request` is the exception to per-invocation delivery, it carries no `invocationId`, because the
+`request` is the exception to per-invocation delivery. It carries no `invocationId`, because the
 transport does not know which command a fetch belongs to, so it reaches the engine-level listener
 only. It is emitted only when you choose a transport: the `platform` default deliberately leaves
 `globalThis.fetch` untouched, so there is nothing to observe.
@@ -115,8 +115,8 @@ path, which is not a trade worth making for a progress bar.
 
 ## Wiring it to a terminal
 
-`@tholus/xterm` writes uv's bytes through untouched, no rewriting, no line-ending translation,
-because a terminal is the thing that owns rendering. That leaves one setting the host has to get
+`@tholus/xterm` writes uv's bytes through untouched, with no rewriting and no line-ending
+translation, because a terminal is the thing that owns rendering. That leaves one setting the host has to get
 right:
 
 ```ts
@@ -126,7 +126,7 @@ const terminal = new Terminal({ convertEol: true });
 uv writes bare `LF`. A terminal that does not convert it moves the cursor down without returning
 it to column 0, so every line starts where the last one ended and the output reads as a staircase.
 `runInTerminal` warns once on a terminal that says `convertEol: false`, and says nothing when the
-terminal does not report the option at all, xterm.js is not the only terminal shaped like
+terminal does not report the option at all, since xterm.js is not the only terminal shaped like
 `TerminalLike`.
 
 `test/parity/tty-render.test.ts` replays a real install through a headless terminal both ways: with
@@ -140,7 +140,7 @@ const { entries, bytes } = await engine.exportTree("/work/.venv/lib/python3.14/s
 ```
 
 One transferable buffer plus an offset table, instead of a chatty filesystem API. This is what you
-hand to Pyodide, see [pyodide.md](pyodide.md).
+hand to Pyodide; see [pyodide.md](pyodide.md).
 
 ## Finishing
 

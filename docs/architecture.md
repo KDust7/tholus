@@ -15,7 +15,7 @@ The port keeps uv's logic and replaces its four contacts with the outside world:
 | Subprocess | `python -c`, PEP 517 hooks | An RPC to a Pyodide runtime the host attaches |
 | Interpreter discovery | Runs a probe script | A synthetic interpreter built from static target facts |
 
-Everything else, resolution, metadata handling, wheel unpacking, virtual environment layout, is
+Everything else (resolution, metadata handling, wheel unpacking, virtual environment layout) is
 uv's own code, unmodified.
 
 ## Layers
@@ -49,14 +49,14 @@ design requires `SharedArrayBuffer`, so embedding pages need no COOP/COEP header
 emits those schemas as JSON Schema documents that the Rust side validates against. Both
 implementations answer to the same document, so neither can drift silently.
 
-Alongside it, `test/contract/transcripts/` holds golden message sequences for the canonical flows,
+Alongside it, `test/contract/transcripts/` holds golden message sequences for the canonical flows:
 handshake, streaming output, stdin round-trip, cancellation, structured failure. Any implementation
 claiming to be an engine must satisfy them. `@tholus/mock-engine` satisfies them today, which is
 what lets the SDK be built and tested before the real engine compiles.
 
 ## Why there are two output channels
 
-The engine emits raw bytes on stdout and stderr, real ANSI, real progress bars, byte-identical to
+The engine emits raw bytes on stdout and stderr: real ANSI, real progress bars, byte-identical to
 native uv. It *also* emits structured events for the same activity.
 
 These are independent. Programmatic consumers never parse terminal output, and terminal consumers
@@ -80,7 +80,7 @@ reference table.
 
 ## Networking without CORS assumptions
 
-PyPI turns out to be fully CORS-open for reads, the simple index, wheel downloads, range requests,
+PyPI turns out to be fully CORS-open for reads. The simple index, wheel downloads, range requests,
 and PEP 658 metadata sidecars all permit browser origins. So the default transport is plain `fetch`
 and the zero-configuration path works with no infrastructure.
 

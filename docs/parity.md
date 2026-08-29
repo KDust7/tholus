@@ -6,17 +6,17 @@ honest.
 
 ## The bar
 
-N-class, byte parity. For a given command, the bytes uv writes to stdout and stderr in the
+N-class is byte parity. For a given command, the bytes uv writes to stdout and stderr in the
 browser must equal the bytes native uv writes, after normalizing the handful of tokens that cannot
 match: temporary paths, durations, transfer rates, sizes, the Python implementation string and uv's
-own build stamp. Ordering is never forgiven, a differently-ordered `readdir` is a failure, not a
+own build stamp. Ordering is never forgiven: a differently-ordered `readdir` is a failure, not a
 nuisance.
 
-W-class, reviewed snapshots. Where byte parity is not meaningful (structured reports, terminal
+W-class is reviewed snapshots. Where byte parity is not meaningful (structured reports, terminal
 renderings), a frozen snapshot is compared and any change has to be reviewed deliberately, the same
 way an API report is.
 
-TTY, render parity. Both raw streams are replayed through a headless terminal at the recorded
+TTY is render parity. Both raw streams are replayed through a headless terminal at the recorded
 geometry, and the final screen and scrollback must match.
 
 ## Both sides must be the same uv
@@ -28,7 +28,7 @@ pair being compared at all.
 Two traps follow from that:
 
 - `uv-cli/build.rs` reads `.git/HEAD`, so committing between the two builds is enough to skew
-  them. The rule that works is *commit, then rebuild both*, or build both, then commit. Deciding to
+  them. The rule that works is commit, then rebuild both; or build both, then commit. Deciding to
   commit "while the build runs" is the specific move to avoid.
 - Both lagging equally is fine, and is the normal state. The gate compares the binaries against
   each other, not against `HEAD`. What is not fine is a fork change that alters *native* behavior
@@ -58,8 +58,8 @@ All of them need a native uv built from the same fork commit as the artifact.
 
 ## What the fixtures contain, and why that is publishable
 
-The snapshots embed the actual bytes of the distributions each scenario downloads, 8.9 MB across
-27 distributions, because a replay server that did not would be replaying nothing. The pre-reveal
+The snapshots embed the actual bytes of the distributions each scenario downloads, 8.9 MB across 27
+distributions, because a replay server that did not would be replaying nothing. The pre-reveal
 checklist asks for this posture to be stated, not assumed, so:
 
 - Everything embedded is an unmodified upstream artifact from PyPI, recorded byte for byte. None
@@ -69,7 +69,7 @@ checklist asks for this posture to be stated, not assumed, so:
   `hatchling`, `pathspec`, `pluggy`), BSD-3-Clause (`idna`, `flit-core`), MPL-2.0 (`certifi`). All
   permit redistribution; MPL-2.0's source-availability condition is satisfied by the artifact being
   the unmodified upstream one.
-- Four are ours, `uv_wasm_left`, `uv_wasm_right`, `uv_wasm_shared` (two versions), hand-authored
+- Four are ours: `uv_wasm_left`, `uv_wasm_right` and `uv_wasm_shared` (two versions), hand-authored
   to produce a resolution conflict that no real package pair reliably produces.
 
 If that posture ever stops being comfortable, the fixtures are regenerable: delete them, run the
@@ -86,10 +86,10 @@ It also refuses three ways of inflating that number: a duplicated cell, a follow
 where the recorded answer did not change, and a fixture no test reads.
 
 Two flags were measured and rejected as parity subjects because their output describes the recording
-machine and not uv: `--python-version`, which makes native download an interpreter it does
-not have, and `--emit-marker-expression` outside `--universal`, which prints the running
-interpreter's `python_full_version`. `--emit-index-url` is rejected for a different reason, it
-prints the replay server's ephemeral port.
+machine and not uv: `--python-version`, which makes native download an interpreter it does not have, and
+`--emit-marker-expression` outside `--universal`, which prints the running interpreter's
+`python_full_version`. `--emit-index-url` is rejected for a different reason: it prints the replay
+server's ephemeral port.
 
 ## Running it
 
@@ -100,22 +100,22 @@ bun run vitest run --project browser     # the seven that do, one at a time
 ```
 
 The browser project sets `fileParallelism: false` on purpose. Seven concurrent Chromium instances
-on one machine do not merely run slowly, they produce failures that look like defects. A local
+on one machine do not just run slowly. They produce failures that look like defects. A local
 server refusing a connection with `TypeError: fetch failed`, a `spawnSync` of the native binary
 taking four minutes, a file failing with zero failing tests inside it: all three have been observed,
 and all three were load.
 
-Corollary that matters: a slow run here is not a slow pass, it is an unreliable one. Check
-the duration before believing a failure. Killing a pile of Chromium processes does not leave a quiet
-machine immediately either, give it a moment before concluding anything from the next run.
+The corollary matters: a slow run here is an unreliable one. Check the duration
+before believing a failure. Killing a pile of Chromium processes does not leave a quiet machine
+immediately either, so give it a moment before concluding anything from the next run.
 
 ## Skips
 
 A skipped test in this repository means one of two things, and the name says which.
 
-- Structural, the case does not apply. There is no extension module in a pure-Python wheel, so
+- Structural: the case does not apply. There is no extension module in a pure-Python wheel, so
   the test that would check one is skipped for that scenario. These are inapplicable, not missing.
-- `BLOCKED:`, a defect. The name carries the whole reason, so it reads as a defect in the run
+- `BLOCKED:` marks a defect. The name carries the whole reason, so it reads as a defect in the run
   output instead of disappearing into a count. Anything here is owed work.
 
 The golden transcripts are the third kind: they assert the mock's scripted output, not uv's,
@@ -125,7 +125,7 @@ so they run against the mock and never the engine.
 
 Every gate here has, at some point, been made to fail to confirm it goes red. That is not
 ceremony. This project has four recorded instances of an oracle agreeing with a wrong implementation
-because neither side ran at all, a fixture empty on both sides, a `misses.length === 0` with
+because neither side ran at all: a fixture empty on both sides, a `misses.length === 0` with
 nothing requested, a mock built on the same wrong assumption as the code it checked, and a render
 assertion anchored on a line that looked identical in both renderings.
 

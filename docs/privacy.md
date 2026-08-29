@@ -15,7 +15,7 @@ tholus-operated service. There is no tholus-operated service.
 The requests are made by uv itself, through whichever transport the host chose. With
 `{kind:"platform"}` they are ordinary browser `fetch` calls and follow the page's own CORS and CSP
 rules. With `{kind:"libcurl"}` they are tunneled through a Wisp relay the host supplies, which by
-construction sees every request and response, see [transports.md](transports.md). Choosing that
+construction sees every request and response. See [transports.md](transports.md). Choosing that
 transport means choosing to trust that relay.
 
 `apps/demo` is shaped so that this is a choice you make, not one made for you: no
@@ -51,8 +51,8 @@ one Pyodide release is never mixed into another.
 
 ## Credentials
 
-uv supports authenticated indexes. Anything you pass, a token in an index URL, or headers a custom
-transport adds, is held in memory for the session and is written to the cache by nothing. It does
+uv supports authenticated indexes. Anything you pass (a token in an index URL, or headers a custom
+transport adds) is held in memory for the session and is written to the cache by nothing. It does
 reach the index, which is the point, and it reaches a Wisp relay too if you configured one.
 
 Browser `fetch` silently drops `Cookie` and `Authorization` is subject to CORS preflight, so
@@ -61,11 +61,11 @@ platform transport.
 
 ## What the host can turn off
 
-- `cache: { kind: "none" }`, nothing persists.
-- `transport: { kind: "platform" }` *(default)*, no third party is involved beyond the index.
-- Not attaching a Pyodide runtime, no arbitrary Python from a package's build backend ever executes.
+- `cache: { kind: "none" }`: nothing persists.
+- `transport: { kind: "platform" }`, the default: no third party is involved beyond the index.
+- Not attaching a Pyodide runtime: no arbitrary Python from a package's build backend ever executes.
 
-That last one is worth stating plainly: a source distribution's build backend is arbitrary code,
+That last one is worth stating plainly. A source distribution's build backend is arbitrary code,
 and running one means running it. It executes inside Pyodide's WebAssembly sandbox with access to the
 trees uv hands it, not to the page. Installing only wheels avoids the question entirely, and an
 engine with no runtime attached cannot build from source even if asked.

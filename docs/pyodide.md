@@ -1,12 +1,12 @@
 # Pyodide
 
 uv can resolve, download and install into a virtual environment entirely on its own. What it cannot
-do is *run Python*, there is no interpreter inside the engine. Pyodide supplies one, and
+do is run Python; there is no interpreter inside the engine. Pyodide supplies one, and
 `@tholus/pyodide` connects the two in both directions:
 
-- Mounting, hand an environment uv built to Pyodide so `import` finds it.
-- Build hooks, let uv run a package's PEP 517 backend inside Pyodide, so source distributions
-  build in the browser.
+- Mounting hands an environment uv built to Pyodide so `import` finds it.
+- Build hooks let uv run a package's PEP 517 backend inside Pyodide, so source distributions build
+  in the browser.
 
 Nothing here is required. An engine with no runtime attached still installs wheels; it refuses only
 the things that genuinely need an interpreter, and says so.
@@ -64,12 +64,12 @@ Through the worker SDK that is a single call, `engine.attachRuntime(handler)`, a
 the tree marshaling for you. Driving the engine handle directly, you assemble the same pieces with
 `hookTrees`, `sitePackagesOf` and `applyHookWrites`.
 
-What crosses, per hook: the source tree, the build environment's `site-packages`, and, for
-`build_wheel` only, the output directory uv expects the wheel to appear in. What comes back: stdout,
+What crosses, per hook: the source tree, the build environment's `site-packages`, and (for
+`build_wheel` only) the output directory uv expects the wheel to appear in. What comes back: stdout,
 stderr, an exit status, and the files the hook wrote, which are applied to the engine's filesystem.
 
 uv drives this itself. It calls `get_requires_for_build_wheel`, installs whatever that asks for into
-the build environment, and calls `build_wheel`, you do not orchestrate the sequence.
+the build environment, and calls `build_wheel`. You do not orchestrate the sequence.
 
 The build environment is a temporary directory uv deletes when the build ends. Anything you want
 to know about it has to be observed inside the hook; reading it afterwards finds nothing, which looks
@@ -78,23 +78,23 @@ like a broken bridge and is not.
 ## Without a runtime
 
 `uv pip install` of a wheel needs no runtime at all. A source build without one fails with uv's own
-message about a missing interpreter, not a crash, and that refusal is pinned by tests, it is
-a supported state, not an accident.
+message about a missing interpreter, not a crash, and that refusal is pinned by tests. It is a
+supported state, not an accident.
 
 ## Versions
 
 Pyodide's ABI is probed, not assumed, because it moves. As of Pyodide 314.0.5 the runtime reports
 CPython 3.14, `emscripten-5.0.3-wasm32` and `.cpython-314-wasm32-emscripten.so`, which matches the
 interpreter profile the engine seeds. Pyodide ships neither `micropip` nor `numpy` nor `requests` by
-default, uv installs those.
+default; uv installs those.
 
 ## The private API this depends on, and how you find out it went
 
 Mounting a compiled extension needs `pyodide._api.loadDynlib`, which is private. Decision 22 accepted
 that with a version-gated bridge and a nightly tripwire, and both exist:
 
-- `test/parity/pyodide-surface.test.ts` asserts every member the adapter touches, thirteen `FS.*`
-  methods, `runPython`, and `_api.loadDynlib`, against the pinned Pyodide, on every run.
+- `test/parity/pyodide-surface.test.ts` asserts every member the adapter touches (thirteen `FS.*`
+  methods, `runPython`, and `_api.loadDynlib`) against the pinned Pyodide, on every run.
 - `test/parity/pyodide-matrix.test.ts` asserts the same surface against the stable, previous and
   next channels nightly, so a removal in a prerelease shows up as early warning instead of an upgrade
   that breaks. `scripts/install-pyodide-matrix.mjs` resolves those three from npm's `latest`/`next` tags
@@ -103,5 +103,5 @@ that with a version-gated bridge and a nightly tripwire, and both exist:
 Measured 2026-08-23: the whole surface is intact on 314.0.4, 314.0.5 and 315.0.0-alpha.2.
 
 One fact worth carrying: npm spells a prerelease `315.0.0-alpha.2` and Pyodide reports itself as
-`315.0.0a2`. Anything keying one to the other, a version gate, a cache tag, an ABI string, breaks
+`315.0.0a2`. Anything keying one to the other (a version gate, a cache tag, an ABI string) breaks
 the first time the pin is a prerelease.
