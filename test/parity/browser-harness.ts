@@ -20,7 +20,7 @@ export function contentTypeOf(path: string): string {
 const ENGINES: Record<string, BrowserType> = { chromium, firefox, webkit };
 
 export function chosenBrowser(): string {
-  const named = process.env["UV_WASM_BROWSER"] ?? "chromium";
+  const named = process.env.UV_WASM_BROWSER ?? "chromium";
   if (!(named in ENGINES)) {
     throw new Error(
       `UV_WASM_BROWSER is \`${named}\`, which is not one of ${Object.keys(ENGINES).join(", ")}`,

@@ -21,7 +21,7 @@ const SCENARIOS: readonly { name: string; index: string }[] = [
 ];
 
 const fixtures = resolve(root, "test/fixtures");
-const asked = process.env["UV_WASM_LIVE"] === "1";
+const asked = process.env.UV_WASM_LIVE === "1";
 const hasEngine = existsSync(wasmPath) && existsSync(jsPath);
 
 if (asked && !hasEngine) {

@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { asPythonVersion } from "./pyodide-versions.js";
 
-const manifestPath = process.env["UV_WASM_PYODIDE_MATRIX"] ?? "";
+const manifestPath = process.env.UV_WASM_PYODIDE_MATRIX ?? "";
 const asked = manifestPath !== "";
 
 if (asked && !existsSync(manifestPath)) {

@@ -38,12 +38,12 @@ describe("the hook call carries its arguments as one json payload", () => {
 
   it("survives a script full of quotes, backslashes and newlines", () => {
     const nasty = `print('''  " '' \\ \n ''')`;
-    expect(payloadOf(callOf(request({ script: nasty }), []))["script"]).toBe(nasty);
+    expect(payloadOf(callOf(request({ script: nasty }), [])).script).toBe(nasty);
   });
 
   it("cannot be closed early by a quote in a path uv chose", () => {
     const hostile = `/src"); import os; os.system("echo pwned`;
-    expect(payloadOf(callOf(request({ cwd: hostile }), []))["cwd"]).toBe(hostile);
+    expect(payloadOf(callOf(request({ cwd: hostile }), [])).cwd).toBe(hostile);
   });
 });
 

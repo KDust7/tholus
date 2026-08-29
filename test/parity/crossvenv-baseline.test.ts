@@ -13,7 +13,7 @@ const FIXTURE = resolve(root, "test/fixtures/install-pyodide");
 const REQUIREMENT = "msgpack==1.1.2";
 const WHEEL = "msgpack-1.1.2-cp314-cp314-pyemscripten_2026_0_wasm32.whl";
 
-const crossPython = process.env["UV_WASM_PYODIDE_PYTHON"] ?? "";
+const crossPython = process.env.UV_WASM_PYODIDE_PYTHON ?? "";
 const asked = crossPython !== "";
 const ready =
   asked &&
