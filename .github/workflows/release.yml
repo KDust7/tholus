@@ -104,13 +104,7 @@ jobs:
 
       - name: Publish all six, or none
         if: ${{ !inputs.dry_run }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NPM_TOKEN is unset; a publish would fail halfway and leave the SDK split."
-            exit 1
-          fi
           for name in engine-protocol transport-fetch transport-libcurl core pyodide xterm; do
-            npm publish "./packages/$name" --provenance --access public
+            npm publish "./packages/$name" --access public
           done
