@@ -6,7 +6,7 @@
   "license": "Apache-2.0 OR MIT",
   "description": "A static, framework-free page that runs uv in a terminal and hands the environment to Pyodide",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && esbuild dist/main.js --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/main.js --allow-overwrite --loader:.css=text && node copy-libcurl.mjs",
+    "build": "tsc -p tsconfig.build.json && esbuild dist/main.js --bundle --format=esm --platform=browser --target=es2022 --outfile=dist/main.js --allow-overwrite --loader:.css=text && node copy-libcurl.mjs && node build-site.mjs",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
