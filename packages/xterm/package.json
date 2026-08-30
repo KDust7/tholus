@@ -1,7 +1,6 @@
 {
   "name": "@tholus/xterm",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "license": "Apache-2.0 OR MIT",
   "description": "Drives a tholus engine from an xterm.js terminal, bytes verbatim",

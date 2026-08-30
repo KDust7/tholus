@@ -1,7 +1,6 @@
 {
   "name": "@tholus/engine-protocol",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "license": "Apache-2.0 OR MIT",
   "description": "Wire contract between the tholus engine worker and its host",

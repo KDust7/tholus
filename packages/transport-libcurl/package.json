@@ -1,7 +1,6 @@
 {
   "name": "@tholus/transport-libcurl",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "license": "Apache-2.0 OR MIT",
   "description": "A tholus transport over a host-supplied libcurl.js, for Wisp relays and a real User-Agent",

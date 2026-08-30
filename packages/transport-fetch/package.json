@@ -1,7 +1,6 @@
 {
   "name": "@tholus/transport-fetch",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "license": "Apache-2.0 OR MIT",
   "description": "The default tholus transport: the platform's own fetch, with the rewrites a browser forces",
