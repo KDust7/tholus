@@ -48,19 +48,19 @@ const status = (text: string): void => {
 function relayTransport(relayUrl: string) {
   return {
     kind: "libcurl",
-    moduleUrl: "/libcurl/libcurl.mjs",
-    wasmUrl: "/libcurl/libcurl.wasm",
+    moduleUrl: new URL("../libcurl/libcurl.mjs", import.meta.url).href,
+    wasmUrl: new URL("../libcurl/libcurl.wasm", import.meta.url).href,
     relayUrl,
     userAgent: USER_AGENT,
   } as const;
 }
 
 async function loadPyodide(): Promise<PyodideLike> {
-  const specifier = "/pyodide/pyodide.mjs";
+  const specifier = new URL("../pyodide/pyodide.mjs", import.meta.url).href;
   const module = (await import(specifier)) as {
     loadPyodide: (options: { indexURL: string }) => Promise<PyodideLike>;
   };
-  return module.loadPyodide({ indexURL: "/pyodide/" });
+  return module.loadPyodide({ indexURL: new URL("../pyodide/", import.meta.url).href });
 }
 
 async function main(): Promise<void> {
