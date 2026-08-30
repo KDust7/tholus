@@ -1,0 +1,83 @@
+name: pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "apps/demo/**"
+      - "packages/**"
+      - "crates/**"
+      - "xtask/**"
+      - "Cargo.lock"
+      - ".github/workflows/pages.yml"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  WASM_BINDGEN_VERSION: 0.2.126
+
+jobs:
+  build:
+    name: assemble the demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check out the fork
+        run: git submodule update --init --recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@${{ env.WASM_BINDGEN_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --linker=isolated --frozen-lockfile
+
+      - name: Build wasm artifact
+        run: cargo xtask build
+
+      - name: Build packages and assemble the site
+        run: bun run build
+
+      - name: Every file the page asks for is present
+        run: |
+          for file in index.html demo/main.js demo/worker.js assets/engine.js \
+                      assets/engine_bg.wasm libcurl/libcurl.mjs libcurl/libcurl.wasm; do
+            if [ ! -s "apps/demo/dist/site/$file" ]; then
+              echo "apps/demo/dist/site/$file is missing or empty, so the deployed page would 404."
+              exit 1
+            fi
+          done
+          du -sh apps/demo/dist/site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/demo/dist/site
+
+  deploy:
+    name: publish to pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
