@@ -29,6 +29,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage packages tools test/contract",
     "build": "bun run --filter './packages/*' build && bun run --filter './apps/*' build",
+    "site": "bun run --filter @tholus/demo site",
     "wasm:build": "cargo xtask build",
     "size": "bun run --filter @tholus/size-report report",
     "api": "bun run --filter @tholus/api-report report"

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { copyFile, mkdir, rm } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,6 +16,19 @@ const FILES = [
   ["libcurl/libcurl.mjs", join(here, "dist/libcurl/libcurl.mjs")],
   ["libcurl/libcurl.wasm", join(here, "dist/libcurl/libcurl.wasm")],
 ];
+
+const missing = FILES.filter(([, source]) => !existsSync(source));
+
+if (missing.length > 0) {
+  for (const [served, source] of missing) {
+    process.stderr.write(`${served} is missing: nothing at ${source}\n`);
+  }
+  process.stderr.write(
+    "The engine assets are gitignored and produced by `cargo xtask build`, " +
+      "so assembling the site before that step deploys a page that 404s.\n",
+  );
+  process.exit(1);
+}
 
 await rm(site, { recursive: true, force: true });
 

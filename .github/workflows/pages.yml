@@ -53,8 +53,11 @@ jobs:
       - name: Build wasm artifact
         run: cargo xtask build
 
-      - name: Build packages and assemble the site
+      - name: Build packages
         run: bun run build
+
+      - name: Assemble the site
+        run: bun run site
 
       - name: Every file the page asks for is present
         run: |
