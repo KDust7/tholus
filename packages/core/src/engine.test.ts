@@ -41,17 +41,42 @@ describe("handshake", () => {
     await expect(createEngine({ endpoint })).rejects.toBeInstanceOf(ProtocolMismatchError);
   });
 
-  it("times out on a silent engine", async () => {
+  it("times out on a silent engine, and does not leave the worker running", async () => {
+    let terminated = 0;
     const endpoint = () => ({
       postMessage: () => {},
       addEventListener: () => {},
       removeEventListener: () => {},
-      terminate: () => {},
+      terminate: () => {
+        terminated += 1;
+      },
     });
 
     await expect(createEngine({ endpoint, handshakeTimeoutMs: 20 })).rejects.toBeInstanceOf(
       EngineCrashedError,
     );
+    expect(
+      terminated,
+      "a worker left running holds the cache lock for the whole origin, so the next boot in any tab waits forever",
+    ).toBe(1);
+  });
+
+  it("does not leave the worker running when the engine reports a bad protocol", async () => {
+    const mock = createMockEngine({ build: { engine: "1.0.0", uv: "0.12.3", protocol: "42" } });
+    let terminated = 0;
+    const endpoint = () => ({
+      postMessage: (message: unknown) => mock.postMessage(message),
+      addEventListener: (type: "message", listener: (event: { data: unknown }) => void) =>
+        mock.addEventListener(type, listener),
+      removeEventListener: (type: "message", listener: (event: { data: unknown }) => void) =>
+        mock.removeEventListener(type, listener),
+      terminate: () => {
+        terminated += 1;
+      },
+    });
+
+    await expect(createEngine({ endpoint })).rejects.toBeInstanceOf(ProtocolMismatchError);
+    expect(terminated).toBe(1);
   });
 });
 

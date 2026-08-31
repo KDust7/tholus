@@ -278,7 +278,13 @@ export async function createEngine(options: EngineOptions = {}): Promise<Engine>
     });
   });
 
-  const build = await handshake;
+  let build: BuildIdentity;
+  try {
+    build = await handshake;
+  } catch (error) {
+    endpoint.terminate();
+    throw error;
+  }
 
   const routeMessage = (event: { data: unknown }): void => {
     let message: WorkerMessage;
