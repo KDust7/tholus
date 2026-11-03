@@ -142,6 +142,20 @@ const { entries, bytes } = await engine.exportTree("/work/.venv/lib/python3.14/s
 One transferable buffer plus an offset table, instead of a chatty filesystem API. This is what you
 hand to Pyodide; see [pyodide.md](pyodide.md).
 
+## Handing uv files of your own
+
+uv reads `requirements.txt`, `pyproject.toml`, `uv.lock` and local wheels from its own filesystem,
+not the page's. `importTree` is the way in, and takes the same shape `exportTree` returns:
+
+```ts
+await engine.importTree("/work", { entries, bytes }, { replace: true });
+```
+
+Paths in `entries` are relative to the root and may not climb out of it. Without `replace` the tree
+is laid over whatever is already there; with it the root is removed first, so the engine's copy
+matches what you sent and a file you deleted on your side does not linger on uv's. The promise
+resolves with the files, links and bytes written.
+
 ## Finishing
 
 `engine.dispose()` drains in-flight work, flushes the cache and closes the worker. `engine.terminate()`

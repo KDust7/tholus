@@ -1,6 +1,6 @@
 # @tholus/engine-protocol
 
-97 public exports.
+101 public exports.
 
 ```ts
 export type AckMessage = z.infer<typeof ackMessageSchema>;
@@ -590,7 +590,7 @@ hookWriteSchema: z.ZodObject<{
     removed: z.ZodArray<z.ZodString>;
 }, z.core.$strip>
 
-HOST_MESSAGE_TYPES: readonly ["init", "exec", "resize", "cancel", "ack", "dispose", "exportTree", "attachRuntime", "detachRuntime", "hookResult"]
+HOST_MESSAGE_TYPES: readonly ["init", "exec", "resize", "cancel", "ack", "dispose", "exportTree", "importTree", "attachRuntime", "detachRuntime", "hookResult"]
 
 export type HostMessage = z.infer<typeof hostMessageSchema>;
 
@@ -695,6 +695,22 @@ hostMessageSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
     id: z.ZodString;
     path: z.ZodString;
 }, z.core.$strip>, z.ZodObject<{
+    type: z.ZodLiteral<"importTree">;
+    id: z.ZodString;
+    root: z.ZodString;
+    entries: z.ZodArray<z.ZodDiscriminatedUnion<[z.ZodObject<{
+        kind: z.ZodLiteral<"file">;
+        path: z.ZodString;
+        offset: z.ZodNumber;
+        length: z.ZodNumber;
+    }, z.core.$strip>, z.ZodObject<{
+        kind: z.ZodLiteral<"symlink">;
+        path: z.ZodString;
+        target: z.ZodString;
+    }, z.core.$strip>], "kind">>;
+    bytes: z.ZodCustom<Uint8Array<ArrayBufferLike>, Uint8Array<ArrayBufferLike>>;
+    replace: z.ZodOptional<z.ZodBoolean>;
+}, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"attachRuntime">;
 }, z.core.$strip>, z.ZodObject<{
     type: z.ZodLiteral<"detachRuntime">;
@@ -744,6 +760,60 @@ hostMessageSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
         }, z.core.$strip>;
     }, z.core.$strip>], "ok">;
 }, z.core.$strip>], "type">
+
+export type ImportTreeMessage = z.infer<typeof importTreeMessageSchema>;
+
+importTreeMessageSchema: z.ZodObject<{
+    type: z.ZodLiteral<"importTree">;
+    id: z.ZodString;
+    root: z.ZodString;
+    entries: z.ZodArray<z.ZodDiscriminatedUnion<[z.ZodObject<{
+        kind: z.ZodLiteral<"file">;
+        path: z.ZodString;
+        offset: z.ZodNumber;
+        length: z.ZodNumber;
+    }, z.core.$strip>, z.ZodObject<{
+        kind: z.ZodLiteral<"symlink">;
+        path: z.ZodString;
+        target: z.ZodString;
+    }, z.core.$strip>], "kind">>;
+    bytes: z.ZodCustom<Uint8Array<ArrayBufferLike>, Uint8Array<ArrayBufferLike>>;
+    replace: z.ZodOptional<z.ZodBoolean>;
+}, z.core.$strip>
+
+export type ImportTreeResultMessage = z.infer<typeof importTreeResultMessageSchema>;
+
+importTreeResultMessageSchema: z.ZodObject<{
+    type: z.ZodLiteral<"importTreeResult">;
+    id: z.ZodString;
+    outcome: z.ZodDiscriminatedUnion<[z.ZodObject<{
+        ok: z.ZodLiteral<true>;
+        files: z.ZodNumber;
+        links: z.ZodNumber;
+        bytes: z.ZodNumber;
+    }, z.core.$strip>, z.ZodObject<{
+        ok: z.ZodLiteral<false>;
+        error: z.ZodObject<{
+            code: z.ZodEnum<{
+                network: "network";
+                "resolution-conflict": "resolution-conflict";
+                "package-not-found": "package-not-found";
+                "hash-mismatch": "hash-mismatch";
+                "no-runtime-attached": "no-runtime-attached";
+                "sdist-needs-runtime": "sdist-needs-runtime";
+                "runtime-required": "runtime-required";
+                "build-failed": "build-failed";
+                unsupported: "unsupported";
+                "invalid-config": "invalid-config";
+                cancelled: "cancelled";
+                "engine-crashed": "engine-crashed";
+                "protocol-mismatch": "protocol-mismatch";
+            }>;
+            message: z.ZodString;
+            data: z.ZodOptional<z.ZodUnknown>;
+        }, z.core.$strip>;
+    }, z.core.$strip>], "ok">;
+}, z.core.$strip>
 
 export type IndexOptions = z.infer<typeof indexOptionsSchema>;
 
@@ -1027,7 +1097,7 @@ ttySizeSchema: z.ZodObject<{
     rows: z.ZodNumber;
 }, z.core.$strip>
 
-WORKER_MESSAGE_TYPES: readonly ["initResult", "bootProgress", "output", "event", "exit", "fatal", "exportTreeResult", "hookRequest"]
+WORKER_MESSAGE_TYPES: readonly ["initResult", "bootProgress", "output", "event", "exit", "fatal", "exportTreeResult", "importTreeResult", "hookRequest"]
 
 export type WorkerMessage = z.infer<typeof workerMessageSchema>;
 
@@ -1216,6 +1286,36 @@ workerMessageSchema: z.ZodDiscriminatedUnion<[z.ZodObject<{
             target: z.ZodString;
         }, z.core.$strip>], "kind">>;
         bytes: z.ZodCustom<Uint8Array<ArrayBufferLike>, Uint8Array<ArrayBufferLike>>;
+    }, z.core.$strip>, z.ZodObject<{
+        ok: z.ZodLiteral<false>;
+        error: z.ZodObject<{
+            code: z.ZodEnum<{
+                network: "network";
+                "resolution-conflict": "resolution-conflict";
+                "package-not-found": "package-not-found";
+                "hash-mismatch": "hash-mismatch";
+                "no-runtime-attached": "no-runtime-attached";
+                "sdist-needs-runtime": "sdist-needs-runtime";
+                "runtime-required": "runtime-required";
+                "build-failed": "build-failed";
+                unsupported: "unsupported";
+                "invalid-config": "invalid-config";
+                cancelled: "cancelled";
+                "engine-crashed": "engine-crashed";
+                "protocol-mismatch": "protocol-mismatch";
+            }>;
+            message: z.ZodString;
+            data: z.ZodOptional<z.ZodUnknown>;
+        }, z.core.$strip>;
+    }, z.core.$strip>], "ok">;
+}, z.core.$strip>, z.ZodObject<{
+    type: z.ZodLiteral<"importTreeResult">;
+    id: z.ZodString;
+    outcome: z.ZodDiscriminatedUnion<[z.ZodObject<{
+        ok: z.ZodLiteral<true>;
+        files: z.ZodNumber;
+        links: z.ZodNumber;
+        bytes: z.ZodNumber;
     }, z.core.$strip>, z.ZodObject<{
         ok: z.ZodLiteral<false>;
         error: z.ZodObject<{

@@ -600,6 +600,90 @@ describe("the engine worker speaks the host protocol", () => {
   });
 });
 
+describe("the engine worker imports trees the host sends", () => {
+  const tree = (files: Record<string, string>) => {
+    const parts = Object.entries(files).map(([path, text]) => ({
+      path,
+      bytes: encoder.encode(text),
+    }));
+    const bytes = new Uint8Array(parts.reduce((sum, part) => sum + part.bytes.byteLength, 0));
+    let offset = 0;
+    const entries = parts.map(({ path, bytes: chunk }) => {
+      bytes.set(chunk, offset);
+      const entry = { kind: "file" as const, path, offset, length: chunk.byteLength };
+      offset += chunk.byteLength;
+      return entry;
+    });
+    return { entries, bytes };
+  };
+
+  it("writes the files into the engine's filesystem and reports what it wrote", async () => {
+    const test = harness();
+    await init(test);
+    test.worker.receive({
+      type: "importTree",
+      id: "t1",
+      root: "/work",
+      ...tree({ "requirements.txt": "idna\n", "src/app.py": "print(1)" }),
+    });
+    await test.worker.settled;
+
+    expect(test.emitted.at(-1)).toEqual({
+      type: "importTreeResult",
+      id: "t1",
+      outcome: { ok: true, files: 2, links: 0, bytes: 13 },
+    });
+    expect(new TextDecoder().decode(test.engines[0]?.fsRead("/work/requirements.txt"))).toBe(
+      "idna\n",
+    );
+  });
+
+  it("keeps what was already there unless the host asks to replace it", async () => {
+    const test = harness();
+    await init(test);
+    test.engines[0]?.fsWrite("/work/stale.txt", encoder.encode("old"));
+
+    test.worker.receive({ type: "importTree", id: "t1", root: "/work", ...tree({ a: "1" }) });
+    await test.worker.settled;
+    expect(test.engines[0]?.fsKind("/work/stale.txt")).toBe("file");
+
+    test.worker.receive({
+      type: "importTree",
+      id: "t2",
+      root: "/work",
+      replace: true,
+      ...tree({ a: "1" }),
+    });
+    await test.worker.settled;
+    expect(test.engines[0]?.fsKind("/work/stale.txt")).toBeUndefined();
+    expect(test.engines[0]?.fsKind("/work/a")).toBe("file");
+  });
+
+  it("refuses an entry that escapes the root without writing anything", async () => {
+    const test = harness();
+    await init(test);
+    test.worker.receive({ type: "importTree", id: "t1", root: "/work", ...tree({ "../x": "1" }) });
+    await test.worker.settled;
+
+    expect(test.emitted.at(-1)).toMatchObject({
+      type: "importTreeResult",
+      id: "t1",
+      outcome: { ok: false, error: { code: "unsupported" } },
+    });
+    expect(test.engines[0]?.fsKind("/x")).toBeUndefined();
+  });
+
+  it("refuses to import before init rather than crashing", async () => {
+    const test = harness();
+    test.worker.receive({ type: "importTree", id: "t1", root: "/work", ...tree({}) });
+    await test.worker.settled;
+    expect(test.emitted.at(-1)).toMatchObject({
+      type: "importTreeResult",
+      outcome: { ok: false, error: { code: "invalid-config" } },
+    });
+  });
+});
+
 describe("the engine worker hands the environment to the engine", () => {
   it("installs the configured environment when it initializes", async () => {
     const test = harness();

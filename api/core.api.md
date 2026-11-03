@@ -1,6 +1,6 @@
 # @tholus/core
 
-124 public exports.
+125 public exports.
 
 ```ts
 export declare function applyHookWrites(vfs: HookVfs, writes: readonly HookWrite[]): void;
@@ -135,6 +135,7 @@ export interface Engine {
     readonly venv: ReturnType<typeof createVenvApi>;
     exec(argv: string[], options?: ExecOptions): ExecHandle;
     exportTree(path: string): Promise<ExportedTree>;
+    importTree(root: string, tree: ExportedTree, options?: ImportTreeOptions): Promise<ImportedTree>;
     attachRuntime(handler: RuntimeHandler): () => void;
     onEvent(listener: (event: EngineEvent) => void): () => void;
     dispose(): Promise<void>;
@@ -369,6 +370,11 @@ export interface ImportedTree {
 }
 
 export declare function importTree(vfs: ImportVfs, root: string, entries: readonly TreeEntry[], bytes: Uint8Array): ImportedTree;
+
+export interface ImportTreeOptions {
+    /** Remove whatever is at `root` first, so the engine's copy matches the tree exactly. */
+    replace?: boolean;
+}
 
 export interface ImportVfs {
     fsWrite(path: string, contents: Uint8Array): void;

@@ -13,7 +13,7 @@ import { createFetchTransport } from "@tholus/transport-fetch";
 import { createLibcurlTransport, type LibcurlModule } from "@tholus/transport-libcurl";
 import { PROGRAM_NAME } from "./brand.js";
 import { cacheRoot, resolveEnvironment } from "./config-env.js";
-import { exportTree } from "./export-tree.js";
+import { exportTree, importTree } from "./export-tree.js";
 import {
   applyHookWrites,
   hookTrees,
@@ -612,6 +612,35 @@ export function createEngineWorker(options: EngineWorkerOptions): EngineWorker {
           } catch (error) {
             emit({
               type: "exportTreeResult",
+              id: message.id,
+              outcome: { ok: false, error: { code: "unsupported", message: describe(error) } },
+            });
+          }
+        });
+        return;
+      case "importTree":
+        enqueue(async () => {
+          const handle = engine;
+          if (!handle) {
+            emit({
+              type: "importTreeResult",
+              id: message.id,
+              outcome: {
+                ok: false,
+                error: { code: "invalid-config", message: "the engine is not initialized" },
+              },
+            });
+            return;
+          }
+          try {
+            if (message.replace && handle.fsKind(message.root) === "directory") {
+              handle.fsRemoveDir(message.root);
+            }
+            const imported = importTree(handle, message.root, message.entries, message.bytes);
+            emit({ type: "importTreeResult", id: message.id, outcome: { ok: true, ...imported } });
+          } catch (error) {
+            emit({
+              type: "importTreeResult",
               id: message.id,
               outcome: { ok: false, error: { code: "unsupported", message: describe(error) } },
             });

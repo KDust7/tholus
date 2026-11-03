@@ -132,6 +132,15 @@ export const hookResultMessageSchema = z.object({
   ]),
 });
 
+export const importTreeMessageSchema = z.object({
+  type: z.literal("importTree"),
+  id: z.string(),
+  root: z.string(),
+  entries: z.array(treeEntrySchema),
+  bytes: binarySchema,
+  replace: z.boolean().optional(),
+});
+
 export const hostMessageSchema = z.discriminatedUnion("type", [
   initMessageSchema,
   execMessageSchema,
@@ -140,6 +149,7 @@ export const hostMessageSchema = z.discriminatedUnion("type", [
   ackMessageSchema,
   disposeMessageSchema,
   exportTreeMessageSchema,
+  importTreeMessageSchema,
   attachRuntimeMessageSchema,
   detachRuntimeMessageSchema,
   hookResultMessageSchema,
@@ -212,6 +222,20 @@ export const exportTreeResultMessageSchema = z.object({
   ]),
 });
 
+export const importTreeResultMessageSchema = z.object({
+  type: z.literal("importTreeResult"),
+  id: z.string(),
+  outcome: z.discriminatedUnion("ok", [
+    z.object({
+      ok: z.literal(true),
+      files: z.number().int().nonnegative(),
+      links: z.number().int().nonnegative(),
+      bytes: z.number().int().nonnegative(),
+    }),
+    z.object({ ok: z.literal(false), error: structuredErrorSchema }),
+  ]),
+});
+
 export const workerMessageSchema = z.discriminatedUnion("type", [
   initResultMessageSchema,
   bootProgressMessageSchema,
@@ -220,6 +244,7 @@ export const workerMessageSchema = z.discriminatedUnion("type", [
   exitMessageSchema,
   fatalMessageSchema,
   exportTreeResultMessageSchema,
+  importTreeResultMessageSchema,
   hookRequestMessageSchema,
 ]);
 export type WorkerMessage = z.infer<typeof workerMessageSchema>;
@@ -238,6 +263,8 @@ export type ExitMessage = z.infer<typeof exitMessageSchema>;
 export type FatalMessage = z.infer<typeof fatalMessageSchema>;
 export type ExportTreeMessage = z.infer<typeof exportTreeMessageSchema>;
 export type ExportTreeResultMessage = z.infer<typeof exportTreeResultMessageSchema>;
+export type ImportTreeMessage = z.infer<typeof importTreeMessageSchema>;
+export type ImportTreeResultMessage = z.infer<typeof importTreeResultMessageSchema>;
 export type AttachRuntimeMessage = z.infer<typeof attachRuntimeMessageSchema>;
 export type DetachRuntimeMessage = z.infer<typeof detachRuntimeMessageSchema>;
 export type HookRequestMessage = z.infer<typeof hookRequestMessageSchema>;
@@ -251,6 +278,7 @@ export const HOST_MESSAGE_TYPES = [
   "ack",
   "dispose",
   "exportTree",
+  "importTree",
   "attachRuntime",
   "detachRuntime",
   "hookResult",
@@ -264,6 +292,7 @@ export const WORKER_MESSAGE_TYPES = [
   "exit",
   "fatal",
   "exportTreeResult",
+  "importTreeResult",
   "hookRequest",
 ] as const;
 

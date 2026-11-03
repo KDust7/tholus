@@ -557,6 +557,55 @@ describe("the parts of the handle a host reaches for after the first command", (
     await expect(engine.exportTree("/work")).rejects.toBeInstanceOf(EngineCrashedError);
   });
 
+  it("sends an imported tree and resolves with what the engine wrote", async () => {
+    const test = wire();
+    const engine = await createEngine({ endpoint: test.endpoint });
+
+    const bytes = new Uint8Array([104, 105]);
+    const imported = engine.importTree(
+      "/work",
+      { entries: [{ kind: "file", path: "requirements.txt", offset: 0, length: 2 }], bytes },
+      { replace: true },
+    );
+    const request = test.sent.find((message) => message.type === "importTree");
+    expect(request).toMatchObject({ root: "/work", replace: true, bytes });
+
+    test.reply({
+      type: "importTreeResult",
+      id: request?.id,
+      outcome: { ok: true, files: 1, links: 0, bytes: 2 },
+    });
+
+    await expect(imported).resolves.toEqual({ files: 1, links: 0, bytes: 2 });
+    engine.terminate();
+  });
+
+  it("rejects an import the engine refused, with the engine's own error", async () => {
+    const test = wire();
+    const engine = await createEngine({ endpoint: test.endpoint });
+
+    const imported = engine.importTree("/work", { entries: [], bytes: new Uint8Array() });
+    const request = test.sent.find((message) => message.type === "importTree");
+    expect(request).not.toHaveProperty("replace");
+    test.reply({
+      type: "importTreeResult",
+      id: request?.id,
+      outcome: { ok: false, error: { code: "unsupported", message: "../x escapes the tree" } },
+    });
+
+    await expect(imported).rejects.toThrow("../x escapes the tree");
+    engine.terminate();
+  });
+
+  it("refuses to import once the engine is disposed", async () => {
+    const test = wire();
+    const engine = await createEngine({ endpoint: test.endpoint });
+    await engine.dispose();
+    await expect(
+      engine.importTree("/work", { entries: [], bytes: new Uint8Array() }),
+    ).rejects.toBeInstanceOf(EngineCrashedError);
+  });
+
   it("attaches a runtime and detaches it exactly once", async () => {
     const test = wire();
     const engine = await createEngine({ endpoint: test.endpoint });
