@@ -35,6 +35,25 @@ found relative to the worker. If your layout differs, pass `workerUrl`.
 await createEngine({ workerUrl: new URL("/vendor/uv/worker.js", location.origin) });
 ```
 
+A bundler that renames or relocates assets breaks that relative lookup. In that case run the worker
+yourself with `createEngineWorker` and hand it the engine through the package's own subpaths, so the
+bundler sees and emits both:
+
+```ts
+// my-uv-worker.ts
+import { createEngineWorker } from "@tholus/core";
+import wasmUrl from "@tholus/core/engine.wasm?url";
+
+const worker = createEngineWorker({
+  load: () => import("@tholus/core/engine"),
+  wasm: () => new URL(wasmUrl, self.location.href),
+  emit: (message) => self.postMessage(message),
+});
+self.addEventListener("message", (event) => worker.receive(event.data));
+```
+
+Then pass `endpoint: () => new Worker(new URL("./my-uv-worker.ts", import.meta.url), { type: "module" })`.
+
 ## Running a command
 
 `argv` starts at the subcommand. The program name is the engine's business, not yours.

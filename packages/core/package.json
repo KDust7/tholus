@@ -31,7 +31,9 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./engine": "./assets/engine.js",
+    "./engine.wasm": "./assets/engine_bg.wasm"
   },
   "files": [
     "dist",
